@@ -63,7 +63,7 @@ function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChange(async (user) => {
             if (user && user.email) {
                 setUserEmail(user.email)
                 const userRef = doc(db, "users", user.uid);
