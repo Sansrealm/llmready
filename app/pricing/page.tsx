@@ -71,13 +71,13 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-gray-400">
                     <X className="h-5 w-5 text-gray-300" />
-                    <span>Email reports</span>
+                    <span>Keyword and Industry based Analysis</span>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button variant="outline" className="w-full" asChild>
+                  {/* <Button variant="outline" className="w-full" asChild>
                     <Link href="/signup">Get Started Free</Link>
-                  </Button>
+                  </Button> */}
                 </CardFooter>
               </Card>
               <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
@@ -130,7 +130,7 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span>Email reports</span>
+                    <span>Keyword and Industry based Analysis</span>
                   </div>
                 </CardContent>
                 <CardFooter>

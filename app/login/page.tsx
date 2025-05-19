@@ -11,6 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
+import { createUserWithEmailAndPassword } from "firebase/auth"
+import { auth } from "@/lib/firebase"
+import { useRouter } from "next/navigation"
+import { GithubAuthProvider, signInWithPopup } from "firebase/auth"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -25,14 +29,44 @@ export default function AuthPage() {
     }, 1500)
   }
 
-  const handleSignup = (e: React.FormEvent) => {
+  const router = useRouter()
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
+
+    const email = (document.getElementById("signup-email") as HTMLInputElement)?.value
+    const password = (document.getElementById("signup-password") as HTMLInputElement)?.value
+    const confirmPassword = (document.getElementById("confirm-password") as HTMLInputElement)?.value
+
+    if (password !== confirmPassword) {
       setIsLoading(false)
-      // Redirect would happen here
-    }, 1500)
+      alert("Passwords do not match")
+      return
+    }
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, password)
+      router.push("/dashboard") // or wherever you want to redirect
+    } catch (error: any) {
+      alert(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGitHubLogin = async () => {
+    setIsLoading(true)
+    const provider = new GithubAuthProvider()
+
+    try {
+      await signInWithPopup(auth, provider)
+      router.push("/dashboard") // or wherever after login
+    } catch (error: any) {
+      alert(error.message)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -94,7 +128,9 @@ export default function AuthPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <Button variant="outline">Google</Button>
-                      <Button variant="outline">GitHub</Button>
+                      <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
+                        {isLoading ? "Loading..." : "GitHub"}
+                      </Button>
                     </div>
                   </CardFooter>
                 </Card>
@@ -148,7 +184,9 @@ export default function AuthPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <Button variant="outline">Google</Button>
-                      <Button variant="outline">GitHub</Button>
+                      <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
+                        {isLoading ? "Loading..." : "GitHub"}
+                      </Button>
                     </div>
                   </CardFooter>
                 </Card>

@@ -14,6 +14,18 @@ import Link from "next/link"
 import { ScoreGauge } from "@/components/score-gauge"
 import { ParameterScoreCard } from "@/components/parameter-score-card"
 import { RecommendationCard } from "@/components/recommendation-card"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
+import { db } from "@/lib/firebase"
+import {
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    increment,
+    serverTimestamp,
+} from "firebase/firestore"
+import { auth } from "@/lib/firebase"
 
 interface Parameter {
     name: string
@@ -74,12 +86,23 @@ export default function ResultsPage() {
     //     fetchAnalysis()
     // }, [url])
 
+    const [userEmail, setUserEmail] = useState(email) // default to query param
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user && user.email) {
+                setUserEmail(user.email) // override with Firebase-authenticated email
+            }
+        })
+        return () => unsubscribe()
+    }, [])
+
     useEffect(() => {
         const fetchAnalysis = async () => {
             setLoading(true);
             setError(null);
 
-            const cacheKey = `llm_analysis_${url}_${email}_${industry}_${turnstileToken}`;
+            const cacheKey = `llm_analysis_${url}_${userEmail}_${industry}_${turnstileToken}`;
             const cached = sessionStorage.getItem(cacheKey);
 
             if (cached) {
@@ -92,7 +115,7 @@ export default function ResultsPage() {
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, email, industry, turnstileToken }),
+                    body: JSON.stringify({ url, email: userEmail, industry, turnstileToken }),
                 });
 
                 if (!response.ok) {
@@ -100,9 +123,34 @@ export default function ResultsPage() {
                     throw new Error(errorData.message || 'Analysis failed');
                 }
 
-                const data = await response.json();
-                sessionStorage.setItem(cacheKey, JSON.stringify(data));
-                setAnalysisResult(data);
+                const data = await response.json()
+                sessionStorage.setItem(cacheKey, JSON.stringify(data))
+                setAnalysisResult(data)
+
+                // 🔐 Save user info in Firestore
+                const user = auth.currentUser
+                if (user) {
+                    const userRef = doc(db, "users", user.uid)
+
+                    const userSnap = await getDoc(userRef)
+                    if (userSnap.exists()) {
+                        // Update existing user
+                        await updateDoc(userRef, {
+                            lastUsedAt: serverTimestamp(),
+                            analysisCount: increment(1),
+                        })
+                    } else {
+                        // Create new user record
+                        await setDoc(userRef, {
+                            uid: user.uid,
+                            email: user.email,
+                            createdAt: serverTimestamp(),
+                            lastUsedAt: serverTimestamp(),
+                            analysisCount: 1,
+                            isPaid: false,
+                        })
+                    }
+                }
             } catch (err) {
                 console.error(err);
                 setError(err instanceof Error ? err.message : 'Failed to analyze website');
