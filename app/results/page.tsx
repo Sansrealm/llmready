@@ -233,7 +233,7 @@ export default function ResultsPage() {
                                         title={rec.title}
                                         description={rec.description}
                                         difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
-                                        impact={rec.impact}
+                                        impact={rec.impact as "Low" | "Medium" | "High"}
                                         isPremium={false}
                                     />
                                 ))}
@@ -243,7 +243,7 @@ export default function ResultsPage() {
                                         title={rec.title}
                                         description={rec.description}
                                         difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
-                                        impact={rec.impact}
+                                        impact={rec.impact as "Low" | "Medium" | "High"}
                                         isPremium
                                     />
                                 ))}
@@ -253,7 +253,7 @@ export default function ResultsPage() {
                                         title={rec.title}
                                         description={rec.description}
                                         difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
-                                        impact={rec.impact}
+                                        impact={rec.impact as "Low" | "Medium" | "High"}
                                     />
                                 ))}
                             </div>
