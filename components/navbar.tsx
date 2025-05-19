@@ -1,18 +1,31 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu } from "lucide-react"
+import { Menu, LogOut, User as UserIcon } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { auth, logOut } from "@/lib/firebase"
+import { onAuthStateChanged, User } from "firebase/auth"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const pathname = usePathname()
+  const router = useRouter()
 
-  // This would come from your auth context in a real app
-  const isLoggedIn = false
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, setUser)
+    return () => unsubscribe()
+  }, [])
+
+  const handleLogout = async () => {
+    await logOut()
+    router.push("/login")
+  }
 
   const navigation = [
     { name: "Home", href: "/" },
@@ -39,8 +52,8 @@ export default function Navbar() {
               key={item.name}
               href={item.href}
               className={`text-sm font-medium ${pathname === item.href
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
                 }`}
             >
               {item.name}
@@ -49,10 +62,25 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex md:items-center md:gap-4">
-          {isLoggedIn ? (
-            <Button asChild>
-              <Link href="/profile">My Account</Link>
-            </Button>
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src="/placeholder-avatar.jpg" />
+                  <AvatarFallback>{user.email?.charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="flex items-center gap-2">
+                    <UserIcon className="h-4 w-4" /> Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <>
               <Button variant="ghost" asChild>
@@ -87,8 +115,8 @@ export default function Navbar() {
                     key={item.name}
                     href={item.href}
                     className={`text-lg font-medium ${pathname === item.href
-                        ? "text-blue-600 dark:text-blue-400"
-                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
                       }`}
                     onClick={() => setIsOpen(false)}
                   >
@@ -98,9 +126,9 @@ export default function Navbar() {
               </nav>
 
               <div className="flex flex-col gap-2 pt-6">
-                {isLoggedIn ? (
-                  <Button asChild onClick={() => setIsOpen(false)}>
-                    <Link href="/profile">My Account</Link>
+                {user ? (
+                  <Button asChild onClick={() => { setIsOpen(false); router.push("/profile") }}>
+                    <span>My Account</span>
                   </Button>
                 ) : (
                   <>

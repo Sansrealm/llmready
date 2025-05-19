@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,25 +11,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
-import { createUserWithEmailAndPassword } from "firebase/auth"
-import { auth } from "@/lib/firebase"
-import { useRouter } from "next/navigation"
-import { GithubAuthProvider, signInWithPopup } from "firebase/auth"
+import { auth, signInWithEmail, signUpWithEmail, signInWithGithub } from "@/lib/firebase"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      // Redirect would happen here
-    }, 1500)
-  }
 
-  const router = useRouter()
+    const email = (document.getElementById("email") as HTMLInputElement)?.value
+    const password = (document.getElementById("password") as HTMLInputElement)?.value
+
+    const { user, error } = await signInWithEmail(email, password)
+    setIsLoading(false)
+
+    if (user) {
+      router.push("/analyze")
+    } else {
+      alert(error)
+    }
+  }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,27 +48,25 @@ export default function AuthPage() {
       return
     }
 
-    try {
-      await createUserWithEmailAndPassword(auth, email, password)
-      router.push("/dashboard") // or wherever you want to redirect
-    } catch (error: any) {
-      alert(error.message)
-    } finally {
-      setIsLoading(false)
+    const { user, error } = await signUpWithEmail(email, password)
+    setIsLoading(false)
+
+    if (user) {
+      router.push("/analyze")
+    } else {
+      alert(error)
     }
   }
 
   const handleGitHubLogin = async () => {
     setIsLoading(true)
-    const provider = new GithubAuthProvider()
+    const { user, error } = await signInWithGithub()
+    setIsLoading(false)
 
-    try {
-      await signInWithPopup(auth, provider)
-      router.push("/dashboard") // or wherever after login
-    } catch (error: any) {
-      alert(error.message)
-    } finally {
-      setIsLoading(false)
+    if (user) {
+      router.push("/analyze")
+    } else {
+      alert(error)
     }
   }
 
@@ -101,10 +102,7 @@ export default function AuthPage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password">Password</Label>
-                          <Link
-                            href="/forgot-password"
-                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
+                          <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                             Forgot password?
                           </Link>
                         </div>
