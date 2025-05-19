@@ -19,6 +19,7 @@ import { onAuthStateChanged } from "firebase/auth"
 import { auth, db, onAuthStateChange } from "@/lib/firebase"
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore"
 import AuthGuard from "@/components/AuthGuard"
+import type { User } from "firebase/auth"
 
 interface Parameter {
     name: string
@@ -63,7 +64,7 @@ function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChange(async (user) => {
+        const unsubscribe = onAuthStateChange(async (user: User | null) => {
             if (user && user.email) {
                 setUserEmail(user.email)
                 const userRef = doc(db, "users", user.uid);
