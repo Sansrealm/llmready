@@ -16,7 +16,7 @@ import { ScoreGauge } from "@/components/score-gauge"
 import { ParameterScoreCard } from "@/components/parameter-score-card"
 import { RecommendationCard } from "@/components/recommendation-card"
 import { onAuthStateChanged } from "firebase/auth"
-import { auth, db } from "@/lib/firebase"
+import { auth, db, onAuthStateChange } from "@/lib/firebase"
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore"
 import AuthGuard from "@/components/AuthGuard"
 
