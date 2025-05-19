@@ -1,8 +1,10 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc } from "firebase/firestore"
+import { auth, db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,11 +18,27 @@ import Footer from "@/components/footer"
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [userEmail, setUserEmail] = useState("")
+  const [isPaid, setIsPaid] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserEmail(user.email || "")
+        const userRef = doc(db, "users", user.uid)
+        const userSnap = await getDoc(userRef)
+        if (userSnap.exists()) {
+          const userData = userSnap.data()
+          setIsPaid(userData?.isPaid || false)
+        }
+      }
+    })
+    return () => unsubscribe()
+  }, [])
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
     setTimeout(() => {
       setIsLoading(false)
     }, 1500)
@@ -34,13 +52,13 @@ export default function ProfilePage() {
           <div className="mb-8 flex items-center gap-4">
             <Avatar className="h-16 w-16">
               <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarFallback>{userEmail.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-3xl font-bold">John Doe</h1>
+              <h1 className="text-3xl font-bold">{userEmail || "My Profile"}</h1>
               <div className="flex items-center gap-2">
-                <p className="text-gray-500 dark:text-gray-400">john.doe@example.com</p>
-                <Badge className="bg-green-600">Premium</Badge>
+                <p className="text-gray-500 dark:text-gray-400">{userEmail || "john.doe@example.com"}</p>
+                {isPaid && <Badge className="bg-green-600">Premium</Badge>}
               </div>
             </div>
           </div>
