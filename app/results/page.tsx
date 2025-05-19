@@ -228,13 +228,33 @@ export default function ResultsPage() {
                         <TabsContent value="recommendations">
                             <div className="grid gap-6 md:grid-cols-2">
                                 {freeRecs.map((rec, i) => (
-                                    <RecommendationCard key={i} {...rec} />
+                                    <RecommendationCard
+                                        key={i}
+                                        title={rec.title}
+                                        description={rec.description}
+                                        difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
+                                        impact={rec.impact}
+                                        isPremium={false}
+                                    />
                                 ))}
                                 {!isPremium && premiumRecs.map((rec, i) => (
-                                    <RecommendationCard key={i} {...rec} isPremium />
+                                    <RecommendationCard
+                                        key={i}
+                                        title={rec.title}
+                                        description={rec.description}
+                                        difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
+                                        impact={rec.impact}
+                                        isPremium
+                                    />
                                 ))}
                                 {isPremium && premiumRecs.map((rec, i) => (
-                                    <RecommendationCard key={i} {...rec} />
+                                    <RecommendationCard
+                                        key={i}
+                                        title={rec.title}
+                                        description={rec.description}
+                                        difficulty={rec.difficulty as "Easy" | "Medium" | "Hard"}
+                                        impact={rec.impact}
+                                    />
                                 ))}
                             </div>
                             {!isPremium && (
