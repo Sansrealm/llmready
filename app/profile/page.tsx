@@ -1,10 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
-import { onAuthStateChanged } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,37 +10,91 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Bell, CreditCard, LogOut, Settings, User } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Bell, CreditCard, LogOut, Settings, User, AlertCircle, CheckCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [userEmail, setUserEmail] = useState("")
-  const [isPaid, setIsPaid] = useState(false)
+  const [userData, setUserData] = useState<any>(null)
+  const router = useRouter()
 
+  // Load user data from localStorage on component mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUserEmail(user.email || "")
-        const userRef = doc(db, "users", user.uid)
-        const userSnap = await getDoc(userRef)
-        if (userSnap.exists()) {
-          const userData = userSnap.data()
-          setIsPaid(userData?.isPaid || false)
+    const checkUserData = () => {
+      try {
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          setUserData(JSON.parse(storedUser))
+        } else {
+          // Redirect to login if no user data found
+          router.push("/login?returnUrl=/profile")
         }
+      } catch (error) {
+        console.error("Error loading user data:", error)
+        router.push("/login?returnUrl=/profile")
       }
-    })
-    return () => unsubscribe()
-  }, [])
+    }
+
+    checkUserData()
+  }, [router])
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+
+    // Get form data
+    const formData = new FormData(e.target as HTMLFormElement)
+    const firstName = formData.get("first-name") as string
+    const lastName = formData.get("last-name") as string
+    const email = formData.get("email") as string
+    const company = formData.get("company") as string
+    const website = formData.get("website") as string
+
+    // Update user data in localStorage
     setTimeout(() => {
+      if (userData) {
+        const updatedUser = {
+          ...userData,
+          name: `${firstName} ${lastName}`,
+          email: email,
+          company: company,
+          website: website
+        }
+
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUserData(updatedUser)
+      }
+
       setIsLoading(false)
-    }, 1500)
+    }, 1000)
   }
+
+  const handleUpgradeSubscription = () => {
+    router.push("/pricing?from=profile")
+  }
+
+  const getInitials = (name: string) => {
+    if (!name) return "U"
+    return name.split(" ").map(n => n[0]).join("").toUpperCase()
+  }
+
+  if (!userData) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p>Loading profile...</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  const isFreeAccount = userData.accountType === "free"
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -51,17 +103,34 @@ export default function ProfilePage() {
         <div className="container px-4 py-8 md:px-6 md:py-12">
           <div className="mb-8 flex items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-              <AvatarFallback>{userEmail.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarImage src="/placeholder-user.jpg" alt={userData.name} />
+              <AvatarFallback>{getInitials(userData.name)}</AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-3xl font-bold">{userEmail || "My Profile"}</h1>
+              <h1 className="text-3xl font-bold">{userData.name}</h1>
               <div className="flex items-center gap-2">
-                <p className="text-gray-500 dark:text-gray-400">{userEmail || "john.doe@example.com"}</p>
-                {isPaid && <Badge className="bg-green-600">Premium</Badge>}
+                <p className="text-gray-500 dark:text-gray-400">{userData.email}</p>
+                <Badge className={isFreeAccount ? "bg-blue-600" : "bg-green-600"}>
+                  {isFreeAccount ? "Free" : "Premium"}
+                </Badge>
               </div>
             </div>
           </div>
+
+          {isFreeAccount && (
+            <Alert className="mb-6 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Free Account</AlertTitle>
+              <AlertDescription>
+                You're currently on a free account with limited features. Upgrade to Premium for unlimited website analyses and advanced insights.
+                <div className="mt-2">
+                  <Button onClick={handleUpgradeSubscription} className="bg-blue-600 hover:bg-blue-700">
+                    Upgrade to Premium
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid w-full grid-cols-4 md:w-auto">
@@ -94,52 +163,50 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="first-name">First name</Label>
-                        <Input id="first-name" defaultValue="John" />
+                        <Input
+                          id="first-name"
+                          name="first-name"
+                          defaultValue={userData.name ? userData.name.split(" ")[0] : ""}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="last-name">Last name</Label>
-                        <Input id="last-name" defaultValue="Doe" />
+                        <Input
+                          id="last-name"
+                          name="last-name"
+                          defaultValue={userData.name ? userData.name.split(" ").slice(1).join(" ") : ""}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" defaultValue="john.doe@example.com" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        defaultValue={userData.email}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="company">Company (Optional)</Label>
-                      <Input id="company" defaultValue="Acme Inc." />
+                      <Input
+                        id="company"
+                        name="company"
+                        defaultValue={userData.company || ""}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="website">Website (Optional)</Label>
-                      <Input id="website" type="url" defaultValue="https://example.com" />
+                      <Input
+                        id="website"
+                        name="website"
+                        type="url"
+                        defaultValue={userData.website || ""}
+                      />
                     </div>
                     <Button type="submit" disabled={isLoading}>
                       {isLoading ? "Saving..." : "Save Changes"}
                     </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Password</CardTitle>
-                  <CardDescription>Update your password</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="current-password">Current password</Label>
-                      <Input id="current-password" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">New password</Label>
-                      <Input id="new-password" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm password</Label>
-                      <Input id="confirm-password" type="password" />
-                    </div>
-                    <Button type="submit">Update Password</Button>
                   </form>
                 </CardContent>
               </Card>
@@ -156,94 +223,114 @@ export default function ProfilePage() {
                     <div className="rounded-lg border p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold">Premium Plan</h3>
-                          <p className="text-sm text-gray-500">$29/month</p>
+                          <h3 className="font-semibold">{isFreeAccount ? "Free Plan" : "Premium Plan"}</h3>
+                          <p className="text-sm text-gray-500">{isFreeAccount ? "Limited features" : "$29/month"}</p>
                         </div>
-                        <Badge>Active</Badge>
+                        <Badge>{isFreeAccount ? "Active" : "Active"}</Badge>
                       </div>
                       <div className="mt-4">
-                        <p className="text-sm">Next billing date: June 15, 2023</p>
+                        {isFreeAccount ? (
+                          <div className="space-y-2">
+                            <p className="text-sm">Features included:</p>
+                            <ul className="text-sm list-disc pl-5 space-y-1">
+                              <li>1 website analysis</li>
+                              <li>Basic LLM readiness score</li>
+                              <li>Limited recommendations</li>
+                            </ul>
+                            <Button
+                              onClick={handleUpgradeSubscription}
+                              className="mt-2 w-full md:w-auto"
+                            >
+                              Upgrade to Premium
+                            </Button>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm">Next billing date: June 15, 2023</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm">Features included:</p>
+                              <ul className="text-sm list-disc pl-5 space-y-1">
+                                <li>Unlimited website analyses</li>
+                                <li>Advanced LLM readiness metrics</li>
+                                <li>Detailed recommendations</li>
+                                <li>Priority support</li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="rounded-lg border p-4">
-                      <h3 className="font-semibold">Payment Method</h3>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="rounded bg-gray-100 p-2 dark:bg-gray-800">
-                          <CreditCard className="h-5 w-5" />
+                    {!isFreeAccount && (
+                      <>
+                        <div className="rounded-lg border p-4">
+                          <h3 className="font-semibold">Payment Method</h3>
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="rounded bg-gray-100 p-2 dark:bg-gray-800">
+                              <CreditCard className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Visa ending in 4242</p>
+                              <p className="text-xs text-gray-500">Expires 12/2025</p>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">Visa ending in 4242</p>
-                          <p className="text-xs text-gray-500">Expires 12/2025</p>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button variant="outline">Update Payment Method</Button>
-                      <Button
-                        variant="outline"
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                      >
-                        Cancel Subscription
-                      </Button>
-                    </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button variant="outline">Update Payment Method</Button>
+                          <Button
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+                          >
+                            Cancel Subscription
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Billing History</CardTitle>
-                  <CardDescription>View your past invoices</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">May 15, 2023</p>
-                          <p className="text-sm text-gray-500">Premium Plan - Monthly</p>
+              {!isFreeAccount && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Billing History</CardTitle>
+                    <CardDescription>View your past invoices</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="rounded-lg border p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">May 15, 2023</p>
+                            <p className="text-sm text-gray-500">Premium Plan - Monthly</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">$29.00</p>
+                            <Button variant="link" className="h-auto p-0 text-sm">
+                              Download
+                            </Button>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium">$29.00</p>
-                          <Button variant="link" className="h-auto p-0 text-sm">
-                            Download
-                          </Button>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">April 15, 2023</p>
+                            <p className="text-sm text-gray-500">Premium Plan - Monthly</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">$29.00</p>
+                            <Button variant="link" className="h-auto p-0 text-sm">
+                              Download
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">April 15, 2023</p>
-                          <p className="text-sm text-gray-500">Premium Plan - Monthly</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">$29.00</p>
-                          <Button variant="link" className="h-auto p-0 text-sm">
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">March 15, 2023</p>
-                          <p className="text-sm text-gray-500">Premium Plan - Monthly</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">$29.00</p>
-                          <Button variant="link" className="h-auto p-0 text-sm">
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="notifications" className="mt-6">
@@ -305,18 +392,6 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Marketing Emails</p>
-                        <p className="text-sm text-gray-500">Receive promotional offers and newsletters</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Label htmlFor="marketing-emails" className="sr-only">
-                          Toggle
-                        </Label>
-                        <input type="checkbox" id="marketing-emails" className="h-4 w-4 rounded border-gray-300" />
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
                 <CardFooter>
@@ -357,30 +432,28 @@ export default function ProfilePage() {
                       <option value="gmt">Greenwich Mean Time (GMT)</option>
                     </select>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="dark-mode" className="h-4 w-4 rounded border-gray-300" />
-                    <Label htmlFor="dark-mode">Enable Dark Mode</Label>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex flex-col items-start gap-4">
                   <Button>Save Settings</Button>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </CardFooter>
+                </CardContent>
               </Card>
 
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
-                  <CardDescription>Irreversible account actions</CardDescription>
+                  <CardDescription>Irreversible and destructive actions</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Button variant="destructive">Delete Account</Button>
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-red-200 p-4 dark:border-red-900">
+                    <h3 className="font-semibold text-red-600 dark:text-red-400">Delete Account</h3>
+                    <p className="mt-1 text-sm">
+                      Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+                    >
+                      Delete Account
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

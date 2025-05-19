@@ -1,30 +1,57 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, LogOut, User as UserIcon } from "lucide-react"
+import { Menu, User } from "lucide-react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { auth, logOut } from "@/lib/firebase"
-import { onAuthStateChanged, User } from "firebase/auth"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { usePathname } from "next/navigation"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userName, setUserName] = useState("")
   const pathname = usePathname()
-  const router = useRouter()
 
+  // Check login status from localStorage on component mount and window focus
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, setUser)
-    return () => unsubscribe()
+    const checkLoginStatus = () => {
+      try {
+        const userData = localStorage.getItem("user")
+        if (userData) {
+          const user = JSON.parse(userData)
+          setIsLoggedIn(user.isLoggedIn)
+          setUserName(user.name)
+        } else {
+          setIsLoggedIn(false)
+          setUserName("")
+        }
+      } catch (error) {
+        console.error("Error checking login status:", error)
+        setIsLoggedIn(false)
+      }
+    }
+
+    // Check on mount
+    checkLoginStatus()
+
+    // Check on window focus (in case user logs in/out in another tab)
+    window.addEventListener("focus", checkLoginStatus)
+
+    return () => {
+      window.removeEventListener("focus", checkLoginStatus)
+    }
   }, [])
 
-  const handleLogout = async () => {
-    await logOut()
-    router.push("/login")
+  const handleLogout = () => {
+    localStorage.removeItem("user")
+    setIsLoggedIn(false)
+    setUserName("")
+    setIsOpen(false)
+    // Redirect to home page if on a protected route
+    if (pathname.startsWith("/profile")) {
+      window.location.href = "/"
+    }
   }
 
   const navigation = [
@@ -62,32 +89,25 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex md:items-center md:gap-4">
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-avatar.jpg" />
-                  <AvatarFallback>{user.email?.charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="flex items-center gap-2">
-                    <UserIcon className="h-4 w-4" /> Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                  <LogOut className="mr-2 h-4 w-4" /> Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" className="flex items-center gap-2" asChild>
+                <Link href="/profile">
+                  <User className="h-4 w-4" />
+                  <span>{userName || "My Account"}</span>
+                </Link>
+              </Button>
+              <Button variant="outline" onClick={handleLogout}>
+                Logout
+              </Button>
+            </div>
           ) : (
             <>
               <Button variant="ghost" asChild>
                 <Link href="/login">Login</Link>
               </Button>
               <Button asChild>
-                <Link href="/signup">Sign Up</Link>
+                <Link href="/login?tab=signup">Sign Up</Link>
               </Button>
             </>
           )}
@@ -104,9 +124,9 @@ export default function Navbar() {
             <div className="flex flex-col gap-6 pt-6">
               <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-green-500 text-white">
-                  <span className="font-bold">LR</span>
+                  <span className="font-bold">LC</span>
                 </div>
-                <span className="text-lg font-bold">LLM Ready</span>
+                <span className="text-lg font-bold">LLM Check</span>
               </Link>
 
               <nav className="flex flex-col gap-4">
@@ -126,17 +146,22 @@ export default function Navbar() {
               </nav>
 
               <div className="flex flex-col gap-2 pt-6">
-                {user ? (
-                  <Button asChild onClick={() => { setIsOpen(false); router.push("/profile") }}>
-                    <span>My Account</span>
-                  </Button>
+                {isLoggedIn ? (
+                  <>
+                    <Button asChild onClick={() => setIsOpen(false)}>
+                      <Link href="/profile">My Account</Link>
+                    </Button>
+                    <Button variant="outline" onClick={handleLogout}>
+                      Logout
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button variant="outline" asChild onClick={() => setIsOpen(false)}>
                       <Link href="/login">Login</Link>
                     </Button>
                     <Button asChild onClick={() => setIsOpen(false)}>
-                      <Link href="/signup">Sign Up</Link>
+                      <Link href="/login?tab=signup">Sign Up</Link>
                     </Button>
                   </>
                 )}

@@ -1,4 +1,4 @@
-// ✅ APP/PAGE.TSX (Revised for post-login resume)
+// This file combines your original V0 layout with your working form functionality
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertCircle,
   CheckCircle2,
   ChevronRight,
   Globe,
@@ -31,7 +32,7 @@ import {
 import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import { auth } from "@/lib/firebase";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -39,24 +40,15 @@ export default function Home() {
   const [industry, setIndustry] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [analysisCount, setAnalysisCount] = useState(0);
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
   const router = useRouter();
 
-  // Auto-trigger after login if sessionStorage has data
+  // Load analysis count from localStorage on component mount
   useEffect(() => {
-    const pendingUrl = sessionStorage.getItem("pendingURL");
-    if (pendingUrl) {
-      const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
-      const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-      sessionStorage.removeItem("pendingURL");
-      sessionStorage.removeItem("pendingIndustry");
-      sessionStorage.removeItem("pendingEmail");
-      router.push(
-        `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(
-          pendingEmail
-        )}&industry=${encodeURIComponent(
-          pendingIndustry
-        )}&turnstileToken=dummy`
-      );
+    const storedCount = localStorage.getItem("guestAnalysisCount");
+    if (storedCount) {
+      setAnalysisCount(parseInt(storedCount, 10));
     }
   }, []);
 
@@ -65,30 +57,32 @@ export default function Home() {
     if (!url) return alert("Please enter a valid URL");
     if (!turnstileToken) return alert("Please complete the CAPTCHA challenge");
 
+    // Check if user has already performed an analysis
+    if (analysisCount >= 1) {
+      setShowLoginAlert(true);
+      // Scroll to the alert
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+      return;
+    }
+
     let processedUrl = url;
     try {
-      new URL(processedUrl);
+      const parsed = new URL(processedUrl);
     } catch {
       processedUrl = "https://" + processedUrl;
     }
 
-    const user = auth.currentUser;
-    if (!user) {
-      sessionStorage.setItem("pendingURL", processedUrl);
-      sessionStorage.setItem("pendingIndustry", industry);
-      sessionStorage.setItem("pendingEmail", email);
-      router.push("/login");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
+      // Increment the analysis count and store in localStorage
+      const newCount = analysisCount + 1;
+      setAnalysisCount(newCount);
+      localStorage.setItem("guestAnalysisCount", newCount.toString());
+
       router.push(
-        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(
-          email
-        )}&industry=${encodeURIComponent(
-          industry
-        )}&turnstileToken=${encodeURIComponent(turnstileToken)}`
+        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(industry)}&turnstileToken=${encodeURIComponent(turnstileToken)}`
       );
     } catch (error) {
       console.error("Error:", error);
@@ -98,10 +92,36 @@ export default function Home() {
     }
   };
 
+  const handleLoginRedirect = () => {
+    // Redirect to login page with return URL
+    router.push(`/login?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1">
+        {/* Login Alert */}
+        {showLoginAlert && (
+          <div className="container px-4 md:px-6 mt-4">
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Free analysis limit reached</AlertTitle>
+              <AlertDescription>
+                You've reached the limit for free website analyses. Please log in or create an account to continue.
+                <div className="mt-2">
+                  <Button onClick={handleLoginRedirect} variant="outline" className="mr-2">
+                    Log in
+                  </Button>
+                  <Button onClick={() => router.push('/login?tab=signup')}>
+                    Create account
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         {/* Hero Section */}
         <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900">
           <div className="container px-4 md:px-6">
@@ -157,10 +177,23 @@ export default function Home() {
                     </Select>
                   </div>
 
+                  {/* Analysis Limit Notice */}
+                  {analysisCount === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Free users can analyze 1 website. Create an account for unlimited analyses.
+                    </p>
+                  )}
+
                   {/* Submit */}
-                  <Button type="submit" disabled={isSubmitting} className="w-full">
-                    {isSubmitting ? "Analyzing..." : "Analyze"}
+                  <Button type="submit" disabled={isSubmitting || analysisCount >= 1} className="w-full">
+                    {isSubmitting ? "Analyzing..." : analysisCount >= 1 ? "Analysis Limit Reached" : "Analyze"}
                   </Button>
+
+                  {analysisCount >= 1 && (
+                    <Button type="button" onClick={handleLoginRedirect} className="w-full mt-2">
+                      Log in to analyze more websites
+                    </Button>
+                  )}
                 </form>
               </div>
             </div>

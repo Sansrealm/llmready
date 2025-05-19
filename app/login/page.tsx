@@ -1,9 +1,8 @@
-// ✅ LOGIN/PAGE.TSX (Revised)
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,72 +11,104 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
-import { auth, signInWithEmail, signUpWithEmail, signInWithGithub } from "@/lib/firebase"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [loginEmail, setLoginEmail] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [signupEmail, setSignupEmail] = useState("")
+  const [signupPassword, setSignupPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [activeTab, setActiveTab] = useState("login")
+  const [errorMessage, setErrorMessage] = useState("")
+
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const redirectAfterAuth = () => {
-    const pendingUrl = sessionStorage.getItem("pendingURL")
-    if (pendingUrl) {
-      router.push("/")
-    } else {
-      router.push("/")
+  // Get return URL and tab from query parameters
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "signup") {
+      setActiveTab("signup")
     }
-  }
+  }, [searchParams])
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setErrorMessage("")
 
-    const email = (document.getElementById("email") as HTMLInputElement)?.value
-    const password = (document.getElementById("password") as HTMLInputElement)?.value
-
-    const { user, error } = await signInWithEmail(email, password)
-    setIsLoading(false)
-
-    if (user) {
-      redirectAfterAuth()
-    } else {
-      alert(error)
-    }
-  }
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    const email = (document.getElementById("signup-email") as HTMLInputElement)?.value
-    const password = (document.getElementById("signup-password") as HTMLInputElement)?.value
-    const confirmPassword = (document.getElementById("confirm-password") as HTMLInputElement)?.value
-
-    if (password !== confirmPassword) {
-      setIsLoading(false)
-      alert("Passwords do not match")
+    if (!loginEmail || !loginPassword) {
+      setErrorMessage("Please enter both email and password")
       return
     }
 
-    const { user, error } = await signUpWithEmail(email, password)
-    setIsLoading(false)
+    setIsLoading(true)
 
-    if (user) {
-      redirectAfterAuth()
-    } else {
-      alert(error)
-    }
+    // In a real implementation, this would be an API call to your authentication service
+    // For now, we'll simulate a successful login
+    setTimeout(() => {
+      setIsLoading(false)
+
+      // Store user info in localStorage to simulate authentication
+      const user = {
+        email: loginEmail,
+        name: "User",
+        isLoggedIn: true,
+        accountType: "free"
+      }
+
+      localStorage.setItem("user", JSON.stringify(user))
+
+      // Reset guest analysis count on login
+      localStorage.removeItem("guestAnalysisCount")
+
+      // Redirect to return URL or home page
+      const returnUrl = searchParams.get("returnUrl") || "/"
+      router.push(returnUrl)
+    }, 1500)
   }
 
-  const handleGitHubLogin = async () => {
-    setIsLoading(true)
-    const { user, error } = await signInWithGithub()
-    setIsLoading(false)
+  const handleSignup = (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMessage("")
 
-    if (user) {
-      redirectAfterAuth()
-    } else {
-      alert(error)
+    if (!firstName || !lastName || !signupEmail || !signupPassword || !confirmPassword) {
+      setErrorMessage("Please fill in all fields")
+      return
     }
+
+    if (signupPassword !== confirmPassword) {
+      setErrorMessage("Passwords do not match")
+      return
+    }
+
+    setIsLoading(true)
+
+    // In a real implementation, this would be an API call to your user registration service
+    // For now, we'll simulate a successful signup
+    setTimeout(() => {
+      setIsLoading(false)
+
+      // Store user info in localStorage to simulate authentication
+      const user = {
+        email: signupEmail,
+        name: `${firstName} ${lastName}`,
+        isLoggedIn: true,
+        accountType: "free"
+      }
+
+      localStorage.setItem("user", JSON.stringify(user))
+
+      // Reset guest analysis count on signup
+      localStorage.removeItem("guestAnalysisCount")
+
+      // Redirect to return URL or home page
+      const returnUrl = searchParams.get("returnUrl") || "/"
+      router.push(returnUrl)
+    }, 1500)
   }
 
   return (
@@ -91,7 +122,13 @@ export default function AuthPage() {
               <p className="text-gray-500 dark:text-gray-400">Sign in to your account or create a new one</p>
             </div>
 
-            <Tabs defaultValue="login" className="w-full">
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -107,16 +144,32 @@ export default function AuthPage() {
                     <form onSubmit={handleLogin} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" placeholder="name@example.com" required />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="name@example.com"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password">Password</Label>
-                          <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                          <Link
+                            href="/forgot-password"
+                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
                             Forgot password?
                           </Link>
                         </div>
-                        <Input id="password" type="password" required />
+                        <Input
+                          id="password"
+                          type="password"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          required
+                        />
                       </div>
                       <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? "Logging in..." : "Login"}
@@ -136,9 +189,7 @@ export default function AuthPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <Button variant="outline">Google</Button>
-                      <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
-                        {isLoading ? "Loading..." : "GitHub"}
-                      </Button>
+                      <Button variant="outline">GitHub</Button>
                     </div>
                   </CardFooter>
                 </Card>
@@ -155,24 +206,53 @@ export default function AuthPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="first-name">First name</Label>
-                          <Input id="first-name" required />
+                          <Input
+                            id="first-name"
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                            required
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="last-name">Last name</Label>
-                          <Input id="last-name" required />
+                          <Input
+                            id="last-name"
+                            value={lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                            required
+                          />
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-email">Email</Label>
-                        <Input id="signup-email" type="email" placeholder="name@example.com" required />
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          placeholder="name@example.com"
+                          value={signupEmail}
+                          onChange={(e) => setSignupEmail(e.target.value)}
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="signup-password">Password</Label>
-                        <Input id="signup-password" type="password" required />
+                        <Input
+                          id="signup-password"
+                          type="password"
+                          value={signupPassword}
+                          onChange={(e) => setSignupPassword(e.target.value)}
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="confirm-password">Confirm Password</Label>
-                        <Input id="confirm-password" type="password" required />
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                        />
                       </div>
                       <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? "Creating account..." : "Create Account"}
@@ -192,9 +272,7 @@ export default function AuthPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <Button variant="outline">Google</Button>
-                      <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
-                        {isLoading ? "Loading..." : "GitHub"}
-                      </Button>
+                      <Button variant="outline">GitHub</Button>
                     </div>
                   </CardFooter>
                 </Card>
