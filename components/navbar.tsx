@@ -27,9 +27,9 @@ export default function Navbar() {
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-green-500 text-white">
-              <span className="font-bold">LR</span>
+              <span className="font-bold">LC</span>
             </div>
-            <span className="text-lg font-bold">LLM Ready</span>
+            <span className="text-lg font-bold">LLM Check</span>
           </Link>
         </div>
 
@@ -38,11 +38,10 @@ export default function Navbar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`text-sm font-medium ${
-                pathname === item.href
+              className={`text-sm font-medium ${pathname === item.href
                   ? "text-blue-600 dark:text-blue-400"
                   : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-              }`}
+                }`}
             >
               {item.name}
             </Link>
@@ -87,11 +86,10 @@ export default function Navbar() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`text-lg font-medium ${
-                      pathname === item.href
+                    className={`text-lg font-medium ${pathname === item.href
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-                    }`}
+                      }`}
                     onClick={() => setIsOpen(false)}
                   >
                     {item.name}
