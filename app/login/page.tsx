@@ -1,3 +1,4 @@
+// ✅ LOGIN/PAGE.TSX (Revised)
 "use client"
 
 import type React from "react"
@@ -17,6 +18,15 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+  const redirectAfterAuth = () => {
+    const pendingUrl = sessionStorage.getItem("pendingURL")
+    if (pendingUrl) {
+      router.push("/")
+    } else {
+      router.push("/")
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -28,7 +38,7 @@ export default function AuthPage() {
     setIsLoading(false)
 
     if (user) {
-      router.push("/analyze")
+      redirectAfterAuth()
     } else {
       alert(error)
     }
@@ -52,7 +62,7 @@ export default function AuthPage() {
     setIsLoading(false)
 
     if (user) {
-      router.push("/analyze")
+      redirectAfterAuth()
     } else {
       alert(error)
     }
@@ -64,7 +74,7 @@ export default function AuthPage() {
     setIsLoading(false)
 
     if (user) {
-      router.push("/analyze")
+      redirectAfterAuth()
     } else {
       alert(error)
     }

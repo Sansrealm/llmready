@@ -1,177 +1,196 @@
-// src/app/results/page.tsx
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
-import Navbar from "@/components/navbar"
-import Footer from "@/components/footer"
+import type React from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { ChevronRight, Lock } from "lucide-react"
 import Link from "next/link"
-import { ScoreGauge } from "@/components/score-gauge"
-import { ParameterScoreCard } from "@/components/parameter-score-card"
-import { RecommendationCard } from "@/components/recommendation-card"
-import { onAuthStateChanged } from "firebase/auth"
-import { auth, db, onAuthStateChange } from "@/lib/firebase"
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore"
-import AuthGuard from "@/components/AuthGuard"
-import type { User } from "firebase/auth"
+import Navbar from "@/components/navbar"
+import Footer from "@/components/footer"
+import { auth, signInWithEmail, signUpWithEmail, signInWithGithub } from "@/lib/firebase"
 
-interface Parameter {
-    name: string
-    score: number
-    isPremium: boolean
-    description: string
-}
+export default function AuthPage() {
+    const [isLoading, setIsLoading] = useState(false)
+    const router = useRouter()
 
-interface Recommendation {
-    title: string
-    description: string
-    difficulty: string
-    impact: string
-    isPremium: boolean
-}
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsLoading(true)
 
-interface AnalysisResult {
-    overall_score: number
-    parameters: Parameter[]
-    recommendations: Recommendation[]
-}
+        const email = (document.getElementById("email") as HTMLInputElement)?.value
+        const password = (document.getElementById("password") as HTMLInputElement)?.value
 
-export default function ResultsPageWrapper() {
-    return (
-        <AuthGuard>
-            <ResultsPage />
-        </AuthGuard>
-    );
-}
+        const { user, error } = await signInWithEmail(email, password)
+        setIsLoading(false)
 
-function ResultsPage() {
-    const searchParams = useSearchParams()
-    const url = searchParams.get("url") || "example.com"
-    const queryEmail = searchParams.get("email") || ""
-    const industry = searchParams.get("industry") || ""
-    const turnstileToken = searchParams.get("turnstileToken") || ""
-
-    const [userEmail, setUserEmail] = useState(queryEmail)
-    const [isPremium, setIsPremium] = useState(false)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChange(async (user: User | null) => {
-            if (user && user.email) {
-                setUserEmail(user.email)
-                const userRef = doc(db, "users", user.uid);
-                const userSnap = await getDoc(userRef);
-                const userData = userSnap.exists() ? userSnap.data() : null;
-
-                if (userData?.isPaid === true) {
-                    setIsPremium(true);
-                }
-            }
-        })
-        return () => unsubscribe()
-    }, [])
-
-    useEffect(() => {
-        const fetchAnalysis = async () => {
-            setLoading(true)
-            setError(null)
-
-            const cacheKey = `llm_analysis_${url}_${userEmail}_${industry}_${turnstileToken}`
-            const cached = sessionStorage.getItem(cacheKey)
-
-            if (cached) {
-                setAnalysisResult(JSON.parse(cached))
-                setLoading(false)
-                return
-            }
-
-            try {
-                const response = await fetch("/api/analyze", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url, email: userEmail, industry, turnstileToken })
-                })
-
-                if (!response.ok) {
-                    const errorData = await response.json()
-                    throw new Error(errorData.message || "Analysis failed")
-                }
-
-                const data = await response.json()
-                sessionStorage.setItem(cacheKey, JSON.stringify(data))
-                setAnalysisResult(data)
-
-                const user = auth.currentUser
-                if (user) {
-                    const userRef = doc(db, "users", user.uid)
-                    const userSnap = await getDoc(userRef)
-                    if (userSnap.exists()) {
-                        await updateDoc(userRef, {
-                            lastUsedAt: serverTimestamp(),
-                            analysisCount: increment(1),
-                        })
-                    } else {
-                        await setDoc(userRef, {
-                            uid: user.uid,
-                            email: user.email,
-                            createdAt: serverTimestamp(),
-                            lastUsedAt: serverTimestamp(),
-                            analysisCount: 1,
-                            isPaid: false,
-                        })
-                    }
-                }
-            } catch (err) {
-                console.error(err)
-                setError(err instanceof Error ? err.message : "Failed to analyze website")
-            } finally {
-                setLoading(false)
-            }
+        if (user) {
+            router.push("/analyze")
+        } else {
+            alert(error)
         }
-
-        if (url) {
-            fetchAnalysis()
-        }
-    }, [url, userEmail, industry, turnstileToken])
-
-    if (loading) {
-        return (
-            <div className="container px-4 py-12 text-center">
-                <h1 className="text-4xl font-bold mb-4">Analyzing Your Website</h1>
-                <p className="text-lg text-muted-foreground">Please wait while we analyze {url}</p>
-            </div>
-        )
     }
 
-    if (error || !analysisResult) {
-        return (
-            <div className="container px-4 py-12 text-center">
-                <h1 className="text-4xl font-bold mb-4">Analysis Error</h1>
-                <p className="text-lg text-muted-foreground">{error || "No results available for " + url}</p>
-                <Button className="mt-6" onClick={() => window.location.href = "/"}>Try Again</Button>
-            </div>
-        )
+    const handleSignup = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsLoading(true)
+
+        const email = (document.getElementById("signup-email") as HTMLInputElement)?.value
+        const password = (document.getElementById("signup-password") as HTMLInputElement)?.value
+        const confirmPassword = (document.getElementById("confirm-password") as HTMLInputElement)?.value
+
+        if (password !== confirmPassword) {
+            setIsLoading(false)
+            alert("Passwords do not match")
+            return
+        }
+
+        const { user, error } = await signUpWithEmail(email, password)
+        setIsLoading(false)
+
+        if (user) {
+            router.push("/analyze")
+        } else {
+            alert(error)
+        }
     }
 
-    const freeParams = analysisResult.parameters.filter(p => !p.isPremium)
-    const premiumParams = analysisResult.parameters.filter(p => p.isPremium)
-    const freeRecs = analysisResult.recommendations.filter(r => !r.isPremium)
-    const premiumRecs = analysisResult.recommendations.filter(r => r.isPremium)
+    const handleGitHubLogin = async () => {
+        setIsLoading(true)
+        const { user, error } = await signInWithGithub()
+        setIsLoading(false)
+
+        if (user) {
+            router.push("/analyze")
+        } else {
+            alert(error)
+        }
+    }
 
     return (
-        <div className="flex flex-col min-h-screen">
+        <div className="flex min-h-screen flex-col">
             <Navbar />
-            <main className="flex-1">
-                <div className="container px-4 py-12">
-                    {/* ...remaining JSX remains unchanged... */}
+            <main className="flex-1 flex items-center justify-center py-12">
+                <div className="container px-4 md:px-6">
+                    <div className="mx-auto max-w-md space-y-6">
+                        <div className="space-y-2 text-center">
+                            <h1 className="text-3xl font-bold">Welcome to LLM Ready Analyzer</h1>
+                            <p className="text-gray-500 dark:text-gray-400">Sign in to your account or create a new one</p>
+                        </div>
+
+                        <Tabs defaultValue="login" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="login">Login</TabsTrigger>
+                                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="login">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Login</CardTitle>
+                                        <CardDescription>Enter your credentials to access your account</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <form onSubmit={handleLogin} className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">Email</Label>
+                                                <Input id="email" type="email" placeholder="name@example.com" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <Label htmlFor="password">Password</Label>
+                                                    <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                                                        Forgot password?
+                                                    </Link>
+                                                </div>
+                                                <Input id="password" type="password" required />
+                                            </div>
+                                            <Button type="submit" className="w-full" disabled={isLoading}>
+                                                {isLoading ? "Logging in..." : "Login"}
+                                            </Button>
+                                        </form>
+                                    </CardContent>
+                                    <CardFooter className="flex flex-col">
+                                        <div className="relative my-4 w-full">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
+                                            </div>
+                                            <div className="relative flex justify-center text-xs uppercase">
+                                                <span className="bg-white px-2 text-gray-500 dark:bg-gray-950 dark:text-gray-400">
+                                                    Or continue with
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Button variant="outline">Google</Button>
+                                            <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
+                                                {isLoading ? "Loading..." : "GitHub"}
+                                            </Button>
+                                        </div>
+                                    </CardFooter>
+                                </Card>
+                            </TabsContent>
+
+                            <TabsContent value="signup">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Sign Up</CardTitle>
+                                        <CardDescription>Create a new account to get started</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <form onSubmit={handleSignup} className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="first-name">First name</Label>
+                                                    <Input id="first-name" required />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="last-name">Last name</Label>
+                                                    <Input id="last-name" required />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="signup-email">Email</Label>
+                                                <Input id="signup-email" type="email" placeholder="name@example.com" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="signup-password">Password</Label>
+                                                <Input id="signup-password" type="password" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="confirm-password">Confirm Password</Label>
+                                                <Input id="confirm-password" type="password" required />
+                                            </div>
+                                            <Button type="submit" className="w-full" disabled={isLoading}>
+                                                {isLoading ? "Creating account..." : "Create Account"}
+                                            </Button>
+                                        </form>
+                                    </CardContent>
+                                    <CardFooter className="flex flex-col">
+                                        <div className="relative my-4 w-full">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
+                                            </div>
+                                            <div className="relative flex justify-center text-xs uppercase">
+                                                <span className="bg-white px-2 text-gray-500 dark:bg-gray-950 dark:text-gray-400">
+                                                    Or continue with
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Button variant="outline">Google</Button>
+                                            <Button variant="outline" onClick={handleGitHubLogin} disabled={isLoading}>
+                                                {isLoading ? "Loading..." : "GitHub"}
+                                            </Button>
+                                        </div>
+                                    </CardFooter>
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
                 </div>
             </main>
             <Footer />

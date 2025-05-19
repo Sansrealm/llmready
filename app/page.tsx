@@ -1,7 +1,7 @@
-// This file combines your original V0 layout with your working form functionality
+// ✅ APP/PAGE.TSX (Revised for post-login resume)
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Turnstile from "react-turnstile";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
 import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import { auth } from "@/lib/firebase";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -40,6 +41,25 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const router = useRouter();
 
+  // Auto-trigger after login if sessionStorage has data
+  useEffect(() => {
+    const pendingUrl = sessionStorage.getItem("pendingURL");
+    if (pendingUrl) {
+      const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
+      const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
+      sessionStorage.removeItem("pendingURL");
+      sessionStorage.removeItem("pendingIndustry");
+      sessionStorage.removeItem("pendingEmail");
+      router.push(
+        `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(
+          pendingEmail
+        )}&industry=${encodeURIComponent(
+          pendingIndustry
+        )}&turnstileToken=dummy`
+      );
+    }
+  }, []);
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!url) return alert("Please enter a valid URL");
@@ -47,15 +67,28 @@ export default function Home() {
 
     let processedUrl = url;
     try {
-      const parsed = new URL(processedUrl);
+      new URL(processedUrl);
     } catch {
       processedUrl = "https://" + processedUrl;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      sessionStorage.setItem("pendingURL", processedUrl);
+      sessionStorage.setItem("pendingIndustry", industry);
+      sessionStorage.setItem("pendingEmail", email);
+      router.push("/login");
+      return;
     }
 
     setIsSubmitting(true);
     try {
       router.push(
-        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(industry)}&turnstileToken=${encodeURIComponent(turnstileToken)}`
+        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(
+          email
+        )}&industry=${encodeURIComponent(
+          industry
+        )}&turnstileToken=${encodeURIComponent(turnstileToken)}`
       );
     } catch (error) {
       console.error("Error:", error);
