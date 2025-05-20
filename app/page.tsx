@@ -206,6 +206,22 @@ export default function Home() {
                         ? "Analysis Limit Reached"
                         : "Analyze"}
                   </Button>
+                  {isLimitReached && (
+                    <div className="mt-4 text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+                      <p className="text-sm text-green-800 dark:text-green-300 font-medium">
+                        Want unlimited website checks?
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Unlock full access to LLM readiness audits with a Premium subscription.
+                      </p>
+                      <Button
+                        className="mt-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                        asChild
+                      >
+                        <Link href="/pricing">Upgrade to Premium</Link>
+                      </Button>
+                    </div>
+                  )}
                 </form>
               </div>
             </div>
