@@ -77,7 +77,6 @@ export default function Home() {
       processedUrl = "https://" + processedUrl;
     }
 
-    // Guest flow
     if (!user) {
       if (analysisCount >= 1) {
         setShowLoginAlert(true);
