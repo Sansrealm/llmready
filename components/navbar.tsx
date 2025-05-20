@@ -4,14 +4,15 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User } from "lucide-react"
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { auth } from "@/lib/firebase"
-import { onAuthStateChanged, type User } from "firebase/auth"
+
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<FirebaseUser | null>(null)
   const [loading, setLoading] = useState(true)
   const pathname = usePathname()
 
