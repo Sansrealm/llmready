@@ -87,7 +87,7 @@ export default function ResultsPage() {
                 <div className="container px-4 py-12">
                     <div className="mb-8">
                         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">LLM Readiness Results</h1>
-                        <p className="text-muted-foreground mt-1">Analysis for: <strong>{url}</strong></p>
+                        <p className="text-muted-foreground mt-1">Analysis for: <strong>{rawUrlurl}</strong></p>
                     </div>
 
                     {/* Overall Score Section */}
