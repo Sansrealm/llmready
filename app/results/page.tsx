@@ -14,7 +14,7 @@ import Link from "next/link"
 import { ScoreGauge } from "@/components/score-gauge"
 import { ParameterScoreCard } from "@/components/parameter-score-card"
 import { RecommendationCard } from "@/components/recommendation-card"
-import { onAuthStateChanged, auth } from "@/lib/firebase"
+import { onAuthStateChange, auth } from "@/lib/firebase"
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore"
 import { toast } from "sonner"
 
@@ -26,7 +26,7 @@ export default function ResultsPage() {
     const [isEmailing, setIsEmailing] = useState(false)
 
     useEffect(() => {
-        onAuthStateChanged(auth, (currentUser) => {
+        onAuthStateChange(auth, (currentUser) => {
             setUser(currentUser);
         });
     }, [])
