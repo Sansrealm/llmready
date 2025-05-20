@@ -54,13 +54,14 @@ export default function Home() {
     if (pendingUrl) {
       const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
       const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-      sessionStorage.removeItem("pendingURL");
-      sessionStorage.removeItem("pendingIndustry");
-      sessionStorage.removeItem("pendingEmail");
+      sessionStorage.setItem("pendingURL", processedUrl);
+      sessionStorage.setItem("pendingIndustry", industry);
+      sessionStorage.setItem("pendingEmail", email);
+      sessionStorage.setItem("pendingTurnstileToken", turnstileToken);
       router.push(
         `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(
           pendingIndustry
-        )}&turnstileToken=dummy`
+        )}&turnstileToken=${encodeURIComponent(pendingToken)}`
       );
     }
   }, [router]);
@@ -172,6 +173,10 @@ export default function Home() {
                       onVerify={(token) => setTurnstileToken(token)}
                       theme="auto"
                       className="w-full"
+                      options={{
+                        theme: "auto",
+                        size: "invisible"
+                      }}
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -213,7 +218,7 @@ export default function Home() {
                         Want unlimited website checks?
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Unlock full access to LLM readiness audits with a Premium subscription.
+                        Unlock full access to LLM readiness audits with premium
                       </p>
                       <Button
                         className="mt-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
