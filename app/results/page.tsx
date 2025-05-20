@@ -28,7 +28,7 @@ export default function AuthPage() {
         setIsLoading(false)
 
         if (user) {
-            router.push("/analyze")
+            router.push("/")
         } else {
             alert(error)
         }
