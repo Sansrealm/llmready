@@ -1,5 +1,5 @@
 "use client";
-
+import type { User } from "firebase/auth";
 import { useState, useEffect } from "react";
 import Turnstile from "react-turnstile";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,7 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [analysisCount, setAnalysisCount] = useState(0);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
   const router = useRouter();
 
