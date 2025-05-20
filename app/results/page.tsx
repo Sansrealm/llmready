@@ -14,133 +14,73 @@ import Link from "next/link"
 import { ScoreGauge } from "@/components/score-gauge"
 import { ParameterScoreCard } from "@/components/parameter-score-card"
 import { RecommendationCard } from "@/components/recommendation-card"
-
-interface Parameter {
-    name: string
-    score: number
-    isPremium: boolean
-    description: string
-}
-
-interface Recommendation {
-    title: string
-    description: string
-    difficulty: string
-    impact: string
-    isPremium: boolean
-}
-
-interface AnalysisResult {
-    overall_score: number
-    parameters: Parameter[]
-    recommendations: Recommendation[]
-}
+import { onAuthStateChanged, auth } from "@/lib/firebase"
+import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore"
+import { toast } from "sonner"
 
 export default function ResultsPage() {
     const searchParams = useSearchParams()
-    const url = searchParams.get("url") || "example.com"
-    const email = searchParams.get("email") || ""
-    const industry = searchParams.get("industry") || ""
-    const turnstileToken = searchParams.get("turnstileToken") || "";
-    const isPremium = email !== ""
-
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
-
-    // useEffect(() => {
-    //     const fetchAnalysis = async () => {
-    //         try {
-    //             const response = await fetch("/api/analyze", {
-    //                 method: "POST",
-    //                 headers: { "Content-Type": "application/json" },
-    //                 body: JSON.stringify({ url, email, industry })
-    //             })
-
-    //             if (!response.ok) {
-    //                 const errorData = await response.json()
-    //                 throw new Error(errorData.message || "Analysis failed")
-    //             }
-
-    //             const data = await response.json()
-    //             setAnalysisResult(data)
-    //         } catch (err) {
-    //             setError((err as Error).message)
-    //         } finally {
-    //             setLoading(false)
-    //         }
-    //     }
-
-    //     fetchAnalysis()
-    // }, [url])
+    const rawUrl = searchParams.get("url") || ""
+    const [result, setResult] = useState<any>(null)
+    const [user, setUser] = useState<any>(null)
+    const [isEmailing, setIsEmailing] = useState(false)
 
     useEffect(() => {
-        const fetchAnalysis = async () => {
-            setLoading(true);
-            setError(null);
+        onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+    }, [])
 
-            const cacheKey = `llm_analysis_${url}_${email}_${industry}_${turnstileToken}`;
-            const cached = sessionStorage.getItem(cacheKey);
-
-            if (cached) {
-                setAnalysisResult(JSON.parse(cached));
-                setLoading(false);
-                return;
-            }
-
+    useEffect(() => {
+        const fetchResult = async () => {
             try {
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, email, industry, turnstileToken }),
+                const res = await fetch(`/api/route`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: rawUrl }),
                 });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Analysis failed');
-                }
-
-                const data = await response.json();
-                sessionStorage.setItem(cacheKey, JSON.stringify(data));
-                setAnalysisResult(data);
+                const data = await res.json();
+                setResult(data);
             } catch (err) {
-                console.error(err);
-                setError(err instanceof Error ? err.message : 'Failed to analyze website');
-            } finally {
-                setLoading(false);
+                console.error("Error fetching result:", err);
             }
-        };
-
-        if (url) {
-            fetchAnalysis();
         }
-    }, [url, email, industry]);
-    if (loading) {
-        return (
-            <div className="container px-4 py-12 text-center">
-                <h1 className="text-4xl font-bold mb-4">Analyzing Your Website</h1>
-                <p className="text-lg text-muted-foreground">Please wait while we analyze {url}</p>
-            </div>
-        )
-    }
+        if (rawUrl) fetchResult();
+    }, [rawUrl])
 
-    if (error || !analysisResult) {
-        return (
-            <div className="container px-4 py-12 text-center">
-                <h1 className="text-4xl font-bold mb-4">Analysis Error</h1>
-                <p className="text-lg text-muted-foreground">{error || "No results available for " + url}</p>
-                <Button className="mt-6" onClick={() => window.location.href = "/"}>Try Again</Button>
-            </div>
-        )
+    const handleEmailReport = async () => {
+        if (!user) {
+            toast.error("Please log in to receive the report via email.");
+            return;
+        }
+        setIsEmailing(true);
+        try {
+            const res = await fetch("/api/generate-report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: user.uid,
+                    email: user.email,
+                    websiteUrl: rawUrl,
+                    analysisData: result
+                })
+            });
+            const json = await res.json();
+            if (res.ok) {
+                toast.success("Report emailed successfully! Check your inbox.");
+            } else {
+                toast.error(json.error || "Failed to send report.");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Something went wrong while emailing the report.");
+        } finally {
+            setIsEmailing(false);
+        }
     }
-
-    const freeParams = analysisResult.parameters.filter(p => !p.isPremium)
-    const premiumParams = analysisResult.parameters.filter(p => p.isPremium)
-    const freeRecs = analysisResult.recommendations.filter(r => !r.isPremium)
-    const premiumRecs = analysisResult.recommendations.filter(r => r.isPremium)
 
     return (
-        <div className="flex flex-col min-h-screen">
+        <div>
             <Navbar />
             <main className="flex-1">
                 <div className="container px-4 py-12">
@@ -281,7 +221,9 @@ export default function ResultsPage() {
                         </CardHeader>
                         <CardContent className="flex flex-col sm:flex-row gap-4">
                             <Button variant="outline">Download PDF</Button>
-                            <Button variant="outline">Email Report</Button>
+                            <Button variant="outline" onClick={handleEmailReport} disabled={isEmailing}>
+                                {isEmailing ? "Sending..." : "Email Report"}
+                            </Button>
                             <Button variant="outline">Share Link</Button>
                         </CardContent>
                     </Card>
