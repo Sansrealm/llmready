@@ -24,29 +24,20 @@ export default function ProfilePage() {
 
   // Load user data from localStorage on component mount
   useEffect(() => {
-    const checkUserData = () => {
-      try {
-        const storedUser = localStorage.getItem("user")
-        if (!storedUser) {
-          // Delay just enough to ensure localStorage is populated after redirect
-          setTimeout(() => {
-            const fallbackUser = localStorage.getItem("user")
-            if (fallbackUser) {
-              setUserData(JSON.parse(fallbackUser))
-            } else {
-              router.push("/login?returnUrl=/profile")
-            }
-          }, 300) // small delay
-        } else {
-          setUserData(JSON.parse(storedUser))
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = {
+          name: firebaseUser.displayName || firebaseUser.email || "User",
+          email: firebaseUser.email || "",
+          accountType: "free", // default unless you're syncing from Firestore
         }
-      } catch (error) {
-        console.error("Error loading user data:", error)
+        setUserData(userData)
+      } else {
         router.push("/login?returnUrl=/profile")
       }
-    }
+    })
 
-    checkUserData()
+    return () => unsubscribe()
   }, [router])
 
   const handleSaveProfile = (e: React.FormEvent) => {
