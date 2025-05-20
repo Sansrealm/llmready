@@ -6,49 +6,28 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged, type User } from "firebase/auth"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userName, setUserName] = useState("")
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const pathname = usePathname()
 
-  // Check login status from localStorage on component mount and window focus
   useEffect(() => {
-    const checkLoginStatus = () => {
-      try {
-        const userData = localStorage.getItem("user")
-        if (userData) {
-          const user = JSON.parse(userData)
-          setIsLoggedIn(user.isLoggedIn)
-          setUserName(user.name)
-        } else {
-          setIsLoggedIn(false)
-          setUserName("")
-        }
-      } catch (error) {
-        console.error("Error checking login status:", error)
-        setIsLoggedIn(false)
-      }
-    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser)
+      setLoading(false)
+    })
 
-    // Check on mount
-    checkLoginStatus()
-
-    // Check on window focus (in case user logs in/out in another tab)
-    window.addEventListener("focus", checkLoginStatus)
-
-    return () => {
-      window.removeEventListener("focus", checkLoginStatus)
-    }
+    return () => unsubscribe()
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem("user")
-    setIsLoggedIn(false)
-    setUserName("")
+  const handleLogout = async () => {
+    await auth.signOut()
+    setUser(null)
     setIsOpen(false)
-    // Redirect to home page if on a protected route
     if (pathname.startsWith("/profile")) {
       window.location.href = "/"
     }
@@ -57,8 +36,6 @@ export default function Navbar() {
   const navigation = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/pricing" },
-    // { name: "Features", href: "/features" },
-    // { name: "About", href: "/about" },
   ]
 
   return (
@@ -89,12 +66,12 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex md:items-center md:gap-4">
-          {isLoggedIn ? (
+          {!loading && user ? (
             <div className="flex items-center gap-4">
               <Button variant="ghost" className="flex items-center gap-2" asChild>
                 <Link href="/profile">
                   <User className="h-4 w-4" />
-                  <span>{userName || "My Account"}</span>
+                  <span>{user.displayName || user.email || "My Account"}</span>
                 </Link>
               </Button>
               <Button variant="outline" onClick={handleLogout}>
@@ -102,14 +79,16 @@ export default function Navbar() {
               </Button>
             </div>
           ) : (
-            <>
-              <Button variant="ghost" asChild>
-                <Link href="/login">Login</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/login?tab=signup">Sign Up</Link>
-              </Button>
-            </>
+            !loading && (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/login?tab=signup">Sign Up</Link>
+                </Button>
+              </>
+            )
           )}
         </div>
 
@@ -146,7 +125,7 @@ export default function Navbar() {
               </nav>
 
               <div className="flex flex-col gap-2 pt-6">
-                {isLoggedIn ? (
+                {!loading && user ? (
                   <>
                     <Button asChild onClick={() => setIsOpen(false)}>
                       <Link href="/profile">My Account</Link>
@@ -156,14 +135,16 @@ export default function Navbar() {
                     </Button>
                   </>
                 ) : (
-                  <>
-                    <Button variant="outline" asChild onClick={() => setIsOpen(false)}>
-                      <Link href="/login">Login</Link>
-                    </Button>
-                    <Button asChild onClick={() => setIsOpen(false)}>
-                      <Link href="/login?tab=signup">Sign Up</Link>
-                    </Button>
-                  </>
+                  !loading && (
+                    <>
+                      <Button variant="outline" asChild onClick={() => setIsOpen(false)}>
+                        <Link href="/login">Login</Link>
+                      </Button>
+                      <Button asChild onClick={() => setIsOpen(false)}>
+                        <Link href="/login?tab=signup">Sign Up</Link>
+                      </Button>
+                    </>
+                  )
                 )}
               </div>
             </div>
