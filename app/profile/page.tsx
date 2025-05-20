@@ -69,7 +69,7 @@ export default function ProfilePage() {
           name: ${ firstName } ${ lastName },
           email: email,
           company: company,
-          website: website
+          website: website,
       }
 
       localStorage.setItem("user", JSON.stringify(updatedUser))
