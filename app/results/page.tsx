@@ -14,6 +14,9 @@ import Link from "next/link"
 import { ScoreGauge } from "@/components/score-gauge"
 import { ParameterScoreCard } from "@/components/parameter-score-card"
 import { RecommendationCard } from "@/components/recommendation-card"
+import { onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc } from "firebase/firestore"
+import { auth, db } from "@/lib/firebase"
 
 interface Parameter {
     name: string
@@ -41,48 +44,51 @@ export default function ResultsPage() {
     const url = searchParams.get("url") || "example.com"
     const email = searchParams.get("email") || ""
     const industry = searchParams.get("industry") || ""
-    const turnstileToken = searchParams.get("turnstileToken") || "";
-    const isPremium = email !== ""
+    const turnstileToken = searchParams.get("turnstileToken") || ""
 
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+    const [isPaid, setIsPaid] = useState(false)
+    const [analysisCount, setAnalysisCount] = useState(0)
 
-    // useEffect(() => {
-    //     const fetchAnalysis = async () => {
-    //         try {
-    //             const response = await fetch("/api/analyze", {
-    //                 method: "POST",
-    //                 headers: { "Content-Type": "application/json" },
-    //                 body: JSON.stringify({ url, email, industry })
-    //             })
-
-    //             if (!response.ok) {
-    //                 const errorData = await response.json()
-    //                 throw new Error(errorData.message || "Analysis failed")
-    //             }
-
-    //             const data = await response.json()
-    //             setAnalysisResult(data)
-    //         } catch (err) {
-    //             setError((err as Error).message)
-    //         } finally {
-    //             setLoading(false)
-    //         }
-    //     }
-
-    //     fetchAnalysis()
-    // }, [url])
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userRef = doc(db, "users", user.uid)
+                const snap = await getDoc(userRef)
+                const data = snap.exists() ? snap.data() : null
+                setIsPaid(data?.isPaid || false)
+                setAnalysisCount(data?.analysisCount || 0)
+            }
+        })
+        return () => unsub()
+    }, [])
 
     useEffect(() => {
         const fetchAnalysis = async () => {
             setLoading(true);
             setError(null);
 
+            console.log("Triggering fetch with:", { url, email, industry, turnstileToken });
+
+            if (!turnstileToken || turnstileToken.length < 10) {
+                setError("Missing or invalid CAPTCHA token. Please go back and try again.");
+                setLoading(false);
+                return;
+            }
+
+            if (!isPaid && analysisCount >= 1) {
+                setError("You've reached your analysis limit. Upgrade to continue.");
+                setLoading(false);
+                return;
+            }
+
             const cacheKey = `llm_analysis_${url}_${email}_${industry}_${turnstileToken}`;
             const cached = sessionStorage.getItem(cacheKey);
 
             if (cached) {
+                console.log("Using cached result for:", url);
                 setAnalysisResult(JSON.parse(cached));
                 setLoading(false);
                 return;
@@ -97,6 +103,7 @@ export default function ResultsPage() {
 
                 if (!response.ok) {
                     const errorData = await response.json();
+                    console.error("Analysis failed:", errorData);
                     throw new Error(errorData.message || 'Analysis failed');
                 }
 
@@ -104,7 +111,7 @@ export default function ResultsPage() {
                 sessionStorage.setItem(cacheKey, JSON.stringify(data));
                 setAnalysisResult(data);
             } catch (err) {
-                console.error(err);
+                console.error("Fetch error:", err);
                 setError(err instanceof Error ? err.message : 'Failed to analyze website');
             } finally {
                 setLoading(false);
@@ -114,7 +121,8 @@ export default function ResultsPage() {
         if (url) {
             fetchAnalysis();
         }
-    }, [url, email, industry]);
+    }, [url, email, industry, turnstileToken, isPaid, analysisCount])
+
     if (loading) {
         return (
             <div className="container px-4 py-12 text-center">
@@ -130,6 +138,11 @@ export default function ResultsPage() {
                 <h1 className="text-4xl font-bold mb-4">Analysis Error</h1>
                 <p className="text-lg text-muted-foreground">{error || "No results available for " + url}</p>
                 <Button className="mt-6" onClick={() => window.location.href = "/"}>Try Again</Button>
+                {!isPaid && error?.includes("limit") && (
+                    <Button className="mt-4" asChild>
+                        <Link href="/pricing">Upgrade to Premium</Link>
+                    </Button>
+                )}
             </div>
         )
     }
