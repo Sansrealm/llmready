@@ -184,6 +184,7 @@ export default function ProfilePage() {
                         name="email"
                         type="email"
                         defaultValue={userData.email}
+                        disabled
                       />
                     </div>
                     <div className="space-y-2">
