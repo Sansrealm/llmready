@@ -26,7 +26,7 @@ export default function ResultsPage() {
     const [isEmailing, setIsEmailing] = useState(false)
 
     useEffect(() => {
-        onAuthStateChange(auth, (currentUser) => {
+        onAuthStateChange((currentUser) => {
             setUser(currentUser);
         });
     }, [])
