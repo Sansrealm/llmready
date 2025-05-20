@@ -1,8 +1,12 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
+import { useRouter } from "next/navigation"
+import { auth } from "@/lib/firebase"
+import Navbar from "@/components/navbar"
+import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,64 +15,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Bell, CreditCard, LogOut, Settings, User, AlertCircle, CheckCircle } from "lucide-react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import Navbar from "@/components/navbar"
-import Footer from "@/components/footer"
+import { Bell, CreditCard, Settings, User, CheckCircle } from "lucide-react"
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [userData, setUserData] = useState<any>(null)
+  const [userData, setUserData] = useState<FirebaseUser | null>(null)
   const router = useRouter()
 
-  // Load user data from localStorage on component mount
   useEffect(() => {
-    const checkUserData = () => {
-      try {
-        const storedUser = localStorage.getItem("user")
-        if (storedUser) {
-          setUserData(JSON.parse(storedUser))
-        } else {
-          // Redirect to login if no user data found
-          router.push("/login?returnUrl=/profile")
-        }
-      } catch (error) {
-        console.error("Error loading user data:", error)
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUserData(firebaseUser)
+      } else {
         router.push("/login?returnUrl=/profile")
       }
-    }
-
-    checkUserData()
+    })
+    return () => unsubscribe()
   }, [router])
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    // Get form data
     const formData = new FormData(e.target as HTMLFormElement)
     const firstName = formData.get("first-name") as string
     const lastName = formData.get("last-name") as string
     const email = formData.get("email") as string
     const company = formData.get("company") as string
     const website = formData.get("website") as string
-
-    // Update user data in localStorage
+    // Simulate updating user data
     setTimeout(() => {
       if (userData) {
-        const updatedUser = {
+        setUserData({
           ...userData,
-          name: `${firstName} ${lastName}`,
+          displayName: `${firstName} ${lastName}`,
           email: email,
-          company: company,
-          website: website
-        }
-
-        localStorage.setItem("user", JSON.stringify(updatedUser))
-        setUserData(updatedUser)
+        } as FirebaseUser)
       }
-
       setIsLoading(false)
     }, 1000)
   }
@@ -94,6 +76,7 @@ export default function ProfilePage() {
     )
   }
 
+  const displayName = userData.displayName || userData.email || "User"
   const isFreeAccount = userData.accountType === "free"
 
   return (
@@ -103,11 +86,11 @@ export default function ProfilePage() {
         <div className="container px-4 py-8 md:px-6 md:py-12">
           <div className="mb-8 flex items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder-user.jpg" alt={userData.name} />
-              <AvatarFallback>{getInitials(userData.name)}</AvatarFallback>
+              <AvatarImage src="/placeholder-user.jpg" alt={displayName} />
+              <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-3xl font-bold">{userData.name}</h1>
+              <h1 className="text-3xl font-bold">{displayName}</h1>
               <div className="flex items-center gap-2">
                 <p className="text-gray-500 dark:text-gray-400">{userData.email}</p>
                 <Badge className={isFreeAccount ? "bg-blue-600" : "bg-green-600"}>
