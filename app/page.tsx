@@ -1,18 +1,9 @@
-// ✅ FINAL MERGED app/page.tsx — Guest Limit + Login Resume + Turnstile
 "use client";
 
 import { useState, useEffect } from "react";
 import Turnstile from "react-turnstile";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,18 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
-  Globe,
-  Search,
-  Zap,
-} from "lucide-react";
-import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { auth } from "@/lib/firebase";
 
 export default function Home() {
@@ -43,22 +26,18 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [analysisCount, setAnalysisCount] = useState(0);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
   const router = useRouter();
 
-  // Resume from sessionStorage if redirected after login
+  // Load Firebase user on mount
   useEffect(() => {
-    const pendingUrl = sessionStorage.getItem("pendingURL");
-    if (pendingUrl) {
-      const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
-      const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-      sessionStorage.removeItem("pendingURL");
-      sessionStorage.removeItem("pendingIndustry");
-      sessionStorage.removeItem("pendingEmail");
-      router.push(
-        `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(pendingIndustry)}&turnstileToken=dummy`
-      );
-    }
-  }, [router]);
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      setUser(firebaseUser);
+      setAuthLoaded(true);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load guest usage count from localStorage
   useEffect(() => {
@@ -68,8 +47,26 @@ export default function Home() {
     }
   }, []);
 
+  // Resume pending submission after login
+  useEffect(() => {
+    const pendingUrl = sessionStorage.getItem("pendingURL");
+    if (pendingUrl) {
+      const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
+      const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
+      sessionStorage.removeItem("pendingURL");
+      sessionStorage.removeItem("pendingIndustry");
+      sessionStorage.removeItem("pendingEmail");
+      router.push(
+        `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(
+          pendingIndustry
+        )}&turnstileToken=dummy`
+      );
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!authLoaded) return;
     if (!url.trim()) return alert("Please enter a valid URL");
     if (!turnstileToken) return alert("Please complete the CAPTCHA challenge");
 
@@ -80,30 +77,30 @@ export default function Home() {
       processedUrl = "https://" + processedUrl;
     }
 
-    const user = auth.currentUser;
+    // Guest flow
     if (!user) {
       if (analysisCount >= 1) {
         setShowLoginAlert(true);
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }, 100);
+        setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
         return;
       }
-      // Save input for post-login resume
+
       sessionStorage.setItem("pendingURL", processedUrl);
       sessionStorage.setItem("pendingIndustry", industry);
       sessionStorage.setItem("pendingEmail", email);
 
-      // Increment localStorage count
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
       localStorage.setItem("guestAnalysisCount", newCount.toString());
     }
 
+    // Proceed to results
     setIsSubmitting(true);
     try {
       router.push(
-        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(industry)}&turnstileToken=${encodeURIComponent(turnstileToken)}`
+        `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(
+          industry
+        )}&turnstileToken=${encodeURIComponent(turnstileToken)}`
       );
     } catch (error) {
       console.error("Error:", error);
@@ -113,9 +110,9 @@ export default function Home() {
     }
   };
 
-  const handleLoginRedirect = () => {
-    router.push("/login");
-  };
+  const handleLoginRedirect = () => router.push("/login");
+
+  const isLimitReached = authLoaded && !user && analysisCount >= 1;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -133,9 +130,7 @@ export default function Home() {
                   <Button onClick={handleLoginRedirect} variant="outline" className="mr-2">
                     Log in
                   </Button>
-                  <Button onClick={() => router.push('/login?tab=signup')}>
-                    Create account
-                  </Button>
+                  <Button onClick={() => router.push("/login?tab=signup")}>Create account</Button>
                 </div>
               </AlertDescription>
             </Alert>
@@ -192,13 +187,17 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {analysisCount === 0 && (
+                  {!user && analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free users can analyze 1 website. Create an account for unlimited analyses.
+                      Free users can analyze 1 website. Create an account for more.
                     </p>
                   )}
-                  <Button type="submit" disabled={isSubmitting || (auth.currentUser === null && analysisCount >= 1)} className="w-full">
-                    {isSubmitting ? "Analyzing..." : (auth.currentUser === null && analysisCount >= 1) ? "Analysis Limit Reached" : "Analyze"}
+                  <Button type="submit" disabled={!authLoaded || isSubmitting || isLimitReached} className="w-full">
+                    {isSubmitting
+                      ? "Analyzing..."
+                      : isLimitReached
+                        ? "Analysis Limit Reached"
+                        : "Analyze"}
                   </Button>
                 </form>
               </div>
