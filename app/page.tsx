@@ -64,6 +64,14 @@ export default function Home() {
     }
   }, [router]);
 
+  // To check console for proper user auth and session
+  useEffect(() => {
+    console.log("✅ Auth Loaded:", authLoaded);
+    console.log("👤 User object:", user);
+    console.log("🔁 UID:", user?.uid);
+  }, [authLoaded, user]);
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authLoaded) return;

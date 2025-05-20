@@ -57,8 +57,8 @@ export default function Navbar() {
   const navigation = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/pricing" },
-    { name: "Features", href: "/features" },
-    { name: "About", href: "/about" },
+    // { name: "Features", href: "/features" },
+    // { name: "About", href: "/about" },
   ]
 
   return (

@@ -12,6 +12,8 @@ import Link from "next/link"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -24,7 +26,7 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [activeTab, setActiveTab] = useState("login")
   const [errorMessage, setErrorMessage] = useState("")
-
+  const { user } = await signInWithEmailAndPassword(auth, email, password);
   const router = useRouter()
   const searchParams = useSearchParams()
 
