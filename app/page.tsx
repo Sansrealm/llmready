@@ -54,10 +54,13 @@ export default function Home() {
     if (pendingUrl) {
       const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
       const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-      sessionStorage.setItem("pendingURL", processedUrl);
-      sessionStorage.setItem("pendingIndustry", industry);
-      sessionStorage.setItem("pendingEmail", email);
-      sessionStorage.setItem("pendingTurnstileToken", turnstileToken);
+      const pendingToken = sessionStorage.getItem("pendingTurnstileToken") || "";
+
+      sessionStorage.removeItem("pendingURL");
+      sessionStorage.removeItem("pendingIndustry");
+      sessionStorage.removeItem("pendingEmail");
+      sessionStorage.removeItem("pendingTurnstileToken");
+
       router.push(
         `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(
           pendingIndustry
@@ -97,6 +100,7 @@ export default function Home() {
       sessionStorage.setItem("pendingURL", processedUrl);
       sessionStorage.setItem("pendingIndustry", industry);
       sessionStorage.setItem("pendingEmail", email);
+      sessionStorage.setItem("pendingTurnstileToken", turnstileToken);
 
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
