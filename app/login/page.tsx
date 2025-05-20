@@ -1,117 +1,96 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Link from "next/link"
-import Navbar from "@/components/navbar"
-import Footer from "@/components/footer"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { Button } from "@/components/ui/button";
+import {
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
+import Navbar from "@/components/navbar";
+import Footer from "@/components/footer";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AuthPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [loginEmail, setLoginEmail] = useState("")
-  const [loginPassword, setLoginPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [signupEmail, setSignupEmail] = useState("")
-  const [signupPassword, setSignupPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [activeTab, setActiveTab] = useState("login")
-  const [errorMessage, setErrorMessage] = useState("")
-  const { user } = await signInWithEmailAndPassword(auth, email, password);
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [activeTab, setActiveTab] = useState("login");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Get return URL and tab from query parameters
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Handle return tab param
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "signup") {
-      setActiveTab("signup")
-    }
-  }, [searchParams])
+    const tab = searchParams.get("tab");
+    if (tab === "signup") setActiveTab("signup");
+  }, [searchParams]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMessage("")
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
 
     if (!loginEmail || !loginPassword) {
-      setErrorMessage("Please enter both email and password")
-      return
+      setErrorMessage("Please enter both email and password");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
-    // In a real implementation, this would be an API call to your authentication service
-    // For now, we'll simulate a successful login
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      localStorage.removeItem("guestAnalysisCount");
 
-      // Store user info in localStorage to simulate authentication
-      const user = {
-        email: loginEmail,
-        name: "User",
-        isLoggedIn: true,
-        accountType: "free"
-      }
+      const returnUrl = searchParams.get("returnUrl") || "/";
+      router.push(returnUrl === "/analyze" ? "/" : returnUrl);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage("Invalid email or password.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      localStorage.setItem("user", JSON.stringify(user))
-
-      // Reset guest analysis count on login
-      localStorage.removeItem("guestAnalysisCount")
-
-      // Redirect to return URL or home page
-      const returnUrl = searchParams.get("returnUrl") || "/"
-      router.push(returnUrl)
-    }, 1500)
-  }
-
-  const handleSignup = (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMessage("")
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
 
     if (!firstName || !lastName || !signupEmail || !signupPassword || !confirmPassword) {
-      setErrorMessage("Please fill in all fields")
-      return
+      setErrorMessage("Please fill in all fields");
+      return;
     }
 
     if (signupPassword !== confirmPassword) {
-      setErrorMessage("Passwords do not match")
-      return
+      setErrorMessage("Passwords do not match");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
-    // In a real implementation, this would be an API call to your user registration service
-    // For now, we'll simulate a successful signup
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await createUserWithEmailAndPassword(auth, signupEmail, signupPassword);
+      localStorage.removeItem("guestAnalysisCount");
 
-      // Store user info in localStorage to simulate authentication
-      const user = {
-        email: signupEmail,
-        name: `${firstName} ${lastName}`,
-        isLoggedIn: true,
-        accountType: "free"
-      }
-
-      localStorage.setItem("user", JSON.stringify(user))
-
-      // Reset guest analysis count on signup
-      localStorage.removeItem("guestAnalysisCount")
-
-      // Redirect to return URL or home page
-      const returnUrl = searchParams.get("returnUrl") || "/"
-      router.push(returnUrl)
-    }, 1500)
-  }
+      const returnUrl = searchParams.get("returnUrl") || "/";
+      router.push(returnUrl === "/analyze" ? "/" : returnUrl);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage("Signup failed. Please try another email.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -121,7 +100,9 @@ export default function AuthPage() {
           <div className="mx-auto max-w-md space-y-6">
             <div className="space-y-2 text-center">
               <h1 className="text-3xl font-bold">Welcome to LLM Ready Analyzer</h1>
-              <p className="text-gray-500 dark:text-gray-400">Sign in to your account or create a new one</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Sign in to your account or create a new one
+              </p>
             </div>
 
             {errorMessage && (
@@ -149,22 +130,13 @@ export default function AuthPage() {
                         <Input
                           id="email"
                           type="email"
-                          placeholder="name@example.com"
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="password">Password</Label>
-                          <Link
-                            href="/forgot-password"
-                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            Forgot password?
-                          </Link>
-                        </div>
+                        <Label htmlFor="password">Password</Label>
                         <Input
                           id="password"
                           type="password"
@@ -178,22 +150,6 @@ export default function AuthPage() {
                       </Button>
                     </form>
                   </CardContent>
-                  <CardFooter className="flex flex-col">
-                    <div className="relative my-4 w-full">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white px-2 text-gray-500 dark:bg-gray-950 dark:text-gray-400">
-                          Or continue with
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button variant="outline">Google</Button>
-                      <Button variant="outline">GitHub</Button>
-                    </div>
-                  </CardFooter>
                 </Card>
               </TabsContent>
 
@@ -230,7 +186,6 @@ export default function AuthPage() {
                         <Input
                           id="signup-email"
                           type="email"
-                          placeholder="name@example.com"
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           required
@@ -261,22 +216,6 @@ export default function AuthPage() {
                       </Button>
                     </form>
                   </CardContent>
-                  <CardFooter className="flex flex-col">
-                    <div className="relative my-4 w-full">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white px-2 text-gray-500 dark:bg-gray-950 dark:text-gray-400">
-                          Or continue with
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button variant="outline">Google</Button>
-                      <Button variant="outline">GitHub</Button>
-                    </div>
-                  </CardFooter>
                 </Card>
               </TabsContent>
             </Tabs>
@@ -285,5 +224,5 @@ export default function AuthPage() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
