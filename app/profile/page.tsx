@@ -17,9 +17,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Bell, CreditCard, Settings, User, CheckCircle } from "lucide-react"
 
+type LocalUser = {
+  name: string
+  email: string
+  accountType: "free" | "premium"
+  company?: string
+  website?: string
+}
+
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [userData, setUserData] = useState<FirebaseUser | null>(null)
+  const [userData, setUserData] = useState<LocalUser | null>(null)
   const router = useRouter()
 
   useEffect(() => {
