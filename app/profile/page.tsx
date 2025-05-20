@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-
+import { onAuthStateChanged } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
