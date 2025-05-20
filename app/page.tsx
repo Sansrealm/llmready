@@ -1,4 +1,4 @@
-// This file combines your original V0 layout with your working form functionality
+// ✅ FINAL MERGED app/page.tsx — Guest Limit + Login Resume + Turnstile
 "use client";
 
 import { useState, useEffect } from "react";
@@ -33,6 +33,7 @@ import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { auth } from "@/lib/firebase";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -44,7 +45,22 @@ export default function Home() {
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const router = useRouter();
 
-  // Load analysis count from localStorage on component mount
+  // Resume from sessionStorage if redirected after login
+  useEffect(() => {
+    const pendingUrl = sessionStorage.getItem("pendingURL");
+    if (pendingUrl) {
+      const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
+      const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
+      sessionStorage.removeItem("pendingURL");
+      sessionStorage.removeItem("pendingIndustry");
+      sessionStorage.removeItem("pendingEmail");
+      router.push(
+        `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(pendingIndustry)}&turnstileToken=dummy`
+      );
+    }
+  }, [router]);
+
+  // Load guest usage count from localStorage
   useEffect(() => {
     const storedCount = localStorage.getItem("guestAnalysisCount");
     if (storedCount) {
@@ -52,35 +68,40 @@ export default function Home() {
     }
   }, []);
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url) return alert("Please enter a valid URL");
+    if (!url.trim()) return alert("Please enter a valid URL");
     if (!turnstileToken) return alert("Please complete the CAPTCHA challenge");
 
-    // Check if user has already performed an analysis
-    if (analysisCount >= 1) {
-      setShowLoginAlert(true);
-      // Scroll to the alert
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-      return;
-    }
-
-    let processedUrl = url;
+    let processedUrl = url.trim();
     try {
-      const parsed = new URL(processedUrl);
+      new URL(processedUrl);
     } catch {
       processedUrl = "https://" + processedUrl;
     }
 
-    setIsSubmitting(true);
-    try {
-      // Increment the analysis count and store in localStorage
+    const user = auth.currentUser;
+    if (!user) {
+      if (analysisCount >= 1) {
+        setShowLoginAlert(true);
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 100);
+        return;
+      }
+      // Save input for post-login resume
+      sessionStorage.setItem("pendingURL", processedUrl);
+      sessionStorage.setItem("pendingIndustry", industry);
+      sessionStorage.setItem("pendingEmail", email);
+
+      // Increment localStorage count
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
       localStorage.setItem("guestAnalysisCount", newCount.toString());
+    }
 
+    setIsSubmitting(true);
+    try {
       router.push(
         `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(industry)}&turnstileToken=${encodeURIComponent(turnstileToken)}`
       );
@@ -93,8 +114,7 @@ export default function Home() {
   };
 
   const handleLoginRedirect = () => {
-    // Redirect to login page with return URL
-    router.push(`/login?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+    router.push("/login");
   };
 
   return (
@@ -136,7 +156,6 @@ export default function Home() {
               </div>
               <div className="w-full max-w-md space-y-2">
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* URL Input + Turnstile */}
                   <div className="space-y-3">
                     <Input
                       type="text"
@@ -145,7 +164,6 @@ export default function Home() {
                       onChange={(e) => setUrl(e.target.value)}
                       required
                     />
-
                     <Turnstile
                       sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
                       onVerify={(token) => setTurnstileToken(token)}
@@ -153,8 +171,6 @@ export default function Home() {
                       className="w-full"
                     />
                   </div>
-
-                  {/* Optional Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
                       type="email"
@@ -176,99 +192,16 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Analysis Limit Notice */}
                   {analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Free users can analyze 1 website. Create an account for unlimited analyses.
                     </p>
                   )}
-
-                  {/* Submit */}
-                  <Button type="submit" disabled={isSubmitting || analysisCount >= 1} className="w-full">
-                    {isSubmitting ? "Analyzing..." : analysisCount >= 1 ? "Analysis Limit Reached" : "Analyze"}
+                  <Button type="submit" disabled={isSubmitting || (auth.currentUser === null && analysisCount >= 1)} className="w-full">
+                    {isSubmitting ? "Analyzing..." : (auth.currentUser === null && analysisCount >= 1) ? "Analysis Limit Reached" : "Analyze"}
                   </Button>
-
-                  {analysisCount >= 1 && (
-                    <Button type="button" onClick={handleLoginRedirect} className="w-full mt-2">
-                      Log in to analyze more websites
-                    </Button>
-                  )}
                 </form>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Why LLM Ready Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                  Why LLM Readiness Matters
-                </h2>
-                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed dark:text-gray-400">
-                  As AI-powered search becomes the norm, optimizing your website for Large Language Models is crucial for visibility and traffic.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 py-12 md:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                  <Search className="h-8 w-8 text-green-600" />
-                  <CardTitle className="text-xl">AI Visibility</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Ensure your content is properly understood and indexed by AI search engines.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                  <Zap className="h-8 w-8 text-green-600" />
-                  <CardTitle className="text-xl">Future-Proof</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Stay ahead of the curve as search evolves from keywords to intent-based queries.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                  <Globe className="h-8 w-8 text-green-600" />
-                  <CardTitle className="text-xl">Wider Reach</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Reach users through AI assistants, chatbots, and next-gen search interfaces.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-blue-600 dark:bg-blue-900">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center text-white">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                  Ready to optimize your website for AI?
-                </h2>
-                <p className="mx-auto max-w-[700px] md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed text-blue-100">
-                  Get your free LLM readiness score today and start improving your AI visibility.
-                </p>
-              </div>
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50" asChild>
-                <Link href="#top">
-                  Analyze Your Website
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
             </div>
           </div>
         </section>
