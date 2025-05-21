@@ -27,6 +27,8 @@ export default function ResultsPage() {
     const isPremium = false; // ⛔ TEMPORARY placeholder
     const freeParams: any[] = analysisResult?.parameters?.filter((p: any) => !p.isPremium) || [];
     const premiumParams: any[] = analysisResult?.parameters?.filter((p: any) => p.isPremium) || [];
+    const freeRecs: any[] = analysisResult?.recommendations?.filter((r: any) => !r.isPremium) || [];
+    const premiumRecs: any[] = analysisResult?.recommendations?.filter((r: any) => r.isPremium) || [];
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser: User | null) => {
