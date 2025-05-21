@@ -63,7 +63,7 @@ export default function ResultsPage() {
                     userId: user.uid,
                     email: user.email,
                     websiteUrl: rawUrl,
-                    analysisData: result
+                    analysisData: analysisResult
                 })
             });
             const json = await res.json();
