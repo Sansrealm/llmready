@@ -98,7 +98,7 @@ export default function ResultsPage() {
                                 <CardDescription>Your website's LLM readiness</CardDescription>
                             </CardHeader>
                             <CardContent className="flex justify-center">
-                                <ScoreGauge score={analysisResult.overall_score} />
+                                <ScoreGauge score={result?.overall_score} />
                             </CardContent>
                             <CardFooter className="flex justify-center">
                                 <Badge className={
