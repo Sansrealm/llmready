@@ -253,4 +253,6 @@ export default function ResultsPage() {
                 )}
             </main>
             <Footer />
-        </div>);
+        </div>
+    );
+}
