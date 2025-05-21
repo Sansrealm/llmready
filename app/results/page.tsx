@@ -40,7 +40,7 @@ export default function ResultsPage() {
     useEffect(() => {
         const fetchResult = async () => {
             try {
-                const res = await fetch(`/api/route`, {
+                const res = await fetch(`/api/analyze`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ url: rawUrl }),
