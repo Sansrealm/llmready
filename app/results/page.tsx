@@ -97,48 +97,50 @@ export default function ResultsPage() {
                     </div>
 
                     {/* Overall Score Section */}
-                    <div className="grid gap-6 md:grid-cols-3 mb-12">
-                        <Card className="md:col-span-1">
-                            <CardHeader>
-                                <CardTitle>Overall Score</CardTitle>
-                                <CardDescription>Your website's LLM readiness</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex justify-center">
-                                <ScoreGauge score={analysisResult?.overall_score} />
-                            </CardContent>
-                            <CardFooter className="flex justify-center">
-                                <Badge className={
-                                    analysisResult.overall_score >= 80 ? "bg-green-600" :
-                                        analysisResult.overall_score >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                }>
-                                    {analysisResult.overall_score >= 80 ? "Excellent" : analysisResult.overall_score >= 60 ? "Good" : "Needs Improvement"}
-                                </Badge>
-                            </CardFooter>
-                        </Card>
+                    {analysisResult ? (
+                        <div className="grid gap-6 md:grid-cols-3 mb-12">
+                            <Card className="md:col-span-1">
+                                <CardHeader>
+                                    <CardTitle>Overall Score</CardTitle>
+                                    <CardDescription>Your website's LLM readiness</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex justify-center">
+                                    <ScoreGauge score={analysisResult?.overall_score} />
+                                </CardContent>
+                                <CardFooter className="flex justify-center">
+                                    <Badge className={
+                                        analysisResult.overall_score >= 80 ? "bg-green-600" :
+                                            analysisResult.overall_score >= 60 ? "bg-yellow-600" : "bg-red-600"
+                                    }>
+                                        {analysisResult.overall_score >= 80 ? "Excellent" : analysisResult.overall_score >= 60 ? "Good" : "Needs Improvement"}
+                                    </Badge>
+                                </CardFooter>
+                            </Card>
 
-                        <Card className="md:col-span-2">
-                            <CardHeader>
-                                <CardTitle>Score Summary</CardTitle>
-                                <CardDescription>Breakdown of your LLM readiness factors</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {analysisResult.parameters.map((param: any) => (
-                                    <div key={param.name} className="space-y-1">
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <span>{param.name}</span>
-                                                {param.isPremium && !isPremium && <Lock className="h-4 w-4 text-gray-400" />}
+                            <Card className="md:col-span-2">
+                                <CardHeader>
+                                    <CardTitle>Score Summary</CardTitle>
+                                    <CardDescription>Breakdown of your LLM readiness factors</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {analysisResult.parameters.map((param: any) => (
+                                        <div key={param.name} className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <span>{param.name}</span>
+                                                    {param.isPremium && !isPremium && <Lock className="h-4 w-4 text-gray-400" />}
+                                                </div>
+                                                <span className="font-medium">
+                                                    {param.isPremium && !isPremium ? "Locked" : `${param.score}/100`}
+                                                </span>
                                             </div>
-                                            <span className="font-medium">
-                                                {param.isPremium && !isPremium ? "Locked" : `${param.score}/100`}
-                                            </span>
+                                            <Progress value={param.isPremium && !isPremium ? 100 : param.score} />
                                         </div>
-                                        <Progress value={param.isPremium && !isPremium ? 100 : param.score} />
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
 
                     {/* Tabs */}
                     <Tabs defaultValue="parameters">
