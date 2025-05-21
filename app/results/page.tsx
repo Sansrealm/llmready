@@ -81,6 +81,7 @@ export default function ResultsPage() {
     }
 
     return (
+
         <div>
             <Navbar />
             <main className="flex-1">
@@ -116,19 +117,19 @@ export default function ResultsPage() {
                                 <CardDescription>Breakdown of your LLM readiness factors</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {analysisResult.parameters.map(param: any) => (
-                                <div key={param.name} className="space-y-1">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                                            <span>{param.name}</span>
-                                            {param.isPremium && !isPremium && <Lock className="h-4 w-4 text-gray-400" />}
+                                {analysisResult.parameters.map((param: any) => (
+                                    <div key={param.name} className="space-y-1">
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <span>{param.name}</span>
+                                                {param.isPremium && !isPremium && <Lock className="h-4 w-4 text-gray-400" />}
+                                            </div>
+                                            <span className="font-medium">
+                                                {param.isPremium && !isPremium ? "Locked" : `${param.score}/100`}
+                                            </span>
                                         </div>
-                                        <span className="font-medium">
-                                            {param.isPremium && !isPremium ? "Locked" : `${param.score}/100`}
-                                        </span>
+                                        <Progress value={param.isPremium && !isPremium ? 100 : param.score} />
                                     </div>
-                                    <Progress value={param.isPremium && !isPremium ? 100 : param.score} />
-                                </div>
                                 ))}
                             </CardContent>
                         </Card>
