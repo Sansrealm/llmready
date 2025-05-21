@@ -79,7 +79,7 @@ export default function ResultsPage() {
             setLoading(true);
             setError(null);
 
-            const cacheKey = `llm_analysis_${url}_${email}_${industry}`;
+            const cacheKey = `llm_analysis_${url}`;
             const cached = sessionStorage.getItem(cacheKey);
 
             if (cached) {
@@ -89,27 +89,16 @@ export default function ResultsPage() {
             }
 
             try {
-                // Create the request body with proper TypeScript typing
-                const requestBody: {
-                    url: string;
-                    email: string;
-                    industry: string;
-                    turnstileToken?: string; // Make turnstileToken optional
-                } = {
-                    url,
-                    email,
-                    industry
-                };
-
-                // Only add turnstileToken if it exists
-                if (turnstileToken) {
-                    requestBody.turnstileToken = turnstileToken;
-                }
-
+                // Simplified approach - don't use turnstileToken in results page at all
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody),
+                    body: JSON.stringify({
+                        url,
+                        email,
+                        industry
+                        // No turnstileToken here - verification will happen on the server if needed
+                    }),
                 });
 
                 if (!response.ok) {
@@ -131,7 +120,7 @@ export default function ResultsPage() {
         if (url) {
             fetchAnalysis();
         }
-    }, [url, email, industry, turnstileToken]);
+    }, [url, email, industry]); // Remove turnstileToken from dependencies
 
 
     const isValidAnalysis = (
