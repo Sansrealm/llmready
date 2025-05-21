@@ -24,6 +24,7 @@ export default function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [isEmailing, setIsEmailing] = useState(false)
     const [user, setUser] = useState<User | null>(null);
+    const isPremium = false; // ⛔ TEMPORARY placeholder
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser: User | null) => {
