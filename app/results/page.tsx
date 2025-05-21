@@ -23,6 +23,7 @@ export default function ResultsPage() {
     const rawUrl = searchParams.get("url") || ""
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [isEmailing, setIsEmailing] = useState(false)
+    const [user, setUser] = useState<User | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser: User | null) => {
