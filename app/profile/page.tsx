@@ -445,7 +445,7 @@ export default function ProfilePage() {
                   <div className="rounded-lg border border-red-200 p-4 dark:border-red-900">
                     <h3 className="font-semibold text-red-600 dark:text-red-400">Delete Account</h3>
                     <p className="mt-1 text-sm">
-                      Once you delete your account, there is no going back. Please be certain.
+                      Once you delete your account, there's no going back. Please be certain.
                     </p>
                     <Button
                       variant="outline"
