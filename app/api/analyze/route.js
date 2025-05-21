@@ -123,17 +123,23 @@ export async function POST(request) {
     console.log("GPT response:", raw);
 
     let analysisResult;
+
     try {
       analysisResult = JSON.parse(raw);
-    } catch (parseError) {
-      console.error("Failed to parse GPT JSON:", parseError);
-      return NextResponse.json(
-        {
-          error: "OpenAI returned invalid JSON.",
-          raw,
-        },
-        { status: 500 }
-      );
+      if (
+        typeof analysisResult !== "object" ||
+        typeof analysisResult.overall_score !== "number" ||
+        !Array.isArray(analysisResult.parameters) ||
+        !Array.isArray(analysisResult.recommendations)
+      ) {
+        throw new Error("Invalid analysis structure");
+      }
+    } catch (err) {
+      console.error("❌ GPT JSON parse or shape error:", err);
+      return NextResponse.json({
+        error: "Invalid JSON structure from OpenAI",
+        raw,
+      }, { status: 500 });
     }
 
     return NextResponse.json(analysisResult);

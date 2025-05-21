@@ -124,16 +124,28 @@ export default function ResultsPage() {
         )
     }
 
-    if (error || !analysisResult) {
+    const isValidAnalysis = (
+        analysisResult &&
+        typeof analysisResult.overall_score === 'number' &&
+        Array.isArray(analysisResult.parameters) &&
+        Array.isArray(analysisResult.recommendations)
+    );
+
+    if (loading) {
+        return <LoadingScreen />
+    }
+
+    if (!isValidAnalysis) {
         return (
             <div className="container px-4 py-12 text-center">
                 <h1 className="text-4xl font-bold mb-4">Analysis Error</h1>
-                <p className="text-lg text-muted-foreground">{error || "No results available for " + url}</p>
+                <p className="text-lg text-muted-foreground">
+                    {error || "Invalid analysis response received."}
+                </p>
                 <Button className="mt-6" onClick={() => window.location.href = "/"}>Try Again</Button>
             </div>
-        )
+        );
     }
-
     const freeParams = analysisResult.parameters.filter(p => !p.isPremium)
     const premiumParams = analysisResult.parameters.filter(p => p.isPremium)
     const freeRecs = analysisResult.recommendations.filter(r => !r.isPremium)
