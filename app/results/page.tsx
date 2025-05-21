@@ -21,8 +21,7 @@ import { toast } from "sonner"
 export default function ResultsPage() {
     const searchParams = useSearchParams()
     const rawUrl = searchParams.get("url") || ""
-    const [result, setResult] = useState<any>(null)
-    const [user, setUser] = useState<any>(null)
+    const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [isEmailing, setIsEmailing] = useState(false)
 
     useEffect(() => {
@@ -41,7 +40,7 @@ export default function ResultsPage() {
                     body: JSON.stringify({ url: rawUrl }),
                 });
                 const data = await res.json();
-                setResult(data);
+                setAnalysisResult(data);
             } catch (err) {
                 console.error("Error fetching result:", err);
             }
