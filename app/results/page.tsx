@@ -79,7 +79,7 @@ export default function ResultsPage() {
             setLoading(true);
             setError(null);
 
-            const cacheKey = `llm_analysis_${url}`;
+            const cacheKey = `llm_analysis_${url}_${email}_${industry}`;
             const cached = sessionStorage.getItem(cacheKey);
 
             if (cached) {
@@ -89,16 +89,17 @@ export default function ResultsPage() {
             }
 
             try {
-                // Simplified approach - don't use turnstileToken in results page at all
+                // Simple object - no need for complex TypeScript type definitions
+                const requestBody = {
+                    url,
+                    email,
+                    industry
+                };
+
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        url,
-                        email,
-                        industry
-                        // No turnstileToken here - verification will happen on the server if needed
-                    }),
+                    body: JSON.stringify(requestBody),
                 });
 
                 if (!response.ok) {
@@ -116,10 +117,6 @@ export default function ResultsPage() {
                 setLoading(false);
             }
         };
-
-        if (url) {
-            fetchAnalysis();
-        }
     }, [url, email, industry]); // Remove turnstileToken from dependencies
 
 
