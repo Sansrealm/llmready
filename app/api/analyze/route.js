@@ -23,13 +23,18 @@ async function verifyTurnstile(token) {
 export async function POST(request) {
   try {
     const { url, email, industry, turnstileToken } = await request.json();
-    console.log("🎟️ Received token:", turnstileToken);
 
-    // ✅ Verify Turnstile
-    const isHuman = await verifyTurnstile(turnstileToken);
-    if (!isHuman) {
-      console.error("❌ Turnstile verification failed for token:", turnstileToken);
-      return NextResponse.json({ error: "Bot verification failed." }, { status: 403 });
+    // If turnstileToken is provided, verify it
+    if (turnstileToken) {
+      console.log("🎟️ Received token:", turnstileToken);
+      const isHuman = await verifyTurnstile(turnstileToken);
+      if (!isHuman) {
+        console.error("❌ Turnstile verification failed for token:", turnstileToken);
+        return NextResponse.json({ error: "Bot verification failed." }, { status: 403 });
+      }
+    } else {
+      // No token provided - this is fine if the user is authenticated through Firebase
+      console.log("⚠️ No turnstile token provided - skipping verification");
     }
 
     // 1. Fetch website content

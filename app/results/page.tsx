@@ -79,7 +79,7 @@ export default function ResultsPage() {
             setLoading(true);
             setError(null);
 
-            const cacheKey = `llm_analysis_${url}_${email}_${industry}_${turnstileToken}`;
+            const cacheKey = `llm_analysis_${url}_${email}_${industry}`;
             const cached = sessionStorage.getItem(cacheKey);
 
             if (cached) {
@@ -89,10 +89,18 @@ export default function ResultsPage() {
             }
 
             try {
+                // Send the request with or without the token based on authentication
+                const requestBody = { url, email, industry };
+
+                // Only include turnstileToken if it exists
+                if (turnstileToken) {
+                    requestBody.turnstileToken = turnstileToken;
+                }
+
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, email, industry, turnstileToken }),
+                    body: JSON.stringify(requestBody),
                 });
 
                 if (!response.ok) {
