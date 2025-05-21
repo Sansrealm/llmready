@@ -89,10 +89,19 @@ export default function ResultsPage() {
             }
 
             try {
-                // Send the request with or without the token based on authentication
-                const requestBody = { url, email, industry };
+                // Create the request body with proper TypeScript typing
+                const requestBody: {
+                    url: string;
+                    email: string;
+                    industry: string;
+                    turnstileToken?: string; // Make turnstileToken optional
+                } = {
+                    url,
+                    email,
+                    industry
+                };
 
-                // Only include turnstileToken if it exists
+                // Only add turnstileToken if it exists
                 if (turnstileToken) {
                     requestBody.turnstileToken = turnstileToken;
                 }
