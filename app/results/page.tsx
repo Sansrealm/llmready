@@ -25,6 +25,8 @@ export default function ResultsPage() {
     const [isEmailing, setIsEmailing] = useState(false)
     const [user, setUser] = useState<User | null>(null);
     const isPremium = false; // ⛔ TEMPORARY placeholder
+    const freeParams: any[] = analysisResult?.parameters?.filter((p: any) => !p.isPremium) || [];
+    const premiumParams: any[] = analysisResult?.parameters?.filter((p: any) => p.isPremium) || [];
 
     useEffect(() => {
         const unsubscribe = onAuthStateChange((currentUser: User | null) => {
