@@ -16,6 +16,7 @@ async function verifyTurnstile(token) {
     body: `secret=${secret}&response=${token}`,
   });
   const data = await res.json();
+  console.log("🔐 Turnstile verify result:", data);
   return data.success;
 }
 
