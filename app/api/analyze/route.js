@@ -23,6 +23,7 @@ async function verifyTurnstile(token) {
 export async function POST(request) {
   try {
     const { url, email, industry, turnstileToken } = await request.json();
+    console.log("🎟️ Received token:", turnstileToken);
 
     // ✅ Verify Turnstile
     const isHuman = await verifyTurnstile(turnstileToken);
