@@ -177,7 +177,7 @@ export default function Home() {
                       onVerify={(token) => setTurnstileToken(token)}
                       theme="auto"
                       className="w-full"
-                      domain="llmcheck.app"
+
                       scriptOptions={{
                         appendTo: "head",
                         defer: true,
