@@ -1,7 +1,6 @@
 "use client";
 import type { User } from "firebase/auth";
 import { useState, useEffect } from "react";
-import Turnstile from "react-turnstile";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link"
@@ -24,7 +23,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [industry, setIndustry] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
+
   const [analysisCount, setAnalysisCount] = useState(0);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -54,17 +53,17 @@ export default function Home() {
     if (pendingUrl) {
       const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
       const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-      const pendingToken = sessionStorage.getItem("pendingTurnstileToken") || "";
+
 
       sessionStorage.removeItem("pendingURL");
       sessionStorage.removeItem("pendingIndustry");
       sessionStorage.removeItem("pendingEmail");
-      sessionStorage.removeItem("pendingTurnstileToken");
+
 
       router.push(
         `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(
           pendingIndustry
-        )}&turnstileToken=${encodeURIComponent(pendingToken)}`
+        )}`
       );
     }
   }, [router]);
@@ -81,7 +80,7 @@ export default function Home() {
     e.preventDefault();
     if (!authLoaded) return;
     if (!url.trim()) return alert("Please enter a valid URL");
-    if (!turnstileToken) return alert("Please complete the CAPTCHA challenge");
+
 
     let processedUrl = url.trim();
     try {
@@ -100,7 +99,7 @@ export default function Home() {
       sessionStorage.setItem("pendingURL", processedUrl);
       sessionStorage.setItem("pendingIndustry", industry);
       sessionStorage.setItem("pendingEmail", email);
-      sessionStorage.setItem("pendingTurnstileToken", turnstileToken);
+
 
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
@@ -113,7 +112,7 @@ export default function Home() {
       router.push(
         `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(
           industry
-        )}&turnstileToken=${encodeURIComponent(turnstileToken)}`
+        )}`
       );
     } catch (error) {
       console.error("Error:", error);
@@ -172,12 +171,7 @@ export default function Home() {
                       onChange={(e) => setUrl(e.target.value)}
                       required
                     />
-                    <Turnstile
-                      sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-                      onVerify={(token) => setTurnstileToken(token)}
-                      theme="auto"
-                      className="w-full"
-                    />
+
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
