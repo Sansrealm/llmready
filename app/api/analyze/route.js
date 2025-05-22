@@ -1,57 +1,25 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
+import { auth } from '@clerk/nextjs/server';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// ✅ Turnstile verification function
-async function verifyTurnstile(token) {
-  if (!token) return false;
-
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  try {
-    // Use server-side verification that doesn't trigger CORS issues
-    // This is a more robust approach for production environments
-    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        // Add origin header to help with CORS
-        "Origin": process.env.NEXT_PUBLIC_APP_URL || "https://llmcheck.app"
-      },
-      // Add additional parameters to help with verification
-      body: `secret=${secret}&response=${token}&remoteip=${process.env.VERCEL_IP || ''}`,
-    });
-    const data = await res.json();
-    console.log("🔐 Turnstile verify result:", data);
-    return data.success;
-  } catch (error) {
-    console.error("Turnstile verification error:", error);
-    // Don't fail the entire analysis due to Turnstile issues
-    // This makes the app more resilient to temporary Cloudflare problems
-    return true;
-  }
-}
-
 export async function POST(request) {
   try {
+    // Get authentication status from Clerk
+    const { userId } = auth();
+    const isAuthenticated = !!userId;
+
     // Get request data
     const requestData = await request.json();
-    const { url, email, industry, turnstileToken } = requestData;
+    const { url, email, industry } = requestData;
 
-    // TEMPORARY FIX: Completely bypass Turnstile verification
-    // This ensures the analysis works while we troubleshoot Turnstile integration
-    console.log("🔐 Bypassing Turnstile verification temporarily to restore functionality");
-
-    // Log token status for debugging purposes only
-    if (turnstileToken) {
-      console.log("🔐 Turnstile token was provided, but verification is bypassed");
-    } else {
-      console.log("⚠️ No Turnstile token provided, verification is bypassed anyway");
-    }
+    // Log authentication status
+    console.log(`🔐 User authentication status: ${isAuthenticated ? 'Authenticated' : 'Guest'}`);
 
     // 1. Fetch website content
     const response = await fetch(url);
@@ -86,10 +54,10 @@ export async function POST(request) {
       {
         "overall_score": (0-100),
         "parameters": [
-          { "name": "...", "score": 0-100, "isPremium": true/false, "description": "..." }
+          { "name": "...", "score": 0-100, "isPremium": ${!isAuthenticated}, "description": "..." }
         ],
         "recommendations": [
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": true/false }
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!isAuthenticated} }
         ]
       }
     `;

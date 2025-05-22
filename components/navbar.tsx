@@ -4,35 +4,14 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User } from "lucide-react"
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { auth } from "@/lib/firebase"
-
+import { UserButton, SignInButton, SignUpButton, useAuth } from "@clerk/nextjs"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<FirebaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { isLoaded, userId, isSignedIn } = useAuth()
   const pathname = usePathname()
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser)
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [])
-
-  const handleLogout = async () => {
-    await auth.signOut()
-    setUser(null)
-    setIsOpen(false)
-    if (pathname.startsWith("/profile")) {
-      window.location.href = "/"
-    }
-  }
 
   const navigation = [
     { name: "Home", href: "/" },
@@ -67,27 +46,25 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex md:items-center md:gap-4">
-          {!loading && user ? (
+          {isLoaded && isSignedIn ? (
             <div className="flex items-center gap-4">
               <Button variant="ghost" className="flex items-center gap-2" asChild>
                 <Link href="/profile">
                   <User className="h-4 w-4" />
-                  <span>{user.displayName || user.email || "My Account"}</span>
+                  <span>My Account</span>
                 </Link>
               </Button>
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
+              <UserButton afterSignOutUrl="/" />
             </div>
           ) : (
-            !loading && (
+            isLoaded && (
               <>
-                <Button variant="ghost" asChild>
-                  <Link href="/login">Login</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/login?tab=signup">Sign Up</Link>
-                </Button>
+                <SignInButton mode="modal">
+                  <Button variant="ghost">Login</Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button>Sign Up</Button>
+                </SignUpButton>
               </>
             )
           )}
@@ -126,24 +103,28 @@ export default function Navbar() {
               </nav>
 
               <div className="flex flex-col gap-2 pt-6">
-                {!loading && user ? (
+                {isLoaded && isSignedIn ? (
                   <>
                     <Button asChild onClick={() => setIsOpen(false)}>
                       <Link href="/profile">My Account</Link>
                     </Button>
-                    <Button variant="outline" onClick={handleLogout}>
-                      Logout
-                    </Button>
+                    <div className="flex justify-center py-2">
+                      <UserButton afterSignOutUrl="/" />
+                    </div>
                   </>
                 ) : (
-                  !loading && (
+                  isLoaded && (
                     <>
-                      <Button variant="outline" asChild onClick={() => setIsOpen(false)}>
-                        <Link href="/login">Login</Link>
-                      </Button>
-                      <Button asChild onClick={() => setIsOpen(false)}>
-                        <Link href="/login?tab=signup">Sign Up</Link>
-                      </Button>
+                      <SignInButton mode="modal">
+                        <Button variant="outline" onClick={() => setIsOpen(false)}>
+                          Login
+                        </Button>
+                      </SignInButton>
+                      <SignUpButton mode="modal">
+                        <Button onClick={() => setIsOpen(false)}>
+                          Sign Up
+                        </Button>
+                      </SignUpButton>
                     </>
                   )
                 )}
