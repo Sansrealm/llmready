@@ -31,10 +31,23 @@ export async function POST(request) {
   try {
     // Get request data
     const requestData = await request.json();
-    const { url, email, industry } = requestData;
+    const { url, email, industry, turnstileToken } = requestData;
 
-    // Skip Turnstile verification entirely - we'll implement this in a different way later
-    // For now, let's just get the app working again
+    // Optional Turnstile verification - only verify if token is provided
+    // This allows the analysis to work both with and without the token
+    if (turnstileToken) {
+      console.log("🔐 Turnstile token received, attempting verification");
+      const isValid = await verifyTurnstile(turnstileToken);
+      if (!isValid) {
+        console.warn("⚠️ Turnstile verification failed, but proceeding with analysis");
+        // We're proceeding with analysis even if verification fails
+        // This ensures backward compatibility with existing flows
+      } else {
+        console.log("✅ Turnstile verification successful");
+      }
+    } else {
+      console.log("⚠️ No Turnstile token provided, skipping verification");
+    }
 
     // 1. Fetch website content
     const response = await fetch(url);

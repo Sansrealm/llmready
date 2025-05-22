@@ -41,7 +41,7 @@ export default function ResultsPage() {
     const url = searchParams.get("url") || "example.com"
     const email = searchParams.get("email") || ""
     const industry = searchParams.get("industry") || ""
-    //const turnstileToken = searchParams.get("turnstileToken") || "";
+    const turnstileToken = searchParams.get("turnstileToken") || "";
     const isPremium = email !== ""
 
     const [loading, setLoading] = useState(true)
@@ -93,7 +93,8 @@ export default function ResultsPage() {
                 const requestBody = {
                     url,
                     email,
-                    industry
+                    industry,
+                    turnstileToken
                 };
 
                 const response = await fetch('/api/analyze', {

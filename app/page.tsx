@@ -113,7 +113,7 @@ export default function Home() {
       router.push(
         `/results?url=${encodeURIComponent(processedUrl)}&email=${encodeURIComponent(email)}&industry=${encodeURIComponent(
           industry
-        )}`
+        )}&turnstileToken=${encodeURIComponent(turnstileToken)}`
       );
     } catch (error) {
       console.error("Error:", error);
