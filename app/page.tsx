@@ -177,13 +177,6 @@ export default function Home() {
                       onVerify={(token) => setTurnstileToken(token)}
                       theme="auto"
                       className="w-full"
-
-                      scriptOptions={{
-                        appendTo: "head",
-                        defer: true,
-                      }}
-                      responseField={false}
-                      refreshExpired="auto"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
