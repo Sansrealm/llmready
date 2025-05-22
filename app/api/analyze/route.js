@@ -1,3 +1,4 @@
+// app/api/analyze/route.js
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
@@ -24,7 +25,7 @@ export async function POST(request) {
     const response = await fetch(url);
     const html = await response.text();
 
-    // 2. Parse HTML (existing code)
+    // 2. Parse HTML
     const $ = cheerio.load(html);
     const title = $('title').text();
     const metaDescription = $('meta[name="description"]').attr('content') || '';
@@ -35,7 +36,7 @@ export async function POST(request) {
     const images = $('img').length;
     const imagesWithAlt = $('img[alt]').length;
 
-    // 3. OpenAI prompt (existing code)
+    // 3. OpenAI prompt
     const analysisPrompt = `
       Analyze this website for LLM readiness:
       URL: ${url}

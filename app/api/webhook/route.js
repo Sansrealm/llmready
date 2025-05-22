@@ -1,10 +1,6 @@
-// API route for handling Stripe webhooks
-// src/app/api/webhook/route.js
-
+// app/api/webhook/route.js
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -51,58 +47,32 @@ export async function POST(request) {
 // Handle checkout session completed
 async function handleCheckoutSessionCompleted(session) {
   const userId = session.metadata.userId;
-  
-  // Retrieve the subscription
-  const subscription = await stripe.subscriptions.retrieve(session.subscription);
-  
-  // Store subscription info in Firestore
-  const userSubscriptionRef = doc(db, 'subscriptions', userId);
-  await setDoc(userSubscriptionRef, {
-    stripeCustomerId: session.customer,
-    stripeSubscriptionId: session.subscription,
-    stripePriceId: subscription.items.data[0].price.id,
-    status: subscription.status,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+
+  console.log(`Checkout completed for user: ${userId}`);
+
+  // Here you would typically:
+  // 1. Store subscription info in your database
+  // 2. Update user's plan in Clerk metadata
+  // 3. Send confirmation email
+
+  // For now, just log it
+  console.log('Subscription activated for user:', userId);
 }
 
 // Handle subscription updated
 async function handleSubscriptionUpdated(subscription) {
-  // Find the user by customer ID
-  const customerId = subscription.customer;
-  
-  // In a real app, you would query Firestore to find the user with this customer ID
-  // For simplicity, we'll assume we have a way to find the userId from the customerId
-  // This could be done by maintaining a separate collection mapping customer IDs to user IDs
-  
-  // For demonstration purposes:
-  const userSubscriptionRef = doc(db, 'subscriptions', 'userId'); // Replace with actual userId lookup
-  
-  await setDoc(userSubscriptionRef, {
-    status: subscription.status,
-    stripePriceId: subscription.items.data[0].price.id,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    updatedAt: new Date(),
-  }, { merge: true });
+  console.log('Subscription updated:', subscription.id);
+
+  // Here you would:
+  // 1. Update subscription status in your database
+  // 2. Update user metadata in Clerk
 }
 
 // Handle subscription deleted
 async function handleSubscriptionDeleted(subscription) {
-  // Find the user by customer ID
-  const customerId = subscription.customer;
-  
-  // Similar to above, in a real app you would find the userId from the customerId
-  
-  // For demonstration purposes:
-  const userSubscriptionRef = doc(db, 'subscriptions', 'userId'); // Replace with actual userId lookup
-  
-  await setDoc(userSubscriptionRef, {
-    status: 'canceled',
-    updatedAt: new Date(),
-    canceledAt: new Date(),
-  }, { merge: true });
+  console.log('Subscription deleted:', subscription.id);
+
+  // Here you would:
+  // 1. Update subscription status to canceled in your database
+  // 2. Update user metadata in Clerk
 }
