@@ -6,6 +6,23 @@ import { useAuth } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
 // Import other components as needed
 
+type AnalysisResult = {
+    overall_score: number;
+    parameters: Array<{
+        name: string;
+        score: number;
+        isPremium: boolean;
+        description: string;
+    }>;
+    recommendations: Array<{
+        title: string;
+        description: string;
+        difficulty: string;
+        impact: string;
+        isPremium: boolean;
+    }>;
+};
+
 export default function ResultsPage() {
     const { isLoaded, userId } = useAuth();
     const isAuthenticated = isLoaded && !!userId;
@@ -15,7 +32,7 @@ export default function ResultsPage() {
     const email = searchParams.get("email");
     const industry = searchParams.get("industry");
 
-    const [analysisResult, setAnalysisResult] = useState(null);
+    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
