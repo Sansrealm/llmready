@@ -46,7 +46,7 @@ export default function ResultsPage() {
                 setAnalysisResult(data);
             } catch (err) {
                 console.error("Analysis error:", err);
-                setError(err.message);
+                setError(err instanceof Error ? err.message : 'An unknown error occurred');
             } finally {
                 setLoading(false);
             }
