@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { UserButton, SignInButton, SignUpButton, useAuth } from "@clerk/nextjs"
+import { UserButton, SignInButton, SignUpButton, useUser } from "@clerk/nextjs"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const { isLoaded, userId, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useUser()
   const pathname = usePathname()
 
   const navigation = [
@@ -48,13 +48,14 @@ export default function Navbar() {
         <div className="hidden md:flex md:items-center md:gap-4">
           {isLoaded && isSignedIn ? (
             <div className="flex items-center gap-4">
-              <Button variant="ghost" className="flex items-center gap-2" asChild>
-                <Link href="/profile">
-                  <User className="h-4 w-4" />
-                  <span>My Account</span>
-                </Link>
-              </Button>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "h-8 w-8"
+                  }
+                }}
+              />
             </div>
           ) : (
             isLoaded && (
@@ -105,11 +106,15 @@ export default function Navbar() {
               <div className="flex flex-col gap-2 pt-6">
                 {isLoaded && isSignedIn ? (
                   <>
-                    <Button asChild onClick={() => setIsOpen(false)}>
-                      <Link href="/profile">My Account</Link>
-                    </Button>
                     <div className="flex justify-center py-2">
-                      <UserButton afterSignOutUrl="/" />
+                      <UserButton
+                        afterSignOutUrl="/"
+                        appearance={{
+                          elements: {
+                            avatarBox: "h-10 w-10"
+                          }
+                        }}
+                      />
                     </div>
                   </>
                 ) : (

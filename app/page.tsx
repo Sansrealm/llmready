@@ -1,7 +1,7 @@
 "use client";
-import type { User } from "firebase/auth";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link"
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import { auth } from "@/lib/firebase";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -26,18 +25,8 @@ export default function Home() {
 
   const [analysisCount, setAnalysisCount] = useState(0);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoaded, setAuthLoaded] = useState(false);
+  const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
-
-  // Load Firebase user on mount
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-      setUser(firebaseUser);
-      setAuthLoaded(true);
-    });
-    return () => unsubscribe();
-  }, []);
 
   // Load guest usage count from localStorage
   useEffect(() => {
@@ -50,15 +39,13 @@ export default function Home() {
   // Resume pending submission after login
   useEffect(() => {
     const pendingUrl = sessionStorage.getItem("pendingURL");
-    if (pendingUrl) {
+    if (pendingUrl && isSignedIn) {
       const pendingIndustry = sessionStorage.getItem("pendingIndustry") || "";
       const pendingEmail = sessionStorage.getItem("pendingEmail") || "";
-
 
       sessionStorage.removeItem("pendingURL");
       sessionStorage.removeItem("pendingIndustry");
       sessionStorage.removeItem("pendingEmail");
-
 
       router.push(
         `/results?url=${encodeURIComponent(pendingUrl)}&email=${encodeURIComponent(pendingEmail)}&industry=${encodeURIComponent(
@@ -66,21 +53,12 @@ export default function Home() {
         )}`
       );
     }
-  }, [router]);
-
-  // To check console for proper user auth and session
-  useEffect(() => {
-    console.log("✅ Auth Loaded:", authLoaded);
-    console.log("👤 User object:", user);
-    console.log("🔁 UID:", user?.uid);
-  }, [authLoaded, user]);
-
+  }, [router, isSignedIn]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authLoaded) return;
+    if (!isLoaded) return;
     if (!url.trim()) return alert("Please enter a valid URL");
-
 
     let processedUrl = url.trim();
     try {
@@ -89,7 +67,7 @@ export default function Home() {
       processedUrl = "https://" + processedUrl;
     }
 
-    if (!user) {
+    if (!isSignedIn) {
       if (analysisCount >= 1) {
         setShowLoginAlert(true);
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
@@ -99,7 +77,6 @@ export default function Home() {
       sessionStorage.setItem("pendingURL", processedUrl);
       sessionStorage.setItem("pendingIndustry", industry);
       sessionStorage.setItem("pendingEmail", email);
-
 
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
@@ -122,9 +99,7 @@ export default function Home() {
     }
   };
 
-  const handleLoginRedirect = () => router.push("/login");
-
-  const isLimitReached = authLoaded && !user && analysisCount >= 1;
+  const isLimitReached = isLoaded && !isSignedIn && analysisCount >= 1;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -138,12 +113,6 @@ export default function Home() {
               <AlertTitle>Free analysis limit reached</AlertTitle>
               <AlertDescription>
                 You've reached the limit for free website analyses. Please log in or create an account to continue.
-                <div className="mt-2">
-                  <Button onClick={handleLoginRedirect} variant="outline" className="mr-2">
-                    Log in
-                  </Button>
-                  <Button onClick={() => router.push("/login?tab=signup")}>Create account</Button>
-                </div>
               </AlertDescription>
             </Alert>
           </div>
@@ -171,7 +140,6 @@ export default function Home() {
                       onChange={(e) => setUrl(e.target.value)}
                       required
                     />
-
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
@@ -194,12 +162,12 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {!user && analysisCount === 0 && (
+                  {!isSignedIn && analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Free users can analyze 1 website. Create an account for more.
                     </p>
                   )}
-                  <Button type="submit" disabled={!authLoaded || isSubmitting || isLimitReached} className="w-full">
+                  <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached} className="w-full">
                     {isSubmitting
                       ? "Analyzing..."
                       : isLimitReached

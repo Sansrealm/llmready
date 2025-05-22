@@ -3,7 +3,6 @@ import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
 import { auth } from '@clerk/nextjs/server';
 
-// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -19,14 +18,13 @@ export async function POST(request) {
     const requestData = await request.json();
     const { url, email, industry } = requestData;
 
-    // No verification checks - completely bypassed
     console.log("🔄 Processing analysis request for URL:", url);
 
     // 1. Fetch website content
     const response = await fetch(url);
     const html = await response.text();
 
-    // 2. Parse HTML
+    // 2. Parse HTML (existing code)
     const $ = cheerio.load(html);
     const title = $('title').text();
     const metaDescription = $('meta[name="description"]').attr('content') || '';
@@ -37,7 +35,7 @@ export async function POST(request) {
     const images = $('img').length;
     const imagesWithAlt = $('img[alt]').length;
 
-    // 3. OpenAI prompt
+    // 3. OpenAI prompt (existing code)
     const analysisPrompt = `
       Analyze this website for LLM readiness:
       URL: ${url}
