@@ -291,7 +291,7 @@ export default function ResultsPage() {
                     <Card className="mt-12">
                         <CardHeader>
                             <CardTitle>Export Your Report</CardTitle>
-                            <CardDescription>Save or share your LLM readiness analysis</CardDescription>
+                            <CardDescription>Save or share your LLM readyness analysis</CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col sm:flex-row gap-4">
                             <Button variant="outline">Download PDF</Button>
