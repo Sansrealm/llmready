@@ -13,13 +13,14 @@ export async function POST(request) {
     // Get authentication status from Clerk
     const { userId } = auth();
     const isAuthenticated = !!userId;
+    console.log(`🔐 User authentication status: ${isAuthenticated ? 'Authenticated' : 'Guest'}`);
 
     // Get request data
     const requestData = await request.json();
     const { url, email, industry } = requestData;
 
-    // Log authentication status
-    console.log(`🔐 User authentication status: ${isAuthenticated ? 'Authenticated' : 'Guest'}`);
+    // No verification checks - completely bypassed
+    console.log("🔄 Processing analysis request for URL:", url);
 
     // 1. Fetch website content
     const response = await fetch(url);
@@ -72,7 +73,7 @@ export async function POST(request) {
     });
 
     const raw = completion.choices[0].message.content;
-    console.log("🧠 GPT response:", raw);
+    console.log("🧠 GPT response received");
 
     let analysisResult;
     try {
