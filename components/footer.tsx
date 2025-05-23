@@ -8,9 +8,9 @@ export default function Footer() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-green-500 text-white">
-                <span className="font-bold">LR</span>
+                <span className="font-bold">LC</span>
               </div>
-              <span className="text-lg font-bold">LLM Ready</span>
+              <span className="text-lg font-bold">LLM Check</span>
             </Link>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Optimize your website for AI-powered search and improve your visibility.
@@ -98,7 +98,7 @@ export default function Footer() {
         </div>
         <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            &copy; {new Date().getFullYear()} LLM Ready Analyzer. All rights reserved.
+            &copy; {new Date().getFullYear()} LLM Check Analyzer. All rights reserved.
           </p>
           <div className="flex gap-4">
             <Link href="#" className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50">
