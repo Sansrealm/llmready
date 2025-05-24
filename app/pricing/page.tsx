@@ -29,12 +29,20 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      // Create checkout session
+      // Get user email from Clerk
+      const userEmail = user?.primaryEmailAddress?.emailAddress;
+
+      if (!userEmail) {
+        throw new Error("Could not retrieve your email address");
+      }
+
+      // Include email in the request body
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ email: userEmail }),
       });
 
       if (!response.ok) {
@@ -62,8 +70,19 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
+      // Get user email from Clerk
+      const userEmail = user?.primaryEmailAddress?.emailAddress;
+
+      if (!userEmail) {
+        throw new Error("Could not retrieve your email address");
+      }
+
       const response = await fetch("/api/create-portal-session", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: userEmail }),
       });
 
       if (!response.ok) {

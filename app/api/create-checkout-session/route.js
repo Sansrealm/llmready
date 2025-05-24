@@ -1,7 +1,7 @@
 // API route for creating Stripe checkout sessions
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -13,7 +13,7 @@ export async function POST(request) {
   console.log('Checkout session request received');
 
   try {
-    // Get authentication status from Clerk using auth
+    // Get authentication status from Clerk
     const { userId } = auth();
     console.log('Auth check result:', userId ? 'User authenticated' : 'User not authenticated');
 
@@ -26,22 +26,18 @@ export async function POST(request) {
       );
     }
 
-    console.log('Fetching user data for userId:', userId);
+    // Get user email from request body instead of Clerk
+    // This is more reliable in production environments
+    const { email } = await request.json();
 
-    // Get user data from Clerk
-    const user = await currentUser();
-    if (!user) {
-      console.log('User not found in Clerk');
+    if (!email) {
       return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
+        { error: 'Email is required' },
+        { status: 400 }
       );
     }
 
-    const email = user.emailAddresses[0]?.emailAddress;
-    console.log('User email found:', email ? 'Yes' : 'No');
-
-    console.log('Creating Stripe checkout session');
+    console.log('Creating Stripe checkout session for email:', email);
 
     // Create a checkout session
     const session = await stripe.checkout.sessions.create({
