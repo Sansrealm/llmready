@@ -12,7 +12,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function PricingPage() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,16 +41,19 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      // Get the Clerk session token
-      const token = await getToken();
-
+      // No need to manually get token - Clerk handles this automatically
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Checkout error:", errorData);
+        throw new Error(errorData.error || `HTTP error ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -62,6 +65,7 @@ export default function PricingPage() {
       }
     } catch (error) {
       console.error("Error:", error);
+      alert(`Subscription error: ${error.message}. Please try again.`);
       setIsLoading(false);
     }
   };
@@ -70,15 +74,8 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      // Get the Clerk session token
-      const token = await getToken();
-
       const response = await fetch("/api/create-portal-session", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
       });
 
       const data = await response.json();
@@ -419,8 +416,9 @@ export default function PricingPage() {
                     size="lg"
                     className="bg-blue-800 text-white hover:bg-blue-700"
                     onClick={handleSubscribe}
+                    disabled={isLoading}
                   >
-                    Get Premium
+                    {isLoading ? "Processing..." : "Get Premium"}
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
