@@ -63,9 +63,9 @@ export default function PricingPage() {
         console.error("Failed to create checkout session:", data.error);
         setIsLoading(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      alert(`Subscription error: ${error.message}. Please try again.`);
+      alert(`Subscription error: ${error.message || 'Unknown error'}. Please try again.`);
       setIsLoading(false);
     }
   };
@@ -78,6 +78,11 @@ export default function PricingPage() {
         method: "POST",
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.url) {
@@ -86,8 +91,9 @@ export default function PricingPage() {
         console.error("Failed to create portal session:", data.error);
         setIsLoading(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      alert(`Subscription management error: ${error.message || 'Unknown error'}. Please try again.`);
       setIsLoading(false);
     }
   };

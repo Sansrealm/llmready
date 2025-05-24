@@ -1,8 +1,7 @@
 // API route for creating Stripe checkout sessions
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { clerkClient } from '@clerk/nextjs';
-import { getAuth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -15,7 +14,7 @@ export async function POST(request) {
 
   try {
     // Get authentication status from Clerk using getAuth
-    const { userId } = getAuth(request);
+    const { userId } = auth();
     console.log('Auth check result:', userId ? 'User authenticated' : 'User not authenticated');
 
     // Check if user is authenticated
@@ -30,7 +29,7 @@ export async function POST(request) {
     console.log('Fetching user data for userId:', userId);
 
     // Get user data from Clerk
-    const user = await clerkClient.users.getUser(userId);
+    const user = await currentUser();
     if (!user) {
       console.log('User not found in Clerk');
       return NextResponse.json(
