@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Download, Mail } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 type AnalysisResult = {
     overall_score: number;
@@ -24,10 +26,12 @@ type AnalysisResult = {
         impact: string;
         isPremium: boolean;
     }>;
+    remainingAnalyses?: number;
 };
 
 export default function ResultsPage() {
-    const { isLoaded, isSignedIn } = useUser();
+    const { isLoaded, isSignedIn, user } = useUser();
+    const router = useRouter();
 
     const searchParams = useSearchParams();
     const url = searchParams.get("url");
@@ -37,6 +41,9 @@ export default function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Check if user is premium based on Clerk metadata
+    const isPremium = user?.publicMetadata?.premiumUser === true;
 
     useEffect(() => {
         async function fetchAnalysis() {
@@ -74,6 +81,27 @@ export default function ResultsPage() {
         fetchAnalysis();
     }, [url, email, industry]);
 
+    // Premium feature handlers
+    const generatePdfReport = async () => {
+        if (!isPremium) {
+            router.push("/pricing");
+            return;
+        }
+
+        // PDF generation logic will be implemented in the next phase
+        alert("PDF generation will be implemented in the next phase");
+    };
+
+    const sendEmailReport = async () => {
+        if (!isPremium || !email) {
+            router.push("/pricing");
+            return;
+        }
+
+        // Email sending logic will be implemented in the next phase
+        alert("Email report sending will be implemented in the next phase");
+    };
+
     return (
         <div className="flex min-h-screen flex-col">
             <Navbar />
@@ -81,6 +109,19 @@ export default function ResultsPage() {
                 <div className="container py-8 px-4 md:px-6">
                     <h1 className="text-3xl font-bold mb-4">LLM Readiness Results</h1>
                     <p className="mb-6 text-gray-600">Analysis for: {url}</p>
+
+                    {/* Remaining analyses notice for free users */}
+                    {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
+                        <div className="mb-6 p-4 bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 rounded-lg">
+                            <p>
+                                You have <strong>{analysisResult.remainingAnalyses}</strong> analyses remaining in your free plan.{' '}
+                                <Link href="/pricing" className="underline font-medium">
+                                    Upgrade to Premium
+                                </Link>{' '}
+                                for unlimited analyses.
+                            </p>
+                        </div>
+                    )}
 
                     {loading ? (
                         <div className="space-y-4">
@@ -111,6 +152,40 @@ export default function ResultsPage() {
                                         style={{ width: `${analysisResult.overall_score}%` }}
                                     ></div>
                                 </div>
+
+                                {/* Premium features buttons */}
+                                {isSignedIn && (
+                                    <div className="mt-6 flex flex-wrap gap-4">
+                                        <Button
+                                            onClick={generatePdfReport}
+                                            disabled={!isPremium}
+                                            className={!isPremium ? "opacity-70" : ""}
+                                        >
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download PDF Report
+                                            {!isPremium && <span className="ml-2 text-xs">(Premium)</span>}
+                                        </Button>
+
+                                        {email && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={sendEmailReport}
+                                                disabled={!isPremium}
+                                                className={!isPremium ? "opacity-70" : ""}
+                                            >
+                                                <Mail className="mr-2 h-4 w-4" />
+                                                Send Report to Email
+                                                {!isPremium && <span className="ml-2 text-xs">(Premium)</span>}
+                                            </Button>
+                                        )}
+
+                                        {!isPremium && (
+                                            <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
+                                                <Link href="/pricing">Upgrade to Premium</Link>
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Parameters */}
@@ -129,12 +204,17 @@ export default function ResultsPage() {
                                                     style={{ width: `${param.score}%` }}
                                                 ></div>
                                             </div>
-                                            <p className={`text-sm ${param.isPremium && !isSignedIn ? "blur-sm" : ""}`}>
+                                            <p className={`text-sm ${param.isPremium && !isPremium ? "blur-sm" : ""}`}>
                                                 {param.description}
                                             </p>
-                                            {param.isPremium && !isSignedIn && (
+                                            {param.isPremium && !isPremium && (
                                                 <div className="mt-2 text-center">
-                                                    <p className="text-sm text-gray-500">Sign up for premium insights</p>
+                                                    <p className="text-sm text-gray-500">
+                                                        <Link href="/pricing" className="text-blue-500 hover:underline">
+                                                            Upgrade to premium
+                                                        </Link>{" "}
+                                                        for full insights
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -157,17 +237,35 @@ export default function ResultsPage() {
                                                     Impact: {rec.impact}
                                                 </span>
                                             </div>
-                                            <p className={`text-sm ${rec.isPremium && !isSignedIn ? "blur-sm" : ""}`}>
+                                            <p className={`text-sm ${rec.isPremium && !isPremium ? "blur-sm" : ""}`}>
                                                 {rec.description}
                                             </p>
-                                            {rec.isPremium && !isSignedIn && (
+                                            {rec.isPremium && !isPremium && (
                                                 <div className="mt-2 text-center">
-                                                    <p className="text-sm text-gray-500">Sign up for premium recommendations</p>
+                                                    <p className="text-sm text-gray-500">
+                                                        <Link href="/pricing" className="text-blue-500 hover:underline">
+                                                            Upgrade to premium
+                                                        </Link>{" "}
+                                                        for detailed recommendations
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+
+                            {/* Call to action */}
+                            <div className="mt-8 text-center">
+                                <Button asChild className="mr-4">
+                                    <Link href="/">Analyze Another Website</Link>
+                                </Button>
+
+                                {isSignedIn && !isPremium && (
+                                    <Button asChild variant="outline">
+                                        <Link href="/pricing">View Premium Features</Link>
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     ) : null}

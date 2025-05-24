@@ -1,25 +1,56 @@
-// app/api/analyze/route.js
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 
+// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Maximum number of analyses for free users
+const MAX_FREE_ANALYSES = 3;
 
 export async function POST(request) {
   try {
     // Get authentication status from Clerk
     const { userId } = auth();
-    const isAuthenticated = !!userId;
-    console.log(`🔐 User authentication status: ${isAuthenticated ? 'Authenticated' : 'Guest'}`);
 
     // Get request data
     const requestData = await request.json();
     const { url, email, industry } = requestData;
 
-    console.log("🔄 Processing analysis request for URL:", url);
+    // Check user's subscription status and analysis count
+    let isPremium = false;
+    let analysisCount = 0;
+
+    if (userId) {
+      // Get user data from Clerk
+      const user = await clerkClient.users.getUser(userId);
+      isPremium = user.publicMetadata?.premiumUser === true;
+      analysisCount = user.publicMetadata?.analysisCount || 0;
+
+      // Check if free user has reached limit
+      if (!isPremium && analysisCount >= MAX_FREE_ANALYSES) {
+        return NextResponse.json(
+          { error: "You've reached the maximum number of analyses for free users. Please upgrade to Premium for unlimited analyses." },
+          { status: 403 }
+        );
+      }
+
+      // Increment analysis count for non-premium users
+      if (!isPremium) {
+        await clerkClient.users.updateUser(userId, {
+          publicMetadata: {
+            ...user.publicMetadata,
+            analysisCount: analysisCount + 1,
+          },
+        });
+      }
+    }
+
+    // Log authentication status
+    console.log(`🔐 User authentication status: ${userId ? (isPremium ? 'Premium' : 'Free') : 'Guest'}`);
 
     // 1. Fetch website content
     const response = await fetch(url);
@@ -54,10 +85,10 @@ export async function POST(request) {
       {
         "overall_score": (0-100),
         "parameters": [
-          { "name": "...", "score": 0-100, "isPremium": ${!isAuthenticated}, "description": "..." }
+          { "name": "...", "score": 0-100, "isPremium": ${!userId || isPremium ? false : true}, "description": "..." }
         ],
         "recommendations": [
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!isAuthenticated} }
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!userId || isPremium ? false : true} }
         ]
       }
     `;
@@ -88,6 +119,11 @@ export async function POST(request) {
     } catch (err) {
       console.error("❌ JSON parse or structure error:", err);
       return NextResponse.json({ error: "Invalid JSON from OpenAI", raw }, { status: 500 });
+    }
+
+    // Add remaining analyses count for free users
+    if (userId && !isPremium) {
+      analysisResult.remainingAnalyses = MAX_FREE_ANALYSES - (analysisCount + 1);
     }
 
     return NextResponse.json(analysisResult);

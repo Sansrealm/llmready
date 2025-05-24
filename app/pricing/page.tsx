@@ -1,12 +1,76 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { CheckCircle2, ChevronRight, X } from "lucide-react"
-import Link from "next/link"
-import Navbar from "@/components/navbar"
-import Footer from "@/components/footer"
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { CheckCircle2, ChevronRight, X } from "lucide-react";
+import Link from "next/link";
+import Navbar from "@/components/navbar";
+import Footer from "@/components/footer";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 export default function PricingPage() {
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const isPremium = user?.publicMetadata?.premiumUser === true;
+
+  const handleSubscribe = async () => {
+    if (!isSignedIn) {
+      router.push("/login?redirect=/pricing");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("Failed to create checkout session:", data.error);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setIsLoading(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/create-portal-session", {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("Failed to create portal session:", data.error);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -75,9 +139,16 @@ export default function PricingPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  {/* <Button variant="outline" className="w-full" asChild>
-                    <Link href="/signup">Get Started Free</Link>
-                  </Button> */}
+                  {!isSignedIn && (
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link href="/login">Sign Up Free</Link>
+                    </Button>
+                  )}
+                  {isSignedIn && !isPremium && (
+                    <Button variant="outline" className="w-full" disabled>
+                      Current Plan
+                    </Button>
+                  )}
                 </CardFooter>
               </Card>
               <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
@@ -92,7 +163,7 @@ export default function PricingPage() {
                     </div>
                   </div>
                   <div className="mt-4 text-4xl font-bold">
-                    $29<span className="text-lg font-normal text-gray-500">/month</span>
+                    $9<span className="text-lg font-normal text-gray-500">/month</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -134,9 +205,29 @@ export default function PricingPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full bg-green-600 hover:bg-green-700" asChild>
-                    <Link href="/signup">Get Premium</Link>
-                  </Button>
+                  {!isSignedIn && (
+                    <Button className="w-full bg-green-600 hover:bg-green-700" asChild>
+                      <Link href="/login">Sign Up for Premium</Link>
+                    </Button>
+                  )}
+                  {isSignedIn && !isPremium && (
+                    <Button
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      onClick={handleSubscribe}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : "Upgrade to Premium"}
+                    </Button>
+                  )}
+                  {isSignedIn && isPremium && (
+                    <Button
+                      className="w-full"
+                      onClick={handleManageSubscription}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Loading..." : "Manage Subscription"}
+                    </Button>
+                  )}
                 </CardFooter>
               </Card>
             </div>
@@ -211,8 +302,13 @@ export default function PricingPage() {
                   </tr>
                   <tr className="border-b">
                     <td className="py-4">Number of URLs</td>
-                    <td className="py-4 text-center">1</td>
+                    <td className="py-4 text-center">3</td>
                     <td className="py-4 text-center">Unlimited</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-4">PDF Reports</td>
+                    <td className="py-4 text-center">-</td>
+                    <td className="py-4 text-center">✓</td>
                   </tr>
                 </tbody>
               </table>
@@ -294,12 +390,26 @@ export default function PricingPage() {
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50" asChild>
                   <Link href="/">Try Free Analysis</Link>
                 </Button>
-                <Button size="lg" className="bg-blue-800 text-white hover:bg-blue-700" asChild>
-                  <Link href="/signup">
-                    Get Premium
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                {!isPremium && (
+                  <Button
+                    size="lg"
+                    className="bg-blue-800 text-white hover:bg-blue-700"
+                    onClick={isSignedIn ? handleSubscribe : undefined}
+                    asChild={!isSignedIn}
+                  >
+                    {isSignedIn ? (
+                      <>
+                        Get Premium
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </>
+                    ) : (
+                      <Link href="/login">
+                        Get Premium
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -307,5 +417,5 @@ export default function PricingPage() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
