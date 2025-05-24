@@ -12,7 +12,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function PricingPage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,10 +41,14 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
+      // Get the Clerk session token
+      const token = await getToken();
+
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
       });
 
@@ -66,8 +70,15 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
+      // Get the Clerk session token
+      const token = await getToken();
+
       const response = await fetch("/api/create-portal-session", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
       });
 
       const data = await response.json();
