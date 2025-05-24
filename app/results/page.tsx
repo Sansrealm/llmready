@@ -70,7 +70,7 @@ export default function ResultsPage() {
 
                 const data = await response.json();
                 setAnalysisResult(data);
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Analysis error:", err);
                 setError(err instanceof Error ? err.message : 'An unknown error occurred');
             } finally {
@@ -83,8 +83,13 @@ export default function ResultsPage() {
 
     // Premium feature handlers
     const generatePdfReport = async () => {
+        if (!isSignedIn) {
+            router.push('/login');
+            return;
+        }
+
         if (!isPremium) {
-            router.push("/pricing");
+            router.push('/pricing');
             return;
         }
 
@@ -93,8 +98,13 @@ export default function ResultsPage() {
     };
 
     const sendEmailReport = async () => {
+        if (!isSignedIn) {
+            router.push('/login');
+            return;
+        }
+
         if (!isPremium || !email) {
-            router.push("/pricing");
+            router.push('/pricing');
             return;
         }
 
@@ -154,38 +164,40 @@ export default function ResultsPage() {
                                 </div>
 
                                 {/* Premium features buttons */}
-                                {isSignedIn && (
-                                    <div className="mt-6 flex flex-wrap gap-4">
+                                <div className="mt-6 flex flex-wrap gap-4">
+                                    <Button
+                                        onClick={generatePdfReport}
+                                        disabled={!isSignedIn || !isPremium}
+                                        className={!isSignedIn || !isPremium ? "opacity-70" : ""}
+                                    >
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download PDF Report
+                                        {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
+                                    </Button>
+
+                                    {email && (
                                         <Button
-                                            onClick={generatePdfReport}
-                                            disabled={!isPremium}
-                                            className={!isPremium ? "opacity-70" : ""}
+                                            variant="outline"
+                                            onClick={sendEmailReport}
+                                            disabled={!isSignedIn || !isPremium}
+                                            className={!isSignedIn || !isPremium ? "opacity-70" : ""}
                                         >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download PDF Report
-                                            {!isPremium && <span className="ml-2 text-xs">(Premium)</span>}
+                                            <Mail className="mr-2 h-4 w-4" />
+                                            Send Report to Email
+                                            {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
                                         </Button>
+                                    )}
 
-                                        {email && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={sendEmailReport}
-                                                disabled={!isPremium}
-                                                className={!isPremium ? "opacity-70" : ""}
-                                            >
-                                                <Mail className="mr-2 h-4 w-4" />
-                                                Send Report to Email
-                                                {!isPremium && <span className="ml-2 text-xs">(Premium)</span>}
-                                            </Button>
-                                        )}
-
-                                        {!isPremium && (
-                                            <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
-                                                <Link href="/pricing">Upgrade to Premium</Link>
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
+                                    {!isSignedIn ? (
+                                        <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
+                                            <Link href="/login">Sign in for Premium Features</Link>
+                                        </Button>
+                                    ) : !isPremium && (
+                                        <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
+                                            <Link href="/pricing">Upgrade to Premium</Link>
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Parameters */}
@@ -204,15 +216,21 @@ export default function ResultsPage() {
                                                     style={{ width: `${param.score}%` }}
                                                 ></div>
                                             </div>
-                                            <p className={`text-sm ${param.isPremium && !isPremium ? "blur-sm" : ""}`}>
+                                            <p className={`text-sm ${param.isPremium && (!isSignedIn || !isPremium) ? "blur-sm" : ""}`}>
                                                 {param.description}
                                             </p>
-                                            {param.isPremium && !isPremium && (
+                                            {param.isPremium && (!isSignedIn || !isPremium) && (
                                                 <div className="mt-2 text-center">
                                                     <p className="text-sm text-gray-500">
-                                                        <Link href="/pricing" className="text-blue-500 hover:underline">
-                                                            Upgrade to premium
-                                                        </Link>{" "}
+                                                        {!isSignedIn ? (
+                                                            <Link href="/login" className="text-blue-500 hover:underline">
+                                                                Sign in
+                                                            </Link>
+                                                        ) : (
+                                                            <Link href="/pricing" className="text-blue-500 hover:underline">
+                                                                Upgrade to premium
+                                                            </Link>
+                                                        )}{" "}
                                                         for full insights
                                                     </p>
                                                 </div>
@@ -237,15 +255,21 @@ export default function ResultsPage() {
                                                     Impact: {rec.impact}
                                                 </span>
                                             </div>
-                                            <p className={`text-sm ${rec.isPremium && !isPremium ? "blur-sm" : ""}`}>
+                                            <p className={`text-sm ${rec.isPremium && (!isSignedIn || !isPremium) ? "blur-sm" : ""}`}>
                                                 {rec.description}
                                             </p>
-                                            {rec.isPremium && !isPremium && (
+                                            {rec.isPremium && (!isSignedIn || !isPremium) && (
                                                 <div className="mt-2 text-center">
                                                     <p className="text-sm text-gray-500">
-                                                        <Link href="/pricing" className="text-blue-500 hover:underline">
-                                                            Upgrade to premium
-                                                        </Link>{" "}
+                                                        {!isSignedIn ? (
+                                                            <Link href="/login" className="text-blue-500 hover:underline">
+                                                                Sign in
+                                                            </Link>
+                                                        ) : (
+                                                            <Link href="/pricing" className="text-blue-500 hover:underline">
+                                                                Upgrade to premium
+                                                            </Link>
+                                                        )}{" "}
                                                         for detailed recommendations
                                                     </p>
                                                 </div>
@@ -261,7 +285,11 @@ export default function ResultsPage() {
                                     <Link href="/">Analyze Another Website</Link>
                                 </Button>
 
-                                {isSignedIn && !isPremium && (
+                                {!isSignedIn ? (
+                                    <Button asChild variant="outline">
+                                        <Link href="/login">Sign in for Premium Features</Link>
+                                    </Button>
+                                ) : !isPremium && (
                                     <Button asChild variant="outline">
                                         <Link href="/pricing">View Premium Features</Link>
                                     </Button>

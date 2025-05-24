@@ -13,7 +13,7 @@ export async function POST(request) {
   console.log('Checkout session request received');
 
   try {
-    // Get authentication status from Clerk using getAuth
+    // Get authentication status from Clerk using auth
     const { userId } = auth();
     console.log('Auth check result:', userId ? 'User authenticated' : 'User not authenticated');
 

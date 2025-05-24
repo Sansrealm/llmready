@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -9,39 +9,27 @@ import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-
-  // Check if user came from a subscription intent
-  const subscribeIntent = searchParams.get("subscribe");
 
   const isPremium = user?.publicMetadata?.premiumUser === true;
 
-  // Effect to handle post-login subscription intent
-  useEffect(() => {
-    // If user is signed in, has subscription intent, and is not already premium
-    if (isSignedIn && subscribeIntent === "true" && !isPremium && user) {
-      handleSubscribe();
-    }
-  }, [isSignedIn, subscribeIntent, isPremium, user]);
-
   const handleSubscribe = async () => {
     if (!isSignedIn) {
-      // Redirect to login with a return URL that includes subscription intent
-      router.push(`/login?redirect=/pricing?subscribe=true`);
+      // If not signed in, redirect to login page
+      router.push('/login');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // No need to manually get token - Clerk handles this automatically
+      // Create checkout session
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
@@ -233,8 +221,8 @@ export default function PricingPage() {
                 </CardContent>
                 <CardFooter>
                   {!isSignedIn && (
-                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handleSubscribe()}>
-                      Sign Up for Premium
+                    <Button className="w-full bg-green-600 hover:bg-green-700" asChild>
+                      <Link href="/login">Sign Up for Premium</Link>
                     </Button>
                   )}
                   {isSignedIn && !isPremium && (
@@ -418,15 +406,28 @@ export default function PricingPage() {
                   <Link href="/">Try Free Analysis</Link>
                 </Button>
                 {!isPremium && (
-                  <Button
-                    size="lg"
-                    className="bg-blue-800 text-white hover:bg-blue-700"
-                    onClick={handleSubscribe}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : "Get Premium"}
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  isSignedIn ? (
+                    <Button
+                      size="lg"
+                      className="bg-blue-800 text-white hover:bg-blue-700"
+                      onClick={handleSubscribe}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : "Get Premium"}
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="lg"
+                      className="bg-blue-800 text-white hover:bg-blue-700"
+                      asChild
+                    >
+                      <Link href="/login">
+                        Get Premium
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )
                 )}
               </div>
             </div>
