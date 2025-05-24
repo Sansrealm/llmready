@@ -6,7 +6,7 @@ import { auth } from '@clerk/nextjs/server';
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Premium price ID - $9/month subscription
+// Premium price ID - $9/month subscription per month
 const PREMIUM_PRICE_ID = process.env.STRIPE_PREMIUM_PRICE_ID || 'price_1234567890';
 
 export async function POST(request) {
