@@ -88,8 +88,7 @@ export default function PricingPage() {
 
                   {/* Clerk's built-in PricingTable component */}
                   <PricingTable
-                    // This will automatically handle all billing with your Clerk plans
-                    className="w-full"
+                  // This will automatically handle all billing with your Clerk plans
                   />
                 </div>
               ) : (
