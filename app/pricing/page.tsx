@@ -208,7 +208,7 @@ export default function PricingPage() {
                     </div>
                   </div>
                   <div className="mt-4 text-4xl font-bold">
-                    $1<span className="text-lg font-normal text-gray-500">/month</span>
+                    $9<span className="text-lg font-normal text-gray-500">/month</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -253,7 +253,7 @@ export default function PricingPage() {
                       onClick={handleSubscribe}
                       disabled={isLoading}
                     >
-                      {isLoading ? "Processing..." : "Test $1 Subscription"}
+                      {isLoading ? "Processing..." : "Premium Subscription"}
                     </Button>
                   )}
                   {isSignedIn && isPremium && (
@@ -427,7 +427,7 @@ export default function PricingPage() {
                   Ready to optimize your website for AI?
                 </h2>
                 <p className="mx-auto max-w-[700px] md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed text-blue-100">
-                  Get started today with our free analysis or test our premium features for just $1.
+                  Get started today with our free analysis or go with premium features for just $9.
                 </p>
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -442,7 +442,7 @@ export default function PricingPage() {
                       onClick={handleSubscribe}
                       disabled={isLoading}
                     >
-                      {isLoading ? "Processing..." : "Test Premium ($1)"}
+                      {isLoading ? "Processing..." : "Go Premium ($9)"}
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (
@@ -452,7 +452,7 @@ export default function PricingPage() {
                       asChild
                     >
                       <Link href="/login">
-                        Test Premium ($1)
+                        Go Premium ($9)
                         <ChevronRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
