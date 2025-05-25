@@ -4,85 +4,57 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, ChevronRight, X, RefreshCw } from "lucide-react";
+import { CheckCircle2, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
+// Hook to check premium status using Clerk subscriptions
+function useIsPremium() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded || !user) {
+    return { isPremium: false, isLoading: !isLoaded };
+  }
+
+  // Method 1: Check if user has any active subscription (since you only have one paid plan)
+  const hasActiveSubscription = user.subscriptions?.some(
+    sub => sub.status === 'active'
+  );
+
+  // Method 2: Fallback - check public metadata for existing users who used your old system
+  const hasMetadataPremium = user.publicMetadata?.premiumUser === true;
+
+  const isPremium = hasActiveSubscription || hasMetadataPremium;
+
+  console.log('Premium check:', {
+    hasActiveSubscription,
+    hasMetadataPremium,
+    finalResult: isPremium,
+    subscriptions: user.subscriptions,
+    metadata: user.publicMetadata
+  });
+
+  return {
+    isPremium,
+    isLoading: false,
+    subscriptions: user.subscriptions,
+    activeSubscription: user.subscriptions?.find(sub => sub.status === 'active')
+  };
+}
+
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isPremiumState, setIsPremiumState] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Initial check from Clerk
-  const isPremiumFromClerk = user?.publicMetadata?.premiumUser === true;
-
-  // Effect to set initial state
-  useEffect(() => {
-    if (isPremiumFromClerk) {
-      setIsPremiumState(true);
-    }
-  }, [isPremiumFromClerk]);
-
-  // Enhanced refresh function for production use
-  const refreshSession = async (maxRetries = 3) => {
-    if (!user) return false;
-
-    setRefreshing(true);
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Refresh attempt ${attempt}/${maxRetries}`);
-
-        // Force Clerk to refetch user data
-        await user.reload();
-
-        const isPremium = user.publicMetadata?.premiumUser === true;
-        console.log(`Attempt ${attempt} - Premium status:`, isPremium);
-
-        if (isPremium) {
-          // Success! Premium status found
-          setIsPremiumState(true);
-          setRefreshing(false);
-          return true;
-        }
-
-        // If not premium and not the last attempt, wait before retrying
-        if (attempt < maxRetries) {
-          console.log(`Waiting 5 seconds before retry ${attempt + 1}...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-
-      } catch (error) {
-        console.error(`Refresh attempt ${attempt} failed:`, error);
-
-        if (attempt === maxRetries) {
-          setRefreshing(false);
-          return false;
-        }
-
-        // Wait before retrying on error
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
-    }
-
-    // All attempts failed
-    setIsPremiumState(false);
-    setRefreshing(false);
-    return false;
-  };
-
-  // Use the local state for premium checks
-  const isPremium = isPremiumState;
+  const { isPremium, isLoading: premiumLoading, subscriptions } = useIsPremium();
 
   const handleSubscribe = async () => {
     if (!isSignedIn) {
-      // If not signed in, redirect to login page
       router.push('/login');
       return;
     }
@@ -90,81 +62,52 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      // Get user email from Clerk
-      const userEmail = user?.primaryEmailAddress?.emailAddress;
+      console.log('Starting Clerk subscription process...');
 
-      if (!userEmail) {
-        throw new Error("Could not retrieve your email address");
-      }
-
-      // Include email in the request body
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch("/api/create-clerk-subscription", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: userEmail }),
+        body: JSON.stringify({
+          planId: "cplan_2xbZpef4VI02QgZ70DV5g1kiMxx" // Replace with your actual plan ID from Clerk
+        })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Checkout error:", errorData);
+        console.error("Subscription error:", errorData);
         throw new Error(errorData.error || `HTTP error ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (data.url) {
-        window.location.href = data.url;
+      if (data.checkoutUrl) {
+        console.log('Redirecting to Clerk checkout:', data.checkoutUrl);
+        window.location.href = data.checkoutUrl;
       } else {
-        console.error("Failed to create checkout session:", data.error);
-        setIsLoading(false);
+        console.error("No checkout URL received:", data);
+        throw new Error("No checkout URL received");
       }
     } catch (error: any) {
       console.error("Error:", error);
-      alert(`Subscription error: ${error.message || 'Unknown error'}. Please try again.`);
+      alert(`Subscription error: ${error.message}. Please try again.`);
       setIsLoading(false);
     }
   };
 
-  const handleManageSubscription = async () => {
-    setIsLoading(true);
-
-    try {
-      // Get user email from Clerk
-      const userEmail = user?.primaryEmailAddress?.emailAddress;
-
-      if (!userEmail) {
-        throw new Error("Could not retrieve your email address");
-      }
-
-      const response = await fetch("/api/create-portal-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: userEmail }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error("Failed to create portal session:", data.error);
-        setIsLoading(false);
-      }
-    } catch (error: any) {
-      console.error("Error:", error);
-      alert(`Subscription management error: ${error.message || 'Unknown error'}. Please try again.`);
-      setIsLoading(false);
-    }
+  const handleManageSubscription = () => {
+    // Redirect to Clerk's user profile billing section
+    router.push('/user-profile');
   };
+
+  if (premiumLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -174,22 +117,9 @@ export default function PricingPage() {
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
-                <div className="flex items-center justify-center gap-4 mb-4">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                    Simple, Transparent Pricing
-                  </h1>
-                  {isSignedIn && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => refreshSession()}
-                      disabled={refreshing}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-                      {refreshing ? 'Refreshing...' : 'Refresh Status'}
-                    </Button>
-                  )}
-                </div>
+                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
+                  Simple, Transparent Pricing
+                </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
                   Choose the plan that fits your needs. No hidden fees or surprises.
                 </p>
@@ -198,9 +128,15 @@ export default function PricingPage() {
                   <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
                     <p className="text-sm">
                       Current Plan: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
-                        {isPremium ? 'Premium' : 'Free'}
+                        {isPremium ? 'Premium ✅' : 'Free'}
                       </span>
                     </p>
+                    {/* Debug info - remove this after testing */}
+                    {subscriptions && subscriptions.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Active Subscriptions: {subscriptions.filter(sub => sub.status === 'active').length}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -273,33 +209,21 @@ export default function PricingPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Premium</CardTitle>
-                      <CardDescription>Comprehensive LLM optimization</CardDescription>
+                      <CardTitle>Premium (Test)</CardTitle>
+                      <CardDescription>Testing Clerk billing integration</CardDescription>
                     </div>
                     <div className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300">
-                      Recommended
+                      Test Mode
                     </div>
                   </div>
                   <div className="mt-4 text-4xl font-bold">
-                    $9<span className="text-lg font-normal text-gray-500">/month</span>
+                    $1<span className="text-lg font-normal text-gray-500">/month</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span>Comprehensive website analysis</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span>Content quality score</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span>Advanced metadata analysis</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span>Mobile responsiveness check</span>
+                    <span>Everything in Free</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -321,6 +245,10 @@ export default function PricingPage() {
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                     <span>Keyword and Industry based Analysis</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span>Test billing integration</span>
+                  </div>
                 </CardContent>
                 <CardFooter>
                   {!isSignedIn && (
@@ -334,7 +262,7 @@ export default function PricingPage() {
                       onClick={handleSubscribe}
                       disabled={isLoading}
                     >
-                      {isLoading ? "Processing..." : "Upgrade to Premium"}
+                      {isLoading ? "Processing..." : "Test $1 Subscription"}
                     </Button>
                   )}
                   {isSignedIn && isPremium && (
@@ -347,7 +275,7 @@ export default function PricingPage() {
                         {isLoading ? "Loading..." : "Manage Subscription"}
                       </Button>
                       <div className="text-center text-sm text-green-600 font-medium">
-                        ✓ Current Plan
+                        ✅ Premium Active
                       </div>
                     </div>
                   )}
@@ -506,7 +434,7 @@ export default function PricingPage() {
                   Ready to optimize your website for AI?
                 </h2>
                 <p className="mx-auto max-w-[700px] md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed text-blue-100">
-                  Get started today with our free analysis or upgrade to Premium for comprehensive optimization.
+                  Get started today with our free analysis or test our premium features for just $1.
                 </p>
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -521,7 +449,7 @@ export default function PricingPage() {
                       onClick={handleSubscribe}
                       disabled={isLoading}
                     >
-                      {isLoading ? "Processing..." : "Get Premium"}
+                      {isLoading ? "Processing..." : "Test Premium ($1)"}
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (
@@ -531,7 +459,7 @@ export default function PricingPage() {
                       asChild
                     >
                       <Link href="/login">
-                        Get Premium
+                        Test Premium ($1)
                         <ChevronRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
