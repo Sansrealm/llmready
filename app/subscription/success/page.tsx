@@ -17,80 +17,88 @@ export default function SubscriptionSuccessPage() {
     const [sessionDetails, setSessionDetails] = useState<any>(null);
     const [isPremiumState, setIsPremiumState] = useState(false);
 
-    // Function to refresh session
-    const refreshSession = async () => {
-        if (!isSignedIn) return false;
+    // Enhanced refresh function for production use
+    const refreshSession = async (maxRetries = 3) => {
+        if (!user) return false;
 
-        try {
-            const response = await fetch('/api/refresh-session');
-            if (response.ok) {
-                const data = await response.json();
-                setIsPremiumState(data.isPremium);
-                return data.isPremium;
+        setRefreshing(true);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Refresh attempt ${attempt}/${maxRetries}`);
+
+                // Force Clerk to refetch user data
+                await user.reload();
+
+                const isPremium = user.publicMetadata?.premiumUser === true;
+                console.log(`Attempt ${attempt} - Premium status:`, isPremium);
+
+                if (isPremium) {
+                    // Success! Premium status found
+                    setIsPremiumState(true);
+                    setRefreshing(false);
+                    return true;
+                }
+
+                // If not premium and not the last attempt, wait before retrying
+                if (attempt < maxRetries) {
+                    console.log(`Waiting 5 seconds before retry ${attempt + 1}...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
+            } catch (error) {
+                console.error(`Refresh attempt ${attempt} failed:`, error);
+
+                if (attempt === maxRetries) {
+                    setRefreshing(false);
+                    return false;
+                }
+
+                // Wait before retrying on error
+                await new Promise(resolve => setTimeout(resolve, 3000));
             }
-            return false;
-        } catch (error) {
-            console.error('Error refreshing session:', error);
-            return false;
         }
+
+        // All attempts failed
+        setIsPremiumState(false);
+        setRefreshing(false);
+        return false;
     };
 
+    // Enhanced success page logic
     useEffect(() => {
-        // Redirect to home if not signed in
-        if (isLoaded && !isSignedIn) {
-            router.push('/');
-            return;
-        }
-
-        const fetchSessionDetails = async () => {
-            try {
-                // Refresh session multiple times with delay to account for webhook processing
-                const refreshWithRetry = async () => {
-                    let isPremium = false;
-
-                    // Try up to 5 times with 3-second intervals
-                    for (let i = 0; i < 5; i++) {
-                        console.log(`Attempting session refresh ${i + 1}/5...`);
-
-                        if (i > 0) {
-                            await new Promise(resolve => setTimeout(resolve, 3000));
-                        }
-
-                        isPremium = await refreshSession();
-
-                        if (isPremium) {
-                            console.log('Premium status confirmed!');
-                            break;
-                        }
-                    }
-
-                    return isPremium;
-                };
-
-                const isPremium = await refreshWithRetry();
-
-                // Set session details
-                setSessionDetails({
-                    status: 'success',
-                    subscription: {
-                        plan: 'Premium',
-                        price: '$9/month'
-                    },
-                    isPremium
-                });
-
-                setLoading(false);
-            } catch (err: any) {
-                console.error("Error fetching session details:", err);
-                setError(err.message || "Failed to verify subscription");
-                setLoading(false);
-            }
-        };
-
         if (isSignedIn) {
-            fetchSessionDetails();
+            const handleSubscriptionSuccess = async () => {
+                console.log('Starting subscription success flow...');
+
+                // Wait a bit for webhook to process
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Try to refresh with more attempts for subscription success
+                const success = await refreshSession(8); // Try up to 8 times
+
+                if (success) {
+                    console.log('Premium subscription confirmed!');
+                    setSessionDetails({
+                        status: 'success',
+                        subscription: { plan: 'Premium', price: '$9/month' },
+                        isPremium: true
+                    });
+                } else {
+                    console.log('Premium status not yet active, but payment was processed');
+                    setSessionDetails({
+                        status: 'processing',
+                        subscription: { plan: 'Premium', price: '$9/month' },
+                        isPremium: false
+                    });
+                }
+
+                setLoading(false);
+            };
+
+            handleSubscriptionSuccess();
         }
-    }, [isLoaded, isSignedIn, router]);
+    }, [isSignedIn]);
 
     return (
         <div className="flex min-h-screen flex-col">

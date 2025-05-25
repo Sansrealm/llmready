@@ -54,33 +54,53 @@ export default function ResultsPage() {
         }
     }, [isPremiumFromClerk]);
 
-    // Function to refresh session
-    const refreshSession = async () => {
-        if (!isSignedIn) return false;
+    // Enhanced refresh function for production use
+    const refreshSession = async (maxRetries = 3) => {
+        if (!user) return false;
 
         setRefreshing(true);
-        try {
-            const response = await fetch('/api/refresh-session');
-            if (response.ok) {
-                const data = await response.json();
-                setIsPremiumState(data.isPremium);
-                return data.isPremium;
-            }
-            return isPremiumState;
-        } catch (error) {
-            console.error('Error refreshing session:', error);
-            return isPremiumState;
-        } finally {
-            setRefreshing(false);
-        }
-    };
 
-    // Call refresh function on page load
-    useEffect(() => {
-        if (isSignedIn) {
-            refreshSession();
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Refresh attempt ${attempt}/${maxRetries}`);
+
+                // Force Clerk to refetch user data
+                await user.reload();
+
+                const isPremium = user.publicMetadata?.premiumUser === true;
+                console.log(`Attempt ${attempt} - Premium status:`, isPremium);
+
+                if (isPremium) {
+                    // Success! Premium status found
+                    setIsPremiumState(true);
+                    setRefreshing(false);
+                    return true;
+                }
+
+                // If not premium and not the last attempt, wait before retrying
+                if (attempt < maxRetries) {
+                    console.log(`Waiting 5 seconds before retry ${attempt + 1}...`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
+            } catch (error) {
+                console.error(`Refresh attempt ${attempt} failed:`, error);
+
+                if (attempt === maxRetries) {
+                    setRefreshing(false);
+                    return false;
+                }
+
+                // Wait before retrying on error
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
         }
-    }, [isSignedIn]);
+
+        // All attempts failed
+        setIsPremiumState(false);
+        setRefreshing(false);
+        return false;
+    };
 
     // Use the local state for premium checks
     const isPremium = isPremiumState;
