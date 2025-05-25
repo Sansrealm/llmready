@@ -50,6 +50,8 @@ export default function PricingPage() {
 
   const { isPremium, isLoading: premiumLoading } = useIsPremium();
 
+  // Updated handleSubscribe function for proper Clerk billing:
+
   const handleSubscribe = async () => {
     if (!isSignedIn) {
       router.push('/login');
@@ -59,7 +61,7 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      console.log('Creating subscription...');
+      console.log('Creating Clerk subscription...');
 
       const response = await fetch("/api/create-clerk-subscription", {
         method: "POST",
@@ -68,7 +70,6 @@ export default function PricingPage() {
         },
         body: JSON.stringify({
           planId: "cplan_2xbZpef4VI02QgZ70DV5g1kiMxx"
-          // No need to pass userId anymore - API gets it from currentUser()
         })
       });
 
@@ -76,21 +77,41 @@ export default function PricingPage() {
 
       if (!response.ok) {
         console.error("Subscription failed:", data);
-        throw new Error(data.error || `Server error: ${response.status}`);
+
+        // Handle specific error cases
+        if (data.error?.includes('already have')) {
+          alert('You already have an active premium subscription!');
+        } else if (data.error?.includes('Plan not found')) {
+          alert('Billing configuration error. Please contact support.');
+        } else {
+          alert(`Subscription failed: ${data.error}`);
+        }
+
+        setIsLoading(false);
+        return;
       }
 
       console.log('Subscription response:', data);
 
       if (data.checkoutUrl) {
-        console.log('Redirecting to Clerk checkout...');
+        // Redirect to Clerk's checkout page
+        console.log('✅ Redirecting to Clerk checkout...');
         window.location.href = data.checkoutUrl;
+      } else if (data.directActivation) {
+        // Direct activation (for free plans or immediate activation)
+        console.log('✅ Subscription activated directly!');
+        alert('🎉 Premium subscription activated successfully!');
+
+        // Refresh to show updated status
+        window.location.reload();
       } else {
-        throw new Error("No checkout URL received");
+        console.error('Unexpected response:', data);
+        throw new Error("Unexpected response from subscription service");
       }
 
     } catch (error: any) {
       console.error("Subscription error:", error);
-      alert(`Subscription failed: ${error.message}`);
+      alert(`Subscription error: ${error.message}`);
       setIsLoading(false);
     }
   };

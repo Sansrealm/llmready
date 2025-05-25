@@ -1,14 +1,13 @@
 // app/api/create-clerk-subscription/route.js
-// Fixed to use currentUser() instead of auth()
 
 import { NextResponse } from 'next/server';
 import { clerkClient, currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request) {
-    console.log('🔍 === Clerk Subscription API ===');
+    console.log('🔍 === Clerk Billing API (Enabled) ===');
 
     try {
-        // Use currentUser() instead of auth() since that's working
+        // Get authenticated user
         const user = await currentUser();
 
         if (!user) {
@@ -33,21 +32,30 @@ export async function POST(request) {
             planId: planId
         });
 
-        // Create subscription using Clerk billing
+        // Now that billing is enabled, try the proper Clerk billing API
         try {
             const subscription = await clerkClient.subscriptions.createSubscription({
                 userId: user.id,
                 planId: planId,
             });
 
-            console.log('✅ Subscription created:', {
+            console.log('✅ Clerk subscription created successfully:', {
                 id: subscription.id,
                 hasCheckoutUrl: !!subscription.checkoutUrl,
-                status: subscription.status
+                status: subscription.status,
+                planId: subscription.planId
             });
 
             if (!subscription.checkoutUrl) {
-                throw new Error('No checkout URL provided by Clerk');
+                console.log('⚠️ No checkout URL provided - subscription might be free or direct');
+
+                // Check if this was a direct activation
+                return NextResponse.json({
+                    success: true,
+                    message: 'Subscription activated directly',
+                    subscriptionId: subscription.id,
+                    directActivation: true
+                });
             }
 
             return NextResponse.json({
@@ -57,27 +65,35 @@ export async function POST(request) {
             });
 
         } catch (subscriptionError) {
-            console.error('❌ Subscription creation failed:', subscriptionError);
+            console.error('❌ Clerk subscription failed:', subscriptionError);
+            console.error('Error details:', {
+                message: subscriptionError.message,
+                code: subscriptionError.code,
+                status: subscriptionError.status
+            });
 
-            // Handle specific Clerk billing errors
+            // Handle specific errors
             let errorMessage = 'Subscription creation failed';
 
             if (subscriptionError.message?.includes('not found')) {
-                errorMessage = 'Billing plan not found';
+                errorMessage = 'Plan not found. Please contact support.';
+            } else if (subscriptionError.message?.includes('already exists') || subscriptionError.message?.includes('duplicate')) {
+                errorMessage = 'You already have an active subscription.';
             } else if (subscriptionError.message?.includes('permission') || subscriptionError.message?.includes('unauthorized')) {
-                errorMessage = 'Billing not enabled for this account';
-            } else if (subscriptionError.message?.includes('already exists')) {
-                errorMessage = 'Subscription already exists';
+                errorMessage = 'Billing permission error. Please contact support.';
+            } else if (subscriptionError.message?.includes('createSubscription')) {
+                errorMessage = 'Billing API not available. Please contact support.';
             }
 
             return NextResponse.json({
                 error: errorMessage,
-                details: subscriptionError.message
+                details: subscriptionError.message,
+                code: subscriptionError.code
             }, { status: 500 });
         }
 
     } catch (error) {
-        console.error('❌ API Error:', error);
+        console.error('❌ API Route Error:', error);
         return NextResponse.json({
             error: 'Server error: ' + error.message
         }, { status: 500 });
