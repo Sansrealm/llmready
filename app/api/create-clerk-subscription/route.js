@@ -1,4 +1,3 @@
-// 1. API Route: app/api/create-clerk-subscription/route.js
 import { NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 
@@ -27,6 +26,7 @@ export async function POST(request) {
         });
 
     } catch (error) {
+        // Fixed: removed ": any" type annotation
         console.error('Error creating Clerk subscription:', error);
         return NextResponse.json(
             { error: 'Failed to create subscription: ' + error.message },
