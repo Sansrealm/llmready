@@ -70,7 +70,7 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      // Get user email : Clerk
+      // Get user email from Clerk
       const userEmail = user?.primaryEmailAddress?.emailAddress;
 
       if (!userEmail) {
