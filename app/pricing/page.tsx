@@ -59,7 +59,7 @@ export default function PricingPage() {
     setIsLoading(true);
 
     try {
-      console.log('Starting Clerk subscription process...');
+      console.log('Creating subscription...');
 
       const response = await fetch("/api/create-clerk-subscription", {
         method: "POST",
@@ -68,27 +68,29 @@ export default function PricingPage() {
         },
         body: JSON.stringify({
           planId: "cplan_2xbZpef4VI02QgZ70DV5g1kiMxx"
+          // No need to pass userId anymore - API gets it from currentUser()
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Subscription error:", errorData);
-        throw new Error(errorData.error || `HTTP error ${response.status}`);
-      }
-
       const data = await response.json();
 
+      if (!response.ok) {
+        console.error("Subscription failed:", data);
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
+
+      console.log('Subscription response:', data);
+
       if (data.checkoutUrl) {
-        console.log('Redirecting to Clerk checkout:', data.checkoutUrl);
+        console.log('Redirecting to Clerk checkout...');
         window.location.href = data.checkoutUrl;
       } else {
-        console.error("No checkout URL received:", data);
         throw new Error("No checkout URL received");
       }
+
     } catch (error: any) {
-      console.error("Error:", error);
-      alert(`Subscription error: ${error.message}. Please try again.`);
+      console.error("Subscription error:", error);
+      alert(`Subscription failed: ${error.message}`);
       setIsLoading(false);
     }
   };
