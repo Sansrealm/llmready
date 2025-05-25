@@ -16,6 +16,7 @@ export default function SubscriptionSuccessPage() {
     const [error, setError] = useState<string | null>(null);
     const [sessionDetails, setSessionDetails] = useState<any>(null);
     const [isPremiumState, setIsPremiumState] = useState(false);
+    const [refreshing, setRefreshing] = useState(false); // Added missing state
 
     // Enhanced refresh function for production use
     const refreshSession = async (maxRetries = 3) => {
@@ -65,8 +66,42 @@ export default function SubscriptionSuccessPage() {
         return false;
     };
 
+    // Manual refresh function for button click
+    const handleManualRefresh = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const success = await refreshSession(3);
+
+            if (success) {
+                setSessionDetails({
+                    status: 'success',
+                    subscription: { plan: 'Premium', price: '$9/month' },
+                    isPremium: true
+                });
+            } else {
+                setSessionDetails({
+                    status: 'processing',
+                    subscription: { plan: 'Premium', price: '$9/month' },
+                    isPremium: false
+                });
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to refresh status');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Enhanced success page logic
     useEffect(() => {
+        // Redirect to home if not signed in
+        if (isLoaded && !isSignedIn) {
+            router.push('/');
+            return;
+        }
+
         if (isSignedIn) {
             const handleSubscriptionSuccess = async () => {
                 console.log('Starting subscription success flow...');
@@ -98,7 +133,7 @@ export default function SubscriptionSuccessPage() {
 
             handleSubscriptionSuccess();
         }
-    }, [isSignedIn]);
+    }, [isLoaded, isSignedIn, router]);
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -117,7 +152,9 @@ export default function SubscriptionSuccessPage() {
                                 <div className="space-y-4">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
                                     <p>Activating your premium subscription...</p>
-                                    <p className="text-sm text-gray-500">This may take a few moments</p>
+                                    <p className="text-sm text-gray-500">
+                                        {refreshing ? 'Checking status...' : 'This may take a few moments'}
+                                    </p>
                                 </div>
                             </div>
                         ) : error ? (
@@ -125,10 +162,11 @@ export default function SubscriptionSuccessPage() {
                                 <p className="mb-4">{error}</p>
                                 <Button
                                     variant="outline"
-                                    onClick={() => window.location.reload()}
+                                    onClick={handleManualRefresh}
                                     size="sm"
+                                    disabled={refreshing}
                                 >
-                                    Try Again
+                                    {refreshing ? 'Checking...' : 'Try Again'}
                                 </Button>
                             </div>
                         ) : (
@@ -190,10 +228,11 @@ export default function SubscriptionSuccessPage() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.location.reload()}
+                                onClick={handleManualRefresh}
+                                disabled={refreshing}
                                 className="w-full text-sm"
                             >
-                                Refresh Page
+                                {refreshing ? 'Checking Status...' : 'Check Status Again'}
                             </Button>
                         )}
                     </CardFooter>

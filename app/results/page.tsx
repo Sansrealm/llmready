@@ -184,7 +184,7 @@ export default function ResultsPage() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={refreshSession}
+                                onClick={() => refreshSession()}
                                 disabled={refreshing}
                                 className="ml-2"
                             >
