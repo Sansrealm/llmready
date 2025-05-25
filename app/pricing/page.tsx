@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, ChevronRight, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, X, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
@@ -16,8 +16,49 @@ export default function PricingPage() {
   const { user } = useUser();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isPremiumState, setIsPremiumState] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const isPremium = user?.publicMetadata?.premiumUser === true;
+  // Initial check from Clerk
+  const isPremiumFromClerk = user?.publicMetadata?.premiumUser === true;
+
+  // Effect to set initial state
+  useEffect(() => {
+    if (isPremiumFromClerk) {
+      setIsPremiumState(true);
+    }
+  }, [isPremiumFromClerk]);
+
+  // Function to refresh session
+  const refreshSession = async () => {
+    if (!isSignedIn) return false;
+
+    setRefreshing(true);
+    try {
+      const response = await fetch('/api/refresh-session');
+      if (response.ok) {
+        const data = await response.json();
+        setIsPremiumState(data.isPremium);
+        return data.isPremium;
+      }
+      return isPremiumState;
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      return isPremiumState;
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Call refresh function on page load
+  useEffect(() => {
+    if (isSignedIn) {
+      refreshSession();
+    }
+  }, [isSignedIn]);
+
+  // Use the local state for premium checks
+  const isPremium = isPremiumState;
 
   const handleSubscribe = async () => {
     if (!isSignedIn) {
@@ -113,12 +154,35 @@ export default function PricingPage() {
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Simple, Transparent Pricing
-                </h1>
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
+                    Simple, Transparent Pricing
+                  </h1>
+                  {isSignedIn && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshSession}
+                      disabled={refreshing}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                      {refreshing ? 'Refreshing...' : 'Refresh Status'}
+                    </Button>
+                  )}
+                </div>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
                   Choose the plan that fits your needs. No hidden fees or surprises.
                 </p>
+                {/* Premium status indicator */}
+                {isSignedIn && (
+                  <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
+                    <p className="text-sm">
+                      Current Plan: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
+                        {isPremium ? 'Premium' : 'Free'}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -254,13 +318,18 @@ export default function PricingPage() {
                     </Button>
                   )}
                   {isSignedIn && isPremium && (
-                    <Button
-                      className="w-full"
-                      onClick={handleManageSubscription}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Loading..." : "Manage Subscription"}
-                    </Button>
+                    <div className="w-full space-y-2">
+                      <Button
+                        className="w-full"
+                        onClick={handleManageSubscription}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Loading..." : "Manage Subscription"}
+                      </Button>
+                      <div className="text-center text-sm text-green-600 font-medium">
+                        ✓ Current Plan
+                      </div>
+                    </div>
                   )}
                 </CardFooter>
               </Card>

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Download, Mail } from "lucide-react";
+import { AlertCircle, Download, Mail, RefreshCw } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -41,9 +41,49 @@ export default function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isPremiumState, setIsPremiumState] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // Check if user is premium based on Clerk metadata
-    const isPremium = user?.publicMetadata?.premiumUser === true;
+    // Initial check from Clerk
+    const isPremiumFromClerk = user?.publicMetadata?.premiumUser === true;
+
+    // Effect to set initial state
+    useEffect(() => {
+        if (isPremiumFromClerk) {
+            setIsPremiumState(true);
+        }
+    }, [isPremiumFromClerk]);
+
+    // Function to refresh session
+    const refreshSession = async () => {
+        if (!isSignedIn) return false;
+
+        setRefreshing(true);
+        try {
+            const response = await fetch('/api/refresh-session');
+            if (response.ok) {
+                const data = await response.json();
+                setIsPremiumState(data.isPremium);
+                return data.isPremium;
+            }
+            return isPremiumState;
+        } catch (error) {
+            console.error('Error refreshing session:', error);
+            return isPremiumState;
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    // Call refresh function on page load
+    useEffect(() => {
+        if (isSignedIn) {
+            refreshSession();
+        }
+    }, [isSignedIn]);
+
+    // Use the local state for premium checks
+    const isPremium = isPremiumState;
 
     useEffect(() => {
         async function fetchAnalysis() {
@@ -117,8 +157,33 @@ export default function ResultsPage() {
             <Navbar />
             <main className="flex-1">
                 <div className="container py-8 px-4 md:px-6">
-                    <h1 className="text-3xl font-bold mb-4">LLM Readiness Results</h1>
+                    <div className="flex items-center justify-between mb-4">
+                        <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
+                        {isSignedIn && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={refreshSession}
+                                disabled={refreshing}
+                                className="ml-2"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                                {refreshing ? 'Refreshing...' : 'Refresh Status'}
+                            </Button>
+                        )}
+                    </div>
                     <p className="mb-6 text-gray-600">Analysis for: {url}</p>
+
+                    {/* Premium status indicator */}
+                    {isSignedIn && (
+                        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <p className="text-sm">
+                                Account Status: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
+                                    {isPremium ? 'Premium' : 'Free'}
+                                </span>
+                            </p>
+                        </div>
+                    )}
 
                     {/* Remaining analyses notice for free users */}
                     {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
