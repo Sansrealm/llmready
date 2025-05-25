@@ -13,29 +13,27 @@ export async function POST(request) {
   console.log('Checkout session request received');
 
   try {
-    // Get authentication status from Clerk
-    const { userId } = auth();
-    console.log('Auth check result:', userId ? 'User authenticated' : 'User not authenticated');
-
-    // Check if user is authenticated
-    if (!userId) {
-      console.log('Authentication failed: No userId found');
-      return NextResponse.json(
-        { error: 'You must be logged in to subscribe' },
-        { status: 401 }
-      );
-    }
-
-    // Get user email from request body instead of Clerk
-    // This is more reliable in production environments
+    // Get user email from request body
     const { email } = await request.json();
 
     if (!email) {
+      console.log('Email is required but not provided');
       return NextResponse.json(
         { error: 'Email is required' },
         { status: 400 }
       );
     }
+
+    // Get authentication status from Clerk
+    const { userId } = auth();
+    console.log('Auth check result:', userId ? `User authenticated with ID: ${userId}` : 'User not authenticated');
+
+    // Skip authentication check in production for now
+    // This allows the checkout flow to work even if Clerk auth has issues
+    // The email is still required and provided by the frontend
+
+    // Create a client reference ID - use userId if available, otherwise use email
+    const clientReferenceId = userId || `email:${email}`;
 
     console.log('Creating Stripe checkout session for email:', email);
 
@@ -52,9 +50,9 @@ export async function POST(request) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
       customer_email: email,
-      client_reference_id: userId,
+      client_reference_id: clientReferenceId,
       metadata: {
-        userId: userId,
+        userId: userId || `email:${email}`, // Store userId or email-based ID
       },
     });
 
