@@ -44,11 +44,84 @@ export async function POST(request) {
                 console.log('Checkout session completed:', session.id);
 
                 // Get the userId from the client_reference_id
-                const userId = session.client_reference_id;
+                const clientReferenceId = session.client_reference_id;
+                console.log('Client reference ID:', clientReferenceId);
+
+                // Check if this is a userId or an email-based ID
+                let userId;
+                let userEmail;
+
+                if (clientReferenceId && clientReferenceId.startsWith('email:')) {
+                    // This is an email-based ID
+                    userEmail = clientReferenceId.substring(6); // Remove 'email:' prefix
+                    console.log('Email-based ID detected, email:', userEmail);
+
+                    // Find user by email
+                    try {
+                        const users = await clerkClient.users.getUserList({
+                            emailAddress: [userEmail],
+                        });
+
+                        if (users.length > 0) {
+                            userId = users[0].id;
+                            console.log('Found user by email:', userId);
+                        } else {
+                            console.error('No user found with email:', userEmail);
+                            return NextResponse.json(
+                                { error: 'No user found with this email' },
+                                { status: 400 }
+                            );
+                        }
+                    } catch (error) {
+                        console.error('Error finding user by email:', error);
+                        // Continue with customer email as fallback
+                    }
+                } else if (clientReferenceId) {
+                    // This is a regular userId
+                    userId = clientReferenceId;
+                    console.log('Using provided userId:', userId);
+                } else {
+                    // No client reference ID, try to use customer email
+                    userEmail = session.customer_email;
+                    console.log('No client reference ID, using customer email:', userEmail);
+
+                    if (!userEmail) {
+                        console.error('No userId or email found in session');
+                        return NextResponse.json(
+                            { error: 'No userId or email found in session' },
+                            { status: 400 }
+                        );
+                    }
+
+                    // Find user by email
+                    try {
+                        const users = await clerkClient.users.getUserList({
+                            emailAddress: [userEmail],
+                        });
+
+                        if (users.length > 0) {
+                            userId = users[0].id;
+                            console.log('Found user by customer email:', userId);
+                        } else {
+                            console.error('No user found with customer email:', userEmail);
+                            return NextResponse.json(
+                                { error: 'No user found with this email' },
+                                { status: 400 }
+                            );
+                        }
+                    } catch (error) {
+                        console.error('Error finding user by customer email:', error);
+                        return NextResponse.json(
+                            { error: 'Error finding user: ' + error.message },
+                            { status: 500 }
+                        );
+                    }
+                }
+
                 if (!userId) {
-                    console.error('No userId found in session metadata');
+                    console.error('Could not determine userId from session data');
                     return NextResponse.json(
-                        { error: 'No userId found in session metadata' },
+                        { error: 'Could not determine userId from session data' },
                         { status: 400 }
                     );
                 }
@@ -56,15 +129,24 @@ export async function POST(request) {
                 console.log('Updating user metadata for userId:', userId);
 
                 // Update user metadata in Clerk to mark as premium
-                await clerkClient.users.updateUser(userId, {
-                    publicMetadata: {
-                        premiumUser: true,
-                        subscriptionId: session.subscription,
-                        customerId: session.customer,
-                    },
-                });
+                try {
+                    await clerkClient.users.updateUser(userId, {
+                        publicMetadata: {
+                            premiumUser: true,
+                            subscriptionId: session.subscription,
+                            customerId: session.customer,
+                            updatedAt: new Date().toISOString(),
+                        },
+                    });
 
-                console.log('User metadata updated successfully');
+                    console.log('User metadata updated successfully');
+                } catch (error) {
+                    console.error('Error updating user metadata:', error);
+                    return NextResponse.json(
+                        { error: 'Error updating user metadata: ' + error.message },
+                        { status: 500 }
+                    );
+                }
                 break;
             }
 
@@ -73,36 +155,84 @@ export async function POST(request) {
                 console.log('Subscription updated:', subscription.id);
 
                 // Find the user with this subscription ID
-                const users = await clerkClient.users.getUserList({
-                    query: JSON.stringify({
-                        publicMetadata: { subscriptionId: subscription.id },
-                    }),
-                });
+                try {
+                    const users = await clerkClient.users.getUserList({
+                        query: JSON.stringify({
+                            publicMetadata: { subscriptionId: subscription.id },
+                        }),
+                    });
 
-                if (users.length === 0) {
-                    console.error('No user found with subscription ID:', subscription.id);
+                    if (users.length === 0) {
+                        console.error('No user found with subscription ID:', subscription.id);
+
+                        // Try to find by customer ID as fallback
+                        const customerId = subscription.customer;
+                        if (customerId) {
+                            const usersByCustomer = await clerkClient.users.getUserList({
+                                query: JSON.stringify({
+                                    publicMetadata: { customerId: customerId },
+                                }),
+                            });
+
+                            if (usersByCustomer.length === 0) {
+                                console.error('No user found with customer ID:', customerId);
+                                return NextResponse.json(
+                                    { error: 'No user found with this subscription or customer ID' },
+                                    { status: 400 }
+                                );
+                            }
+
+                            const userId = usersByCustomer[0].id;
+                            console.log('Found user by customer ID:', userId);
+
+                            // Update user metadata based on subscription status
+                            const isActive =
+                                subscription.status === 'active' ||
+                                subscription.status === 'trialing';
+
+                            await clerkClient.users.updateUser(userId, {
+                                publicMetadata: {
+                                    premiumUser: isActive,
+                                    subscriptionStatus: subscription.status,
+                                    subscriptionId: subscription.id, // Update subscription ID
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            });
+
+                            console.log('User subscription status updated by customer ID:', isActive);
+                            break;
+                        }
+
+                        return NextResponse.json(
+                            { error: 'No user found with this subscription ID' },
+                            { status: 400 }
+                        );
+                    }
+
+                    const userId = users[0].id;
+                    console.log('Found user with subscription:', userId);
+
+                    // Update user metadata based on subscription status
+                    const isActive =
+                        subscription.status === 'active' ||
+                        subscription.status === 'trialing';
+
+                    await clerkClient.users.updateUser(userId, {
+                        publicMetadata: {
+                            premiumUser: isActive,
+                            subscriptionStatus: subscription.status,
+                            updatedAt: new Date().toISOString(),
+                        },
+                    });
+
+                    console.log('User subscription status updated:', isActive);
+                } catch (error) {
+                    console.error('Error updating subscription status:', error);
                     return NextResponse.json(
-                        { error: 'No user found with this subscription ID' },
-                        { status: 400 }
+                        { error: 'Error updating subscription status: ' + error.message },
+                        { status: 500 }
                     );
                 }
-
-                const userId = users[0].id;
-                console.log('Found user with subscription:', userId);
-
-                // Update user metadata based on subscription status
-                const isActive =
-                    subscription.status === 'active' ||
-                    subscription.status === 'trialing';
-
-                await clerkClient.users.updateUser(userId, {
-                    publicMetadata: {
-                        premiumUser: isActive,
-                        subscriptionStatus: subscription.status,
-                    },
-                });
-
-                console.log('User subscription status updated:', isActive);
                 break;
             }
 
@@ -111,32 +241,75 @@ export async function POST(request) {
                 console.log('Subscription deleted:', subscription.id);
 
                 // Find the user with this subscription ID
-                const users = await clerkClient.users.getUserList({
-                    query: JSON.stringify({
-                        publicMetadata: { subscriptionId: subscription.id },
-                    }),
-                });
+                try {
+                    const users = await clerkClient.users.getUserList({
+                        query: JSON.stringify({
+                            publicMetadata: { subscriptionId: subscription.id },
+                        }),
+                    });
 
-                if (users.length === 0) {
-                    console.error('No user found with subscription ID:', subscription.id);
+                    if (users.length === 0) {
+                        console.error('No user found with subscription ID:', subscription.id);
+
+                        // Try to find by customer ID as fallback
+                        const customerId = subscription.customer;
+                        if (customerId) {
+                            const usersByCustomer = await clerkClient.users.getUserList({
+                                query: JSON.stringify({
+                                    publicMetadata: { customerId: customerId },
+                                }),
+                            });
+
+                            if (usersByCustomer.length === 0) {
+                                console.error('No user found with customer ID:', customerId);
+                                return NextResponse.json(
+                                    { error: 'No user found with this subscription or customer ID' },
+                                    { status: 400 }
+                                );
+                            }
+
+                            const userId = usersByCustomer[0].id;
+                            console.log('Found user by customer ID:', userId);
+
+                            // Update user metadata to remove premium status
+                            await clerkClient.users.updateUser(userId, {
+                                publicMetadata: {
+                                    premiumUser: false,
+                                    subscriptionStatus: 'canceled',
+                                    updatedAt: new Date().toISOString(),
+                                },
+                            });
+
+                            console.log('User premium status removed by customer ID');
+                            break;
+                        }
+
+                        return NextResponse.json(
+                            { error: 'No user found with this subscription ID' },
+                            { status: 400 }
+                        );
+                    }
+
+                    const userId = users[0].id;
+                    console.log('Found user with subscription:', userId);
+
+                    // Update user metadata to remove premium status
+                    await clerkClient.users.updateUser(userId, {
+                        publicMetadata: {
+                            premiumUser: false,
+                            subscriptionStatus: 'canceled',
+                            updatedAt: new Date().toISOString(),
+                        },
+                    });
+
+                    console.log('User premium status removed');
+                } catch (error) {
+                    console.error('Error removing premium status:', error);
                     return NextResponse.json(
-                        { error: 'No user found with this subscription ID' },
-                        { status: 400 }
+                        { error: 'Error removing premium status: ' + error.message },
+                        { status: 500 }
                     );
                 }
-
-                const userId = users[0].id;
-                console.log('Found user with subscription:', userId);
-
-                // Update user metadata to remove premium status
-                await clerkClient.users.updateUser(userId, {
-                    publicMetadata: {
-                        premiumUser: false,
-                        subscriptionStatus: 'canceled',
-                    },
-                });
-
-                console.log('User premium status removed');
                 break;
             }
 
