@@ -141,6 +141,7 @@ export default function ResultsPage() {
     };
 
     // Premium feature handlers
+    // Premium feature handlers - ONLY UPDATE THIS FUNCTION
     const generatePdfReport = async () => {
         if (!isSignedIn) {
             router.push('/login');
@@ -152,24 +153,71 @@ export default function ResultsPage() {
             return;
         }
 
-        // PDF generation logic will be implemented in the next phase
-        alert("PDF generation will be implemented in the next phase");
-    };
-
-    const sendEmailReport = async () => {
-        if (!isSignedIn) {
-            router.push('/login');
+        if (!analysisResult) {
+            alert("No analysis data available for PDF generation");
             return;
         }
 
-        if (!isPremium || !email) {
-            router.push('/pricing');
-            return;
-        }
+        try {
+            setRefreshing(true); // Reuse the refreshing state for loading indicator
 
-        // Email sending logic will be implemented in the next phase
-        alert("Email report sending will be implemented in the next phase");
+            console.log('🔄 Generating PDF report...');
+
+            const response = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    analysisResult,
+                    url,
+                    email
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate PDF');
+            }
+
+            // Convert response to blob and trigger download
+            const pdfBlob = await response.blob();
+            const downloadUrl = URL.createObjectURL(pdfBlob);
+
+            // Create temporary download link
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `llm-readiness-report-${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+
+            // Cleanup
+            document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
+
+            console.log('✅ PDF download initiated');
+
+        } catch (error) {
+            console.error('❌ PDF generation failed:', error);
+            alert(`Failed to generate PDF report: ${error.message}`);
+        } finally {
+            setRefreshing(false);
+        }
     };
+    // const sendEmailReport = async () => {
+    //     if (!isSignedIn) {
+    //         router.push('/login');
+    //         return;
+    //     }
+
+    //     if (!isPremium || !email) {
+    //         router.push('/pricing');
+    //         return;
+    //     }
+
+    //     // Email sending logic will be implemented in the next phase
+    //     alert("Email report sending will be implemented in the next phase");
+    // };
 
     // Show loading screen while checking premium status
     if (premiumLoading || loading) {
@@ -197,6 +245,7 @@ export default function ResultsPage() {
                 <div className="container py-8 px-4 md:px-6">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
+
                     </div>
                     <p className="mb-6 text-gray-600">Analysis for: {url}</p>
 
@@ -270,11 +319,11 @@ export default function ResultsPage() {
                                 <div className="mt-6 flex flex-wrap gap-4">
                                     <Button
                                         onClick={generatePdfReport}
-                                        disabled={!isSignedIn || !isPremium}
+                                        disabled={!isSignedIn || !isPremium || refreshing}
                                         className={!isSignedIn || !isPremium ? "opacity-70" : ""}
                                     >
                                         <Download className="mr-2 h-4 w-4" />
-                                        Download PDF Report
+                                        {refreshing ? 'Generating PDF...' : 'Download PDF Report'}
                                         {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
                                     </Button>
 
