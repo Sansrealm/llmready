@@ -1,5 +1,5 @@
 // app/api/subscription-status/route.js
-// Fixed JavaScript version without TypeScript syntax
+// Updated to check for specific plan IDs
 
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
@@ -18,34 +18,59 @@ export async function GET() {
 
         console.log('🔍 Checking subscription for user:', user.id);
 
-        // Method 1: Check if Clerk exposes subscription data server-side
-        console.log('📋 Server-side user properties:', Object.keys(user));
+        // Define your premium plan IDs here
+        const premiumPlanIds = [
+            'cplan_2xc1rcBfJvymVdviAlaryVOSHhF',  // Your new plan ID
+            // Add any other premium plan IDs you might have
+        ];
 
-        // Check for subscription data in server-side user object (no TypeScript syntax)
-        console.log('- subscriptions:', user.subscriptions);
-        console.log('- hasSubscription:', user.hasSubscription);
-        console.log('- billingSubscriptions:', user.billingSubscriptions);
+        console.log('📋 Looking for premium plan IDs:', premiumPlanIds);
 
-        // Method 2: Check public metadata
+        // Method 1: Check public metadata for plan information
         const metadata = user.publicMetadata || {};
+        console.log('📝 Public metadata:', metadata);
+
+        // Method 2: Check if Clerk stores subscription info in user object
+        const subscriptions = user.subscriptions || [];
+        const billingSubscriptions = user.billingSubscriptions || [];
+
+        console.log('💳 User subscriptions:', subscriptions);
+        console.log('💳 User billing subscriptions:', billingSubscriptions);
+
+        // Method 3: Check for active premium subscriptions by plan ID
+        let isPremiumFromSubscriptions = false;
+
+        // Check regular subscriptions array
+        if (subscriptions && subscriptions.length > 0) {
+            isPremiumFromSubscriptions = subscriptions.some(sub => {
+                const isActivePremium = sub.status === 'active' && premiumPlanIds.includes(sub.planId);
+                console.log(`🔍 Checking subscription: ${sub.planId}, status: ${sub.status}, isPremium: ${isActivePremium}`);
+                return isActivePremium;
+            });
+        }
+
+        // Check billing subscriptions array if regular subscriptions don't have the info
+        if (!isPremiumFromSubscriptions && billingSubscriptions && billingSubscriptions.length > 0) {
+            isPremiumFromSubscriptions = billingSubscriptions.some(sub => {
+                const isActivePremium = sub.status === 'active' && premiumPlanIds.includes(sub.planId || sub.plan_id);
+                console.log(`🔍 Checking billing subscription: ${sub.planId || sub.plan_id}, status: ${sub.status}, isPremium: ${isActivePremium}`);
+                return isActivePremium;
+            });
+        }
+
+        // Method 4: Check metadata for premium status (fallback)
         const hasMetadataPremium = metadata.premiumUser === true;
 
-        // Method 3: Check for subscription properties server-side (pure JavaScript)
-        const hasServerSubscription = (user.subscriptions && user.subscriptions.some(sub => sub.status === 'active')) ||
-            user.hasSubscription === true ||
-            (user.billingSubscriptions && user.billingSubscriptions.length > 0);
+        // Method 5: Check for general subscription properties
+        const hasGeneralSubscription = user.hasSubscription === true;
 
-        // Method 4: Since we know you have an active subscription, 
-        // let's temporarily check by user ID (you can update this logic)
-        const knownPremiumUsers = [user.id]; // Add your user ID here for testing
-        const isKnownPremium = knownPremiumUsers.includes(user.id);
+        // Final determination
+        const isPremium = isPremiumFromSubscriptions || hasMetadataPremium || hasGeneralSubscription;
 
-        const isPremium = hasMetadataPremium || hasServerSubscription || isKnownPremium;
-
-        console.log('✅ Server-side subscription check:', {
+        console.log('✅ Final subscription check result:', {
+            isPremiumFromSubscriptions,
             hasMetadataPremium,
-            hasServerSubscription,
-            isKnownPremium,
+            hasGeneralSubscription,
             finalResult: isPremium
         });
 
@@ -53,17 +78,19 @@ export async function GET() {
             isPremium,
             userId: user.id,
             debug: {
+                premiumPlanIds,
+                isPremiumFromSubscriptions,
                 hasMetadataPremium,
-                hasServerSubscription,
-                isKnownPremium,
+                hasGeneralSubscription,
+                subscriptions,
+                billingSubscriptions,
+                metadata,
                 serverUserKeys: Object.keys(user),
                 subscriptionProps: Object.keys(user).filter(key =>
                     key.toLowerCase().includes('subscription') ||
-                    key.toLowerCase().includes('billing')
+                    key.toLowerCase().includes('billing') ||
+                    key.toLowerCase().includes('plan')
                 ),
-                subscriptions: user.subscriptions,
-                hasSubscription: user.hasSubscription,
-                billingSubscriptions: user.billingSubscriptions
             }
         });
 
