@@ -17,62 +17,54 @@ import { PricingTable } from "@clerk/nextjs";
 // Updated premium check that uses Clerk's actual subscription methods
 // Replace the useIsPremium function with this:
 
+// Updated premium check that uses server-side API
+// Replace the useIsPremium function with this:
+
 function useIsPremium() {
   const { user, isLoaded } = useUser();
+  const [isPremium, setIsPremium] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [debug, setDebug] = useState<any>({});
 
-  if (!isLoaded || !user) {
-    return { isPremium: false, isLoading: !isLoaded };
-  }
+  useEffect(() => {
+    async function checkSubscriptionStatus() {
+      if (!isLoaded || !user) {
+        setIsLoading(false);
+        return;
+      }
 
-  console.log('🔍 Checking premium status for user:', user.id);
-  console.log('📋 All user properties:', Object.keys(user));
+      try {
+        console.log('🔍 Fetching subscription status from server...');
 
-  // Check if user object has subscription-related properties
-  const userAny = user as any; // Type assertion to access potential subscription properties
+        const response = await fetch('/api/subscription-status');
+        const data = await response.json();
 
-  console.log('🔍 Checking for subscription properties...');
-  console.log('- subscriptions:', userAny.subscriptions);
-  console.log('- hasSubscription:', userAny.hasSubscription);
-  console.log('- activeSubscriptions:', userAny.activeSubscriptions);
-  console.log('- subscription:', userAny.subscription);
+        console.log('✅ Server response:', data);
 
-  // Method 1: Check various possible subscription properties
-  const hasActiveSubscription = userAny.subscriptions?.some((sub: any) => sub.status === 'active') ||
-    userAny.activeSubscriptions?.length > 0 ||
-    userAny.hasSubscription === true ||
-    userAny.subscription?.status === 'active';
+        setIsPremium(data.isPremium || false);
+        setDebug(data.debug || {});
 
-  // Method 2: Check legacy metadata
-  const hasMetadataPremium = user.publicMetadata?.premiumUser === true;
+      } catch (error) {
+        console.error('❌ Failed to check subscription status:', error);
+        setIsPremium(false);
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-  // Method 3: Since we see "Active" in the UI, let's try to detect it by checking if we can find subscription info
-  // Check if the user object has any properties that might indicate subscription status
-  const subscriptionProperties = Object.keys(userAny).filter(key =>
-    key.toLowerCase().includes('subscription') ||
-    key.toLowerCase().includes('billing') ||
-    key.toLowerCase().includes('plan')
-  );
-
-  console.log('📋 Found subscription-related properties:', subscriptionProperties);
-
-  const isPremium = hasActiveSubscription || hasMetadataPremium;
-
-  console.log('✅ Premium check results:', {
-    hasActiveSubscription,
-    hasMetadataPremium,
-    subscriptionProperties,
-    finalResult: isPremium
-  });
+    checkSubscriptionStatus();
+  }, [user, isLoaded]);
 
   return {
     isPremium,
-    isLoading: false,
-    metadata: user.publicMetadata,
-    debug: {
-      hasActiveSubscription,
-      hasMetadataPremium,
-      subscriptionProperties,
-      userKeys: Object.keys(user)
+    isLoading,
+    debug,
+    refresh: () => {
+      if (user) {
+        setIsLoading(true);
+        // Re-run the effect by updating a dependency
+        window.location.reload();
+      }
     }
   };
 }
@@ -121,49 +113,28 @@ export default function PricingPage() {
         </section>
 
 
-        // Enhanced debug component to see more user properties
-        // Replace the existing debug component with this:
-
         {isSignedIn && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
-            <h3 className="font-bold mb-2">🔍 Enhanced Debug Info:</h3>
+            <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
             <div className="space-y-2">
               <div><strong>User ID:</strong> {user?.id}</div>
               <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+              <div><strong>Premium Status:</strong> <span className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ Premium' : '❌ Free'}</span></div>
 
               <div className="mt-2">
-                <strong>Public Metadata:</strong>
+                <strong>Server-Side Debug:</strong>
                 <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
-                  {JSON.stringify(user?.publicMetadata, null, 2)}
+                  {JSON.stringify(debug, null, 2)}
                 </pre>
               </div>
 
               <div className="mt-2">
-                <strong>Subscription Properties Check:</strong>
-                <div className="text-xs space-y-1">
-                  <div>• subscriptions: {JSON.stringify((user as any)?.subscriptions)}</div>
-                  <div>• hasSubscription: {JSON.stringify((user as any)?.hasSubscription)}</div>
-                  <div>• activeSubscriptions: {JSON.stringify((user as any)?.activeSubscriptions)}</div>
-                  <div>• subscription: {JSON.stringify((user as any)?.subscription)}</div>
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <strong>All User Properties:</strong>
-                <div className="text-xs text-gray-600 max-h-20 overflow-auto">
-                  {user ? Object.keys(user).join(', ') : 'No user'}
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <strong>Subscription-related Properties:</strong>
-                <div className="text-xs text-blue-600">
-                  {user ? Object.keys(user as any).filter(key =>
-                    key.toLowerCase().includes('subscription') ||
-                    key.toLowerCase().includes('billing') ||
-                    key.toLowerCase().includes('plan')
-                  ).join(', ') || 'None found' : 'No user'}
-                </div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-2 py-1 bg-blue-500 text-white rounded text-xs"
+                >
+                  Refresh Status
+                </button>
               </div>
             </div>
           </div>
