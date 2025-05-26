@@ -1,3 +1,4 @@
+//app/page.tsx - Updated with server-side subscription check
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +18,56 @@ import { AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 
+// Updated premium check that uses server-side API (same as pricing page)
+function useIsPremium() {
+  const { user, isLoaded } = useUser();
+  const [isPremium, setIsPremium] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [debug, setDebug] = useState<any>({});
+
+  useEffect(() => {
+    async function checkSubscriptionStatus() {
+      if (!isLoaded || !user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        console.log('🔍 Fetching subscription status from server...');
+
+        const response = await fetch('/api/subscription-status');
+        const data = await response.json();
+
+        console.log('✅ Server response:', data);
+
+        setIsPremium(data.isPremium || false);
+        setDebug(data.debug || {});
+
+      } catch (error) {
+        console.error('❌ Failed to check subscription status:', error);
+        setIsPremium(false);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkSubscriptionStatus();
+  }, [user, isLoaded]);
+
+  return {
+    isPremium,
+    isLoading,
+    debug,
+    refresh: () => {
+      if (user) {
+        setIsLoading(true);
+        // Re-run the effect by updating a dependency
+        window.location.reload();
+      }
+    }
+  };
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
@@ -27,6 +78,9 @@ export default function Home() {
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
+
+  // Use the same server-side subscription check as pricing page
+  const { isPremium, isLoading: premiumLoading, debug } = useIsPremium();
 
   // Load guest usage count from localStorage
   useEffect(() => {
@@ -67,6 +121,7 @@ export default function Home() {
       processedUrl = "https://" + processedUrl;
     }
 
+    // For signed-in users, check if they're premium to determine limits
     if (!isSignedIn) {
       if (analysisCount >= 1) {
         setShowLoginAlert(true);
@@ -130,6 +185,36 @@ export default function Home() {
                   Analyze your website's readiness for Large Language Models and improve your visibility in AI-powered search.
                 </p>
               </div>
+
+              {/* Premium status indicator for signed-in users */}
+              {isSignedIn && !premiumLoading && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
+                  <p className="text-sm">
+                    Current Plan: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
+                      {isPremium ? 'Premium ✅' : 'Free'}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {/* Debug info for development */}
+              {isSignedIn && process.env.NODE_ENV === 'development' && !premiumLoading && (
+                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs max-w-md">
+                  <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
+                  <div className="space-y-2">
+                    <div><strong>User ID:</strong> {user?.id}</div>
+                    <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+                    <div><strong>Premium Status:</strong> <span className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ Premium' : '❌ Free'}</span></div>
+                    <div className="mt-2">
+                      <strong>Server-Side Debug:</strong>
+                      <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
+                        {JSON.stringify(debug, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="w-full max-w-md space-y-2">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
@@ -162,18 +247,36 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Updated usage info based on subscription status */}
                   {!isSignedIn && analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Free users can analyze 1 website. Create an account for more.
                     </p>
                   )}
-                  <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached} className="w-full">
+
+                  {isSignedIn && !premiumLoading && !isPremium && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Free plan users get limited analyses. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade to Premium</Link> for unlimited access.
+                    </p>
+                  )}
+
+                  {isSignedIn && !premiumLoading && isPremium && (
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Premium plan: Unlimited website analyses ✅
+                    </p>
+                  )}
+
+                  <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached || premiumLoading} className="w-full">
                     {isSubmitting
                       ? "Analyzing..."
-                      : isLimitReached
-                        ? "Analysis Limit Reached"
-                        : "Analyze"}
+                      : premiumLoading
+                        ? "Loading..."
+                        : isLimitReached
+                          ? "Analysis Limit Reached"
+                          : "Analyze"}
                   </Button>
+
                   {isLimitReached && (
                     <div className="mt-4 text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                       <p className="text-sm text-green-800 dark:text-green-300 font-medium">
@@ -190,13 +293,7 @@ export default function Home() {
                       </Button>
                     </div>
                   )}
-                </form>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </div>
-  );
-}
+
+                  {/* Show upgrade CTA for signed-in free users */}
+                  {isSignedIn && !premiumLoading && !isPremium && (
+                    <div

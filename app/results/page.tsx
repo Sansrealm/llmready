@@ -1,4 +1,4 @@
-// REFRESH-SESSION
+// RESULTS - Updated with server-side subscription check
 "use client";
 
 import { useState, useEffect } from "react";
@@ -30,6 +30,56 @@ type AnalysisResult = {
     remainingAnalyses?: number;
 };
 
+// Updated premium check that uses server-side API (same as pricing page)
+function useIsPremium() {
+    const { user, isLoaded } = useUser();
+    const [isPremium, setIsPremium] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [debug, setDebug] = useState<any>({});
+
+    useEffect(() => {
+        async function checkSubscriptionStatus() {
+            if (!isLoaded || !user) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                console.log('🔍 Fetching subscription status from server...');
+
+                const response = await fetch('/api/subscription-status');
+                const data = await response.json();
+
+                console.log('✅ Server response:', data);
+
+                setIsPremium(data.isPremium || false);
+                setDebug(data.debug || {});
+
+            } catch (error) {
+                console.error('❌ Failed to check subscription status:', error);
+                setIsPremium(false);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        checkSubscriptionStatus();
+    }, [user, isLoaded]);
+
+    return {
+        isPremium,
+        isLoading,
+        debug,
+        refresh: () => {
+            if (user) {
+                setIsLoading(true);
+                // Re-run the effect by updating a dependency
+                window.location.reload();
+            }
+        }
+    };
+}
+
 export default function ResultsPage() {
     const { isLoaded, isSignedIn, user } = useUser();
     const router = useRouter();
@@ -42,69 +92,10 @@ export default function ResultsPage() {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isPremiumState, setIsPremiumState] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Initial check from Clerk
-    const isPremiumFromClerk = user?.publicMetadata?.premiumUser === true;
-
-    // Effect to set initial state
-    useEffect(() => {
-        if (isPremiumFromClerk) {
-            setIsPremiumState(true);
-        }
-    }, [isPremiumFromClerk]);
-
-    // Enhanced refresh function for production use
-    const refreshSession = async (maxRetries = 3) => {
-        if (!user) return false;
-
-        setRefreshing(true);
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`Refresh attempt ${attempt}/${maxRetries}`);
-
-                // Force Clerk to refetch user data
-                await user.reload();
-
-                const isPremium = user.publicMetadata?.premiumUser === true;
-                console.log(`Attempt ${attempt} - Premium status:`, isPremium);
-
-                if (isPremium) {
-                    // Success! Premium status found
-                    setIsPremiumState(true);
-                    setRefreshing(false);
-                    return true;
-                }
-
-                // If not premium and not the last attempt, wait before retrying
-                if (attempt < maxRetries) {
-                    console.log(`Waiting 5 seconds before retry ${attempt + 1}...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-
-            } catch (error) {
-                console.error(`Refresh attempt ${attempt} failed:`, error);
-
-                if (attempt === maxRetries) {
-                    setRefreshing(false);
-                    return false;
-                }
-
-                // Wait before retrying on error
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-        }
-
-        // All attempts failed
-        setIsPremiumState(false);
-        setRefreshing(false);
-        return false;
-    };
-
-    // Use the local state for premium checks
-    const isPremium = isPremiumState;
+    // Use the same server-side subscription check as pricing page
+    const { isPremium, isLoading: premiumLoading, debug, refresh } = useIsPremium();
 
     useEffect(() => {
         async function fetchAnalysis() {
@@ -142,6 +133,13 @@ export default function ResultsPage() {
         fetchAnalysis();
     }, [url, email, industry]);
 
+    // Enhanced refresh function
+    const refreshSession = async () => {
+        setRefreshing(true);
+        await refresh();
+        setRefreshing(false);
+    };
+
     // Premium feature handlers
     const generatePdfReport = async () => {
         if (!isSignedIn) {
@@ -173,6 +171,25 @@ export default function ResultsPage() {
         alert("Email report sending will be implemented in the next phase");
     };
 
+    // Show loading screen while checking premium status
+    if (premiumLoading || loading) {
+        return (
+            <div className="flex min-h-screen flex-col">
+                <Navbar />
+                <main className="flex-1">
+                    <div className="container py-8 px-4 md:px-6">
+                        <div className="space-y-4">
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-32 w-full" />
+                            <Skeleton className="h-32 w-full" />
+                        </div>
+                    </div>
+                </main>
+                <Footer />
+            </div>
+        );
+    }
+
     return (
         <div className="flex min-h-screen flex-col">
             <Navbar />
@@ -184,7 +201,7 @@ export default function ResultsPage() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => refreshSession()}
+                                onClick={refreshSession}
                                 disabled={refreshing}
                                 className="ml-2"
                             >
@@ -200,9 +217,27 @@ export default function ResultsPage() {
                         <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                             <p className="text-sm">
                                 Account Status: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
-                                    {isPremium ? 'Premium' : 'Free'}
+                                    {isPremium ? 'Premium ✅' : 'Free'}
                                 </span>
                             </p>
+                        </div>
+                    )}
+
+                    {/* Debug info for testing */}
+                    {isSignedIn && process.env.NODE_ENV === 'development' && (
+                        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
+                            <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
+                            <div className="space-y-2">
+                                <div><strong>User ID:</strong> {user?.id}</div>
+                                <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+                                <div><strong>Premium Status:</strong> <span className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ Premium' : '❌ Free'}</span></div>
+                                <div className="mt-2">
+                                    <strong>Server-Side Debug:</strong>
+                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
+                                        {JSON.stringify(debug, null, 2)}
+                                    </pre>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -219,13 +254,7 @@ export default function ResultsPage() {
                         </div>
                     )}
 
-                    {loading ? (
-                        <div className="space-y-4">
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-32 w-full" />
-                            <Skeleton className="h-32 w-full" />
-                        </div>
-                    ) : error ? (
+                    {error ? (
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Analysis Error</AlertTitle>
