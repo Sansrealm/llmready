@@ -296,4 +296,28 @@ export default function Home() {
 
                   {/* Show upgrade CTA for signed-in free users */}
                   {isSignedIn && !premiumLoading && !isPremium && (
-                    <div
+                    <div className="mt-4 text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                        Premium Benefits Available
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Get unlimited analyses, advanced insights, and more
+                      </p>
+                      <Button
+                        className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                        asChild
+                      >
+                        <Link href="/pricing">View Premium Plans</Link>
+                      </Button>
+                    </div>
+                  )}
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
