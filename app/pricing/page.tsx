@@ -11,6 +11,9 @@ import { useAuth, useUser } from "@clerk/nextjs";
 // Import Clerk's PricingTable component
 import { PricingTable } from "@clerk/nextjs";
 
+// Fixed premium check hook that works with Clerk's TypeScript types
+// Replace the useIsPremium function in your pricing page with this:
+
 function useIsPremium() {
   const { user, isLoaded } = useUser();
 
@@ -19,35 +22,38 @@ function useIsPremium() {
   }
 
   console.log('🔍 Checking premium status for user:', user.id);
-  console.log('📋 User metadata:', user.publicMetadata);
-  console.log('📋 User private metadata:', user.privateMetadata);
-  console.log('📋 User unsafe metadata:', user.unsafeMetadata);
+  console.log('📋 User public metadata:', user.publicMetadata);
 
-  // Method 1: Check if user has active Clerk subscription
-  const hasClerkSubscription = user.publicMetadata?.subscriptionStatus === 'active' ||
-    user.publicMetadata?.hasActiveSubscription === true ||
-    user.publicMetadata?.subscription === 'premium' ||
-    user.publicMetadata?.plan === 'premium';
+  // Check all possible ways Clerk might store subscription info in publicMetadata
+  const metadata = user.publicMetadata || {};
 
-  // Method 2: Check legacy metadata
-  const hasMetadataPremium = user.publicMetadata?.premiumUser === true;
+  // Method 1: Direct premium flag (your old system)
+  const hasLegacyPremium = metadata.premiumUser === true;
 
-  // Method 3: Check private metadata (Clerk sometimes stores subscription info here)
-  const hasPrivateSubscription = user.privateMetadata?.subscriptionStatus === 'active' ||
-    user.privateMetadata?.hasActiveSubscription === true;
+  // Method 2: Subscription status flags (various ways Clerk might store it)
+  const hasActiveSubscription = metadata.subscriptionStatus === 'active' ||
+    metadata.hasActiveSubscription === true ||
+    metadata.subscription === 'premium' ||
+    metadata.subscription === 'active' ||
+    metadata.plan === 'premium' ||
+    metadata.planStatus === 'active' ||
+    metadata.billingStatus === 'active';
 
-  // Method 4: Check unsafe metadata
-  const hasUnsafeSubscription = user.unsafeMetadata?.subscriptionStatus === 'active' ||
-    user.unsafeMetadata?.hasActiveSubscription === true;
+  // Method 3: Check for any subscription-related fields
+  const hasAnySubscriptionField = Object.keys(metadata).some(key =>
+    key.toLowerCase().includes('subscription') ||
+    key.toLowerCase().includes('premium') ||
+    key.toLowerCase().includes('billing')
+  );
 
-  const isPremium = hasClerkSubscription || hasMetadataPremium || hasPrivateSubscription || hasUnsafeSubscription;
+  const isPremium = hasLegacyPremium || hasActiveSubscription;
 
   console.log('✅ Premium check results:', {
-    hasClerkSubscription,
-    hasMetadataPremium,
-    hasPrivateSubscription,
-    hasUnsafeSubscription,
-    finalResult: isPremium
+    hasLegacyPremium,
+    hasActiveSubscription,
+    hasAnySubscriptionField,
+    finalResult: isPremium,
+    allMetadataKeys: Object.keys(metadata)
   });
 
   return {
@@ -55,10 +61,10 @@ function useIsPremium() {
     isLoading: false,
     metadata: user.publicMetadata,
     debug: {
-      hasClerkSubscription,
-      hasMetadataPremium,
-      hasPrivateSubscription,
-      hasUnsafeSubscription
+      hasLegacyPremium,
+      hasActiveSubscription,
+      hasAnySubscriptionField,
+      metadataKeys: Object.keys(metadata)
     }
   };
 }
@@ -109,12 +115,22 @@ export default function PricingPage() {
 
         {isSignedIn && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
-            <h3 className="font-bold mb-2">Debug Info (Remove after testing):</h3>
-            <div className="space-y-1">
+            <h3 className="font-bold mb-2">🔍 Debug Info (Remove after testing):</h3>
+            <div className="space-y-2">
               <div><strong>User ID:</strong> {user?.id}</div>
-              <div><strong>Public Metadata:</strong> {JSON.stringify(user?.publicMetadata, null, 2)}</div>
-              <div><strong>Private Metadata:</strong> {JSON.stringify(user?.privateMetadata, null, 2)}</div>
-              <div><strong>Unsafe Metadata:</strong> {JSON.stringify(user?.unsafeMetadata, null, 2)}</div>
+              <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+              <div className="mt-2">
+                <strong>Public Metadata:</strong>
+                <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
+                  {JSON.stringify(user?.publicMetadata, null, 2)}
+                </pre>
+              </div>
+              <div className="mt-2">
+                <strong>Available Properties:</strong>
+                <div className="text-xs text-gray-600">
+                  {user ? Object.keys(user).join(', ') : 'No user'}
+                </div>
+              </div>
             </div>
           </div>
         )}
