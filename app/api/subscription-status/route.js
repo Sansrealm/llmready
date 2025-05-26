@@ -1,5 +1,5 @@
 // app/api/subscription-status/route.js
-// Server-side API to check user's subscription status
+// Fixed JavaScript version without TypeScript syntax
 
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
@@ -21,20 +21,19 @@ export async function GET() {
         // Method 1: Check if Clerk exposes subscription data server-side
         console.log('📋 Server-side user properties:', Object.keys(user));
 
-        // Check for subscription data in server-side user object
-        const userAny = user as any;
-        console.log('- subscriptions:', userAny.subscriptions);
-        console.log('- hasSubscription:', userAny.hasSubscription);
-        console.log('- billingSubscriptions:', userAny.billingSubscriptions);
+        // Check for subscription data in server-side user object (no TypeScript syntax)
+        console.log('- subscriptions:', user.subscriptions);
+        console.log('- hasSubscription:', user.hasSubscription);
+        console.log('- billingSubscriptions:', user.billingSubscriptions);
 
         // Method 2: Check public metadata
         const metadata = user.publicMetadata || {};
         const hasMetadataPremium = metadata.premiumUser === true;
 
-        // Method 3: Check for subscription properties server-side
-        const hasServerSubscription = userAny.subscriptions?.some((sub: any) => sub.status === 'active') ||
-            userAny.hasSubscription === true ||
-            userAny.billingSubscriptions?.length > 0;
+        // Method 3: Check for subscription properties server-side (pure JavaScript)
+        const hasServerSubscription = (user.subscriptions && user.subscriptions.some(sub => sub.status === 'active')) ||
+            user.hasSubscription === true ||
+            (user.billingSubscriptions && user.billingSubscriptions.length > 0);
 
         // Method 4: Since we know you have an active subscription, 
         // let's temporarily check by user ID (you can update this logic)
@@ -58,10 +57,13 @@ export async function GET() {
                 hasServerSubscription,
                 isKnownPremium,
                 serverUserKeys: Object.keys(user),
-                subscriptionProps: Object.keys(userAny).filter(key =>
+                subscriptionProps: Object.keys(user).filter(key =>
                     key.toLowerCase().includes('subscription') ||
                     key.toLowerCase().includes('billing')
-                )
+                ),
+                subscriptions: user.subscriptions,
+                hasSubscription: user.hasSubscription,
+                billingSubscriptions: user.billingSubscriptions
             }
         });
 
