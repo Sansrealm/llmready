@@ -197,18 +197,6 @@ export default function ResultsPage() {
                 <div className="container py-8 px-4 md:px-6">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
-                        {isSignedIn && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={refreshSession}
-                                disabled={refreshing}
-                                className="ml-2"
-                            >
-                                <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-                                {refreshing ? 'Refreshing...' : 'Refresh Status'}
-                            </Button>
-                        )}
                     </div>
                     <p className="mb-6 text-gray-600">Analysis for: {url}</p>
 

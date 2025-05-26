@@ -262,9 +262,9 @@ export default function Home() {
                   )}
 
                   {isSignedIn && !premiumLoading && isPremium && (
-                    <p className="text-sm text-green-600 dark:text-green-400">
-                      Premium plan: Unlimited website analyses ✅
-                    </p>
+                    // <p className="text-sm text-green-600 dark:text-green-400">
+                    //   Premium plan: Unlimited website analyses ✅
+                    // </p>
                   )}
 
                   <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached || premiumLoading} className="w-full">
