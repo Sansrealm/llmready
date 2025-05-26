@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect import
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Link from "next/link";
@@ -11,15 +11,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 // Import Clerk's PricingTable component
 import { PricingTable } from "@clerk/nextjs";
 
-// Fixed premium check hook that works with Clerk's TypeScript types
-// Replace the useIsPremium function in your pricing page with this:
-
-// Updated premium check that uses Clerk's actual subscription methods
-// Replace the useIsPremium function with this:
-
 // Updated premium check that uses server-side API
-// Replace the useIsPremium function with this:
-
 function useIsPremium() {
   const { user, isLoaded } = useUser();
   const [isPremium, setIsPremium] = useState(false);
@@ -68,6 +60,7 @@ function useIsPremium() {
     }
   };
 }
+
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
