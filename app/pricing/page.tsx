@@ -14,6 +14,9 @@ import { PricingTable } from "@clerk/nextjs";
 // Fixed premium check hook that works with Clerk's TypeScript types
 // Replace the useIsPremium function in your pricing page with this:
 
+// Updated premium check that uses Clerk's actual subscription methods
+// Replace the useIsPremium function with this:
+
 function useIsPremium() {
   const { user, isLoaded } = useUser();
 
@@ -22,38 +25,43 @@ function useIsPremium() {
   }
 
   console.log('🔍 Checking premium status for user:', user.id);
-  console.log('📋 User public metadata:', user.publicMetadata);
+  console.log('📋 All user properties:', Object.keys(user));
 
-  // Check all possible ways Clerk might store subscription info in publicMetadata
-  const metadata = user.publicMetadata || {};
+  // Check if user object has subscription-related properties
+  const userAny = user as any; // Type assertion to access potential subscription properties
 
-  // Method 1: Direct premium flag (your old system)
-  const hasLegacyPremium = metadata.premiumUser === true;
+  console.log('🔍 Checking for subscription properties...');
+  console.log('- subscriptions:', userAny.subscriptions);
+  console.log('- hasSubscription:', userAny.hasSubscription);
+  console.log('- activeSubscriptions:', userAny.activeSubscriptions);
+  console.log('- subscription:', userAny.subscription);
 
-  // Method 2: Subscription status flags (various ways Clerk might store it)
-  const hasActiveSubscription = metadata.subscriptionStatus === 'active' ||
-    metadata.hasActiveSubscription === true ||
-    metadata.subscription === 'premium' ||
-    metadata.subscription === 'active' ||
-    metadata.plan === 'premium' ||
-    metadata.planStatus === 'active' ||
-    metadata.billingStatus === 'active';
+  // Method 1: Check various possible subscription properties
+  const hasActiveSubscription = userAny.subscriptions?.some((sub: any) => sub.status === 'active') ||
+    userAny.activeSubscriptions?.length > 0 ||
+    userAny.hasSubscription === true ||
+    userAny.subscription?.status === 'active';
 
-  // Method 3: Check for any subscription-related fields
-  const hasAnySubscriptionField = Object.keys(metadata).some(key =>
+  // Method 2: Check legacy metadata
+  const hasMetadataPremium = user.publicMetadata?.premiumUser === true;
+
+  // Method 3: Since we see "Active" in the UI, let's try to detect it by checking if we can find subscription info
+  // Check if the user object has any properties that might indicate subscription status
+  const subscriptionProperties = Object.keys(userAny).filter(key =>
     key.toLowerCase().includes('subscription') ||
-    key.toLowerCase().includes('premium') ||
-    key.toLowerCase().includes('billing')
+    key.toLowerCase().includes('billing') ||
+    key.toLowerCase().includes('plan')
   );
 
-  const isPremium = hasLegacyPremium || hasActiveSubscription;
+  console.log('📋 Found subscription-related properties:', subscriptionProperties);
+
+  const isPremium = hasActiveSubscription || hasMetadataPremium;
 
   console.log('✅ Premium check results:', {
-    hasLegacyPremium,
     hasActiveSubscription,
-    hasAnySubscriptionField,
-    finalResult: isPremium,
-    allMetadataKeys: Object.keys(metadata)
+    hasMetadataPremium,
+    subscriptionProperties,
+    finalResult: isPremium
   });
 
   return {
@@ -61,10 +69,10 @@ function useIsPremium() {
     isLoading: false,
     metadata: user.publicMetadata,
     debug: {
-      hasLegacyPremium,
       hasActiveSubscription,
-      hasAnySubscriptionField,
-      metadataKeys: Object.keys(metadata)
+      hasMetadataPremium,
+      subscriptionProperties,
+      userKeys: Object.keys(user)
     }
   };
 }
@@ -113,22 +121,48 @@ export default function PricingPage() {
         </section>
 
 
+        // Enhanced debug component to see more user properties
+        // Replace the existing debug component with this:
+
         {isSignedIn && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
-            <h3 className="font-bold mb-2">🔍 Debug Info (Remove after testing):</h3>
+            <h3 className="font-bold mb-2">🔍 Enhanced Debug Info:</h3>
             <div className="space-y-2">
               <div><strong>User ID:</strong> {user?.id}</div>
               <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+
               <div className="mt-2">
                 <strong>Public Metadata:</strong>
-                <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
+                <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
                   {JSON.stringify(user?.publicMetadata, null, 2)}
                 </pre>
               </div>
+
               <div className="mt-2">
-                <strong>Available Properties:</strong>
-                <div className="text-xs text-gray-600">
+                <strong>Subscription Properties Check:</strong>
+                <div className="text-xs space-y-1">
+                  <div>• subscriptions: {JSON.stringify((user as any)?.subscriptions)}</div>
+                  <div>• hasSubscription: {JSON.stringify((user as any)?.hasSubscription)}</div>
+                  <div>• activeSubscriptions: {JSON.stringify((user as any)?.activeSubscriptions)}</div>
+                  <div>• subscription: {JSON.stringify((user as any)?.subscription)}</div>
+                </div>
+              </div>
+
+              <div className="mt-2">
+                <strong>All User Properties:</strong>
+                <div className="text-xs text-gray-600 max-h-20 overflow-auto">
                   {user ? Object.keys(user).join(', ') : 'No user'}
+                </div>
+              </div>
+
+              <div className="mt-2">
+                <strong>Subscription-related Properties:</strong>
+                <div className="text-xs text-blue-600">
+                  {user ? Object.keys(user as any).filter(key =>
+                    key.toLowerCase().includes('subscription') ||
+                    key.toLowerCase().includes('billing') ||
+                    key.toLowerCase().includes('plan')
+                  ).join(', ') || 'None found' : 'No user'}
                 </div>
               </div>
             </div>
