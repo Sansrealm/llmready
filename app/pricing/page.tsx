@@ -11,7 +11,6 @@ import { useAuth, useUser } from "@clerk/nextjs";
 // Import Clerk's PricingTable component
 import { PricingTable } from "@clerk/nextjs";
 
-// Hook to check premium status
 function useIsPremium() {
   const { user, isLoaded } = useUser();
 
@@ -19,14 +18,48 @@ function useIsPremium() {
     return { isPremium: false, isLoading: !isLoaded };
   }
 
-  // Check metadata for premium status
+  console.log('🔍 Checking premium status for user:', user.id);
+  console.log('📋 User metadata:', user.publicMetadata);
+  console.log('📋 User private metadata:', user.privateMetadata);
+  console.log('📋 User unsafe metadata:', user.unsafeMetadata);
+
+  // Method 1: Check if user has active Clerk subscription
+  const hasClerkSubscription = user.publicMetadata?.subscriptionStatus === 'active' ||
+    user.publicMetadata?.hasActiveSubscription === true ||
+    user.publicMetadata?.subscription === 'premium' ||
+    user.publicMetadata?.plan === 'premium';
+
+  // Method 2: Check legacy metadata
   const hasMetadataPremium = user.publicMetadata?.premiumUser === true;
-  const hasSubscriptionFlag = user.publicMetadata?.hasActiveSubscription === true;
+
+  // Method 3: Check private metadata (Clerk sometimes stores subscription info here)
+  const hasPrivateSubscription = user.privateMetadata?.subscriptionStatus === 'active' ||
+    user.privateMetadata?.hasActiveSubscription === true;
+
+  // Method 4: Check unsafe metadata
+  const hasUnsafeSubscription = user.unsafeMetadata?.subscriptionStatus === 'active' ||
+    user.unsafeMetadata?.hasActiveSubscription === true;
+
+  const isPremium = hasClerkSubscription || hasMetadataPremium || hasPrivateSubscription || hasUnsafeSubscription;
+
+  console.log('✅ Premium check results:', {
+    hasClerkSubscription,
+    hasMetadataPremium,
+    hasPrivateSubscription,
+    hasUnsafeSubscription,
+    finalResult: isPremium
+  });
 
   return {
-    isPremium: hasMetadataPremium || hasSubscriptionFlag,
+    isPremium,
     isLoading: false,
-    metadata: user.publicMetadata
+    metadata: user.publicMetadata,
+    debug: {
+      hasClerkSubscription,
+      hasMetadataPremium,
+      hasPrivateSubscription,
+      hasUnsafeSubscription
+    }
   };
 }
 
@@ -72,6 +105,19 @@ export default function PricingPage() {
             </div>
           </div>
         </section>
+
+
+        {isSignedIn && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
+            <h3 className="font-bold mb-2">Debug Info (Remove after testing):</h3>
+            <div className="space-y-1">
+              <div><strong>User ID:</strong> {user?.id}</div>
+              <div><strong>Public Metadata:</strong> {JSON.stringify(user?.publicMetadata, null, 2)}</div>
+              <div><strong>Private Metadata:</strong> {JSON.stringify(user?.privateMetadata, null, 2)}</div>
+              <div><strong>Unsafe Metadata:</strong> {JSON.stringify(user?.unsafeMetadata, null, 2)}</div>
+            </div>
+          </div>
+        )}
 
         {/* Clerk Pricing Table */}
         <section className="w-full py-12 md:py-24 lg:py-32">
