@@ -66,7 +66,7 @@ export default function PricingPage() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
 
-  const { isPremium, isLoading: premiumLoading } = useIsPremium();
+  const { isPremium, isLoading: premiumLoading, debug } = useIsPremium();
 
   if (premiumLoading) {
     return (
