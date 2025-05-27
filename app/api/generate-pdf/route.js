@@ -294,9 +294,9 @@ function generatePrintReadyHTML(analysisResult, url, userEmail) {
         </div>
 
         <div class="footer">
-            <p><strong>LLM Ready</strong> - AI-Powered Website Optimization</p>
+            <p><strong>LLM Check</strong> - AI-Powered Website Optimization</p>
             <p>Report generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-            <p>For questions or support, visit <strong>llmcheck.app</strong></p>
+            <p>For questions or support, visit <strong><a href="https://www.llmcheck.app">www.llmcheck.app</a></strong></p>
         </div>
     </body>
     </html>
