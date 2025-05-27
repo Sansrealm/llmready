@@ -304,44 +304,38 @@ export default function ResultsPage() {
                         </div>
                     )}
 
-                    {/* CLIENT-SIDE CLERK DEBUG */}
+                    {/* CLIENT-SIDE CLERK DEBUG - TypeScript Safe */}
                     {isSignedIn && process.env.NODE_ENV === 'development' && (
                         <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left text-xs">
                             <h3 className="font-bold mb-2">🔍 CLIENT-SIDE CLERK DEBUG:</h3>
                             <div className="space-y-2">
                                 <div><strong>Client User ID:</strong> {user?.id}</div>
                                 <div><strong>Client Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
-                                <div><strong>Client Has Subscription:</strong> {user?.hasSubscription ? '✅ Yes' : '❌ No'}</div>
 
-                                {/* Show all user properties */}
+                                {/* Check public metadata */}
+                                <div><strong>Public Metadata:</strong> {JSON.stringify(user?.publicMetadata || {})}</div>
+
+                                {/* Show all user properties that might be subscription-related */}
                                 <div className="mt-2">
-                                    <strong>All Client User Properties:</strong>
-                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-40">
-                                        {JSON.stringify(
-                                            Object.keys(user || {}).reduce((acc, key) => {
-                                                if (key.toLowerCase().includes('sub') ||
-                                                    key.toLowerCase().includes('bill') ||
-                                                    key.toLowerCase().includes('plan') ||
-                                                    key.toLowerCase().includes('metadata')) {
-                                                    acc[key] = user[key];
-                                                }
-                                                return acc;
-                                            }, {}),
-                                            null,
-                                            2
-                                        )}
+                                    <strong>Available User Properties:</strong>
+                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
+                                        {JSON.stringify(Object.keys(user || {}), null, 2)}
                                     </pre>
                                 </div>
 
-                                {/* Try to access subscriptions directly */}
+                                {/* Try to access any subscription-like properties safely */}
                                 <div className="mt-2">
-                                    <strong>Direct Subscription Access:</strong>
+                                    <strong>Subscription-Related Data:</strong>
                                     <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
                                         {JSON.stringify({
-                                            subscriptions: user?.subscriptions || 'undefined',
-                                            billingSubscriptions: user?.billingSubscriptions || 'undefined',
-                                            hasSubscription: user?.hasSubscription || 'undefined',
-                                            publicMetadata: user?.publicMetadata || 'undefined'
+                                            publicMetadata: user?.publicMetadata || {},
+                                            privateMetadata: user?.privateMetadata || {},
+                                            // Check if any subscription properties exist (safely)
+                                            hasAnySubscriptionProps: Object.keys(user || {}).some(key =>
+                                                key.toLowerCase().includes('sub') ||
+                                                key.toLowerCase().includes('bill') ||
+                                                key.toLowerCase().includes('plan')
+                                            )
                                         }, null, 2)}
                                     </pre>
                                 </div>
