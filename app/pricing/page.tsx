@@ -107,7 +107,7 @@ export default function PricingPage() {
         </section>
 
 
-        {/* {isSignedIn && (
+        {isSignedIn && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
             <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
             <div className="space-y-2">
@@ -132,7 +132,7 @@ export default function PricingPage() {
               </div>
             </div>
           </div>
-        )} */}
+        )}
 
         {/* Clerk Pricing Table */}
         <section className="w-full py-12 md:py-24 lg:py-32">

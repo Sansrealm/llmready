@@ -1,4 +1,4 @@
-// RESULTS - Updated with PDF download functionality
+// RESULTS - Updated with server-side subscription check
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Download, Mail, RefreshCw, Loader2, CheckCircle } from "lucide-react";
+import { AlertCircle, Download, Mail, RefreshCw } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ function useIsPremium() {
             try {
                 console.log('🔍 Fetching subscription status from server...');
 
-                const response = await fetch('/api/subscription-check');
+                const response = await fetch('/api/subscription-status');
                 const data = await response.json();
 
                 console.log('✅ Server response:', data);
@@ -93,11 +93,6 @@ export default function ResultsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-
-    // PDF generation states
-    const [pdfGenerating, setPdfGenerating] = useState(false);
-    const [pdfSuccess, setPdfSuccess] = useState<string | null>(null);
-    const [pdfError, setPdfError] = useState<string | null>(null);
 
     // Use the same server-side subscription check as pricing page
     const { isPremium, isLoading: premiumLoading, debug, refresh } = useIsPremium();
@@ -145,7 +140,7 @@ export default function ResultsPage() {
         setRefreshing(false);
     };
 
-    // PDF generation function
+    // Premium feature handlers
     const generatePdfReport = async () => {
         if (!isSignedIn) {
             router.push('/login');
@@ -157,61 +152,8 @@ export default function ResultsPage() {
             return;
         }
 
-        if (!analysisResult || !url) {
-            setPdfError('Missing analysis data for PDF generation');
-            return;
-        }
-
-        try {
-            setPdfGenerating(true);
-            setPdfError(null);
-            setPdfSuccess(null);
-
-            console.log('🔄 Generating PDF report...');
-
-            const response = await fetch('/api/generate-pdf', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    analysisResult,
-                    url,
-                    email: email || user?.emailAddresses?.[0]?.emailAddress,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to generate PDF');
-            }
-
-            if (data.success && data.downloadUrl) {
-                console.log('✅ PDF generated successfully:', data.downloadUrl);
-
-                // Trigger download
-                const link = document.createElement('a');
-                link.href = data.downloadUrl;
-                link.download = data.filename || 'llm-readiness-report.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setPdfSuccess('PDF report downloaded successfully!');
-
-                // Clear success message after 5 seconds
-                setTimeout(() => setPdfSuccess(null), 5000);
-            } else {
-                throw new Error('Invalid response from PDF generation service');
-            }
-
-        } catch (err: any) {
-            console.error('❌ PDF generation failed:', err);
-            setPdfError(err.message || 'Failed to generate PDF report');
-        } finally {
-            setPdfGenerating(false);
-        }
+        // PDF generation logic will be implemented in the next phase
+        alert("PDF generation will be implemented in the next phase");
     };
 
     const sendEmailReport = async () => {
@@ -255,6 +197,7 @@ export default function ResultsPage() {
                 <div className="container py-8 px-4 md:px-6">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
+
                     </div>
                     <p className="mb-6 text-gray-600">Analysis for: {url}</p>
 
@@ -267,23 +210,6 @@ export default function ResultsPage() {
                                 </span>
                             </p>
                         </div>
-                    )}
-
-                    {/* PDF Success/Error Messages */}
-                    {pdfSuccess && (
-                        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-                            <CheckCircle className="h-4 w-4" />
-                            <AlertTitle>Success!</AlertTitle>
-                            <AlertDescription>{pdfSuccess}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    {pdfError && (
-                        <Alert variant="destructive" className="mb-4">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>PDF Generation Error</AlertTitle>
-                            <AlertDescription>{pdfError}</AlertDescription>
-                        </Alert>
                     )}
 
                     {/* Debug info for testing */}
@@ -304,40 +230,6 @@ export default function ResultsPage() {
                         </div>
                     )}
 
-                    {/* CLIENT-SIDE CLERK DEBUG - Only using verified UserResource properties */}
-                    {isSignedIn && process.env.NODE_ENV === 'development' && (
-                        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left text-xs">
-                            <h3 className="font-bold mb-2">🔍 CLIENT-SIDE CLERK DEBUG:</h3>
-                            <div className="space-y-2">
-                                <div><strong>Client User ID:</strong> {user?.id}</div>
-                                <div><strong>Client Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
-
-                                {/* Only use confirmed UserResource properties */}
-                                <div><strong>Public Metadata:</strong> {JSON.stringify(user?.publicMetadata || {})}</div>
-
-                                {/* Show all available user properties */}
-                                <div className="mt-2">
-                                    <strong>Available User Properties:</strong>
-                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
-                                        {JSON.stringify(Object.keys(user || {}), null, 2)}
-                                    </pre>
-                                </div>
-
-                                {/* Safe subscription check */}
-                                <div className="mt-2">
-                                    <strong>User Object Sample:</strong>
-                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
-                                        {JSON.stringify({
-                                            id: user?.id,
-                                            publicMetadata: user?.publicMetadata,
-                                            createdAt: user?.createdAt,
-                                            updatedAt: user?.updatedAt
-                                        }, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     {/* Remaining analyses notice for free users */}
                     {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
                         <div className="mb-6 p-4 bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 rounded-lg">
@@ -379,15 +271,11 @@ export default function ResultsPage() {
                                 <div className="mt-6 flex flex-wrap gap-4">
                                     <Button
                                         onClick={generatePdfReport}
-                                        disabled={!isSignedIn || !isPremium || pdfGenerating}
+                                        disabled={!isSignedIn || !isPremium}
                                         className={!isSignedIn || !isPremium ? "opacity-70" : ""}
                                     >
-                                        {pdfGenerating ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Download className="mr-2 h-4 w-4" />
-                                        )}
-                                        {pdfGenerating ? 'Generating PDF...' : 'Download PDF Report'}
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download PDF Report
                                         {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
                                     </Button>
 
