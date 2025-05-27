@@ -1,12 +1,40 @@
 // app/api/generate-pdf/route.js
-// FINAL SOLUTION - Using your exact plan slug for PDF generation
+// PRODUCTION-ONLY PDF GENERATION - Optimized for Vercel serverless
 
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { put } from '@vercel/blob';
 import puppeteer from 'puppeteer';
 
-// Generate HTML template for PDF (same as before)
+// Production-optimized Puppeteer configuration for Vercel
+const getBrowser = async () => {
+    console.log('🔄 Launching browser for production...');
+
+    return await puppeteer.launch({
+        headless: 'new',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-extensions',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-default-apps',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--memory-pressure-off'
+        ],
+        timeout: 60000, // 60 second timeout for production
+        protocolTimeout: 60000
+    });
+};
+
+// Lightweight HTML template optimized for PDF generation
 function generateReportHTML(analysisResult, url, userEmail) {
     const { overall_score, parameters, recommendations } = analysisResult;
 
@@ -17,136 +45,120 @@ function generateReportHTML(analysisResult, url, userEmail) {
         <meta charset="utf-8">
         <title>LLM Readiness Report</title>
         <style>
+            * { box-sizing: border-box; }
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.6;
+                font-family: Arial, sans-serif;
+                line-height: 1.5;
                 color: #333;
                 max-width: 800px;
                 margin: 0 auto;
-                padding: 40px 20px;
+                padding: 20px;
+                font-size: 14px;
             }
             .header {
                 text-align: center;
-                margin-bottom: 40px;
-                border-bottom: 3px solid #2563eb;
-                padding-bottom: 20px;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #2563eb;
+                padding-bottom: 15px;
             }
             .header h1 {
                 color: #1e40af;
-                font-size: 2.5rem;
-                margin: 0;
+                font-size: 2rem;
+                margin: 0 0 10px 0;
             }
             .header p {
                 color: #64748b;
-                font-size: 1.1rem;
-                margin: 10px 0;
+                margin: 5px 0;
             }
             .score-section {
-                background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                background: #3b82f6;
                 color: white;
-                padding: 30px;
-                border-radius: 12px;
+                padding: 20px;
+                border-radius: 8px;
                 text-align: center;
-                margin: 30px 0;
+                margin: 20px 0;
             }
             .score-number {
-                font-size: 4rem;
+                font-size: 3rem;
                 font-weight: bold;
                 margin: 0;
             }
             .score-label {
-                font-size: 1.2rem;
-                opacity: 0.9;
+                font-size: 1.1rem;
+                margin-top: 10px;
             }
             .progress-bar {
                 width: 100%;
-                height: 8px;
+                height: 6px;
                 background: rgba(255,255,255,0.3);
-                border-radius: 4px;
-                margin: 20px 0;
-                overflow: hidden;
+                border-radius: 3px;
+                margin: 15px 0;
             }
             .progress-fill {
                 height: 100%;
                 background: white;
-                border-radius: 4px;
+                border-radius: 3px;
                 width: ${overall_score}%;
             }
             .section {
-                margin: 40px 0;
+                margin: 30px 0;
+                page-break-inside: avoid;
             }
             .section h2 {
                 color: #1e40af;
-                font-size: 1.8rem;
-                margin-bottom: 20px;
-                border-left: 4px solid #3b82f6;
-                padding-left: 15px;
+                font-size: 1.5rem;
+                margin-bottom: 15px;
+                border-left: 3px solid #3b82f6;
+                padding-left: 10px;
             }
-            .parameter-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 20px;
-                margin: 20px 0;
-            }
-            .parameter-card {
-                border: 2px solid #e5e7eb;
-                border-radius: 8px;
-                padding: 20px;
+            .parameter-card, .recommendation-card {
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                padding: 15px;
+                margin: 10px 0;
                 background: #f9fafb;
+                page-break-inside: avoid;
             }
             .parameter-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
             }
-            .parameter-name {
+            .parameter-name, .recommendation-title {
                 font-weight: 600;
                 color: #374151;
             }
             .parameter-score {
                 font-weight: bold;
                 color: #059669;
-                font-size: 1.1rem;
             }
             .parameter-bar {
                 width: 100%;
-                height: 6px;
+                height: 4px;
                 background: #e5e7eb;
-                border-radius: 3px;
-                margin: 10px 0;
+                border-radius: 2px;
+                margin: 8px 0;
             }
             .parameter-fill {
                 height: 100%;
                 background: #10b981;
-                border-radius: 3px;
+                border-radius: 2px;
             }
-            .parameter-desc {
+            .parameter-desc, .recommendation-desc {
                 font-size: 0.9rem;
                 color: #6b7280;
-                margin-top: 10px;
-            }
-            .recommendation-card {
-                border: 1px solid #d1d5db;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 15px 0;
-                background: white;
-            }
-            .recommendation-title {
-                font-weight: 600;
-                color: #111827;
-                margin-bottom: 10px;
+                margin-top: 8px;
             }
             .recommendation-tags {
-                margin: 10px 0;
+                margin: 8px 0;
             }
             .tag {
                 display: inline-block;
-                padding: 4px 12px;
-                border-radius: 20px;
-                font-size: 0.8rem;
-                margin-right: 10px;
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 0.75rem;
+                margin-right: 8px;
                 font-weight: 500;
             }
             .difficulty-tag {
@@ -157,23 +169,16 @@ function generateReportHTML(analysisResult, url, userEmail) {
                 background: #d1fae5;
                 color: #065f46;
             }
-            .recommendation-desc {
-                color: #4b5563;
-                margin-top: 10px;
-            }
             .footer {
-                margin-top: 60px;
+                margin-top: 40px;
                 text-align: center;
-                padding-top: 20px;
+                padding-top: 15px;
                 border-top: 1px solid #e5e7eb;
                 color: #6b7280;
-                font-size: 0.9rem;
-            }
-            .footer strong {
-                color: #1e40af;
+                font-size: 0.85rem;
             }
             @media print {
-                body { margin: 0; padding: 20px; }
+                body { margin: 0; padding: 15px; }
                 .section { page-break-inside: avoid; }
             }
         </style>
@@ -182,11 +187,7 @@ function generateReportHTML(analysisResult, url, userEmail) {
         <div class="header">
             <h1>LLM Readiness Report</h1>
             <p><strong>Website:</strong> ${url}</p>
-            <p><strong>Generated:</strong> ${new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    })}</p>
+            <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
             ${userEmail ? `<p><strong>Report for:</strong> ${userEmail}</p>` : ''}
         </div>
 
@@ -196,27 +197,22 @@ function generateReportHTML(analysisResult, url, userEmail) {
             <div class="progress-bar">
                 <div class="progress-fill"></div>
             </div>
-            <p style="margin-top: 20px; opacity: 0.9;">
-                Your website's optimization level for Large Language Models and AI-powered search
-            </p>
         </div>
 
         <div class="section">
             <h2>Analysis Parameters</h2>
-            <div class="parameter-grid">
-                ${parameters.map(param => `
-                    <div class="parameter-card">
-                        <div class="parameter-header">
-                            <span class="parameter-name">${param.name}</span>
-                            <span class="parameter-score">${param.score}/100</span>
-                        </div>
-                        <div class="parameter-bar">
-                            <div class="parameter-fill" style="width: ${param.score}%"></div>
-                        </div>
-                        <div class="parameter-desc">${param.description}</div>
+            ${parameters.map(param => `
+                <div class="parameter-card">
+                    <div class="parameter-header">
+                        <span class="parameter-name">${param.name}</span>
+                        <span class="parameter-score">${param.score}/100</span>
                     </div>
-                `).join('')}
-            </div>
+                    <div class="parameter-bar">
+                        <div class="parameter-fill" style="width: ${param.score}%"></div>
+                    </div>
+                    <div class="parameter-desc">${param.description}</div>
+                </div>
+            `).join('')}
         </div>
 
         <div class="section">
@@ -235,7 +231,7 @@ function generateReportHTML(analysisResult, url, userEmail) {
 
         <div class="footer">
             <p><strong>LLM Ready</strong> - AI-Powered Website Optimization</p>
-            <p>This report was generated automatically. For questions or support, contact our team.</p>
+            <p>Generated on ${new Date().toLocaleDateString()}</p>
         </div>
     </body>
     </html>
@@ -243,103 +239,138 @@ function generateReportHTML(analysisResult, url, userEmail) {
 }
 
 export async function POST(request) {
+    let browser = null;
+    const startTime = Date.now();
+
     try {
-        // OFFICIAL CLERK BILLING METHOD
+        console.log('🔄 Starting PDF generation process...');
+
+        // CLERK BILLING CHECK
         const { has, userId } = await auth();
 
         if (!userId) {
+            console.log('❌ No user ID found');
             return NextResponse.json(
                 { error: 'Authentication required' },
                 { status: 401 }
             );
         }
 
-        console.log('🔄 PDF generation request for user:', userId);
-
-        // OFFICIAL: Use has() with your exact plan slug
         const hasPremiumPlan = has({ plan: 'llm_check_premium' });
 
         if (!hasPremiumPlan) {
-            console.log('❌ PDF generation denied: User does not have llm_check_premium plan');
+            console.log('❌ User does not have premium plan:', userId);
             return NextResponse.json(
                 { error: 'Premium subscription required' },
                 { status: 403 }
             );
         }
 
-        console.log('✅ PDF generation approved for premium user:', userId);
+        console.log('✅ Premium user confirmed:', userId);
 
-        // Parse request body
+        // PARSE REQUEST
         const { analysisResult, url, email } = await request.json();
 
         if (!analysisResult || !url) {
             return NextResponse.json(
-                { error: 'Missing required data' },
+                { error: 'Missing analysis data or URL' },
                 { status: 400 }
             );
         }
 
-        console.log('🔄 Generating PDF report...');
+        console.log('🔄 Generating HTML content...');
 
-        // Generate HTML content
+        // GENERATE HTML
         const htmlContent = generateReportHTML(analysisResult, url, email);
 
-        // Launch Puppeteer and generate PDF
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
+        console.log('🔄 Launching browser (this may take 10-15 seconds on cold start)...');
+
+        // LAUNCH BROWSER
+        browser = await getBrowser();
+
+        console.log('🔄 Creating page and setting content...');
+
+        // CREATE PAGE
+        const page = await browser.newPage();
+
+        // Set smaller viewport for faster rendering
+        await page.setViewport({ width: 800, height: 600 });
+
+        // Set content with reduced wait time
+        await page.setContent(htmlContent, {
+            waitUntil: 'domcontentloaded',
+            timeout: 30000
         });
 
-        const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        console.log('🔄 Generating PDF...');
 
-        // Generate PDF
+        // GENERATE PDF
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
             margin: {
-                top: '20px',
-                bottom: '20px',
-                left: '20px',
-                right: '20px'
-            }
+                top: '15px',
+                bottom: '15px',
+                left: '15px',
+                right: '15px'
+            },
+            preferCSSPageSize: true,
+            timeout: 30000
         });
 
-        await browser.close();
+        console.log('✅ PDF generated successfully');
 
-        // Generate filename
-        const timestamp = new Date().toISOString().split('T')[0];
-        const sanitizedUrl = url.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 50);
+        // CLOSE BROWSER EARLY
+        await browser.close();
+        browser = null;
+
+        // GENERATE FILENAME
+        const timestamp = Date.now();
+        const sanitizedUrl = url.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30);
         const filename = `llm-report-${sanitizedUrl}-${timestamp}.pdf`;
 
-        console.log('🔄 Uploading PDF to Vercel Blob...');
+        console.log('🔄 Uploading to Vercel Blob...');
 
-        // Upload to Vercel Blob
+        // UPLOAD TO BLOB
         const blob = await put(filename, pdfBuffer, {
             access: 'public',
             contentType: 'application/pdf',
         });
 
-        console.log('✅ PDF uploaded successfully:', blob.url);
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ PDF generation completed in ${totalTime}ms`);
 
-        // Return download URL
         return NextResponse.json({
             success: true,
             downloadUrl: blob.url,
             filename: filename,
-            message: 'PDF report generated successfully'
+            message: 'PDF report generated successfully',
+            processingTime: `${totalTime}ms`
         });
 
     } catch (error) {
-        console.error('❌ PDF generation failed:', error);
+        const totalTime = Date.now() - startTime;
+        console.error(`❌ PDF generation failed after ${totalTime}ms:`, error.name, error.message);
+        console.error('❌ Full error:', error);
+
         return NextResponse.json(
-            { error: 'Failed to generate PDF report', details: error.message },
+            {
+                error: 'PDF generation failed',
+                details: error.message,
+                errorType: error.name,
+                processingTime: `${totalTime}ms`
+            },
             { status: 500 }
         );
+    } finally {
+        // CLEANUP
+        if (browser) {
+            try {
+                await browser.close();
+                console.log('🔄 Browser cleanup completed');
+            } catch (closeError) {
+                console.error('❌ Browser cleanup error:', closeError);
+            }
+        }
     }
 }
