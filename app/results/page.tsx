@@ -146,6 +146,8 @@ export default function ResultsPage() {
     };
 
     // PDF generation function
+    // TypeScript-safe version of the generatePdfReport function
+
     const generatePdfReport = async () => {
         if (!isSignedIn) {
             router.push('/login');
@@ -167,7 +169,7 @@ export default function ResultsPage() {
             setPdfError(null);
             setPdfSuccess(null);
 
-            console.log('🔄 Generating PDF report...');
+            console.log('🔄 Starting PDF/HTML report generation...');
 
             const response = await fetch('/api/generate-pdf', {
                 method: 'POST',
@@ -181,34 +183,59 @@ export default function ResultsPage() {
                 }),
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to generate PDF');
+                // Try to get error message from JSON response
+                try {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to generate report');
+                } catch (jsonError) {
+                    throw new Error(`Report generation failed (${response.status})`);
+                }
             }
 
-            if (data.success && data.downloadUrl) {
-                console.log('✅ PDF generated successfully:', data.downloadUrl);
+            console.log('✅ Report generated successfully');
 
-                // Trigger download
-                const link = document.createElement('a');
-                link.href = data.downloadUrl;
-                link.download = data.filename || 'llm-readiness-report.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+            // Get the filename from response headers
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'llm-readiness-report.html';
 
-                setPdfSuccess('PDF report downloaded successfully!');
-
-                // Clear success message after 5 seconds
-                setTimeout(() => setPdfSuccess(null), 5000);
-            } else {
-                throw new Error('Invalid response from PDF generation service');
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
             }
 
-        } catch (err: any) {
-            console.error('❌ PDF generation failed:', err);
-            setPdfError(err.message || 'Failed to generate PDF report');
+            // Get the HTML content as blob
+            const blob = await response.blob();
+
+            // Create download link and trigger download
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename;
+
+            // Append to body, click, and cleanup
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Cleanup the URL object
+            window.URL.revokeObjectURL(downloadUrl);
+
+            setPdfSuccess('Report downloaded successfully! Open the HTML file and press Ctrl+P to save as PDF.');
+
+            // Clear success message after 8 seconds
+            setTimeout(() => setPdfSuccess(null), 8000);
+
+        } catch (error: unknown) {
+            // TypeScript-safe error handling
+            const errorMessage = error instanceof Error
+                ? error.message
+                : 'An unknown error occurred';
+
+            console.error('❌ Report generation failed:', error);
+            setPdfError(`Failed to generate report: ${errorMessage}`);
         } finally {
             setPdfGenerating(false);
         }
@@ -273,15 +300,25 @@ export default function ResultsPage() {
                     {pdfSuccess && (
                         <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
                             <CheckCircle className="h-4 w-4" />
-                            <AlertTitle>Success!</AlertTitle>
-                            <AlertDescription>{pdfSuccess}</AlertDescription>
+                            <AlertTitle>Report Downloaded Successfully! 📄</AlertTitle>
+                            <AlertDescription>
+                                <div className="mt-2">
+                                    <p className="font-semibold">To convert to PDF:</p>
+                                    <ol className="list-decimal list-inside mt-1 space-y-1 text-sm">
+                                        <li>Open the downloaded HTML file in your browser</li>
+                                        <li>Press <kbd className="px-2 py-1 bg-gray-200 rounded text-xs font-mono">Ctrl+P</kbd> (Windows) or <kbd className="px-2 py-1 bg-gray-200 rounded text-xs font-mono">Cmd+P</kbd> (Mac)</li>
+                                        <li>Select "Save as PDF" or "Microsoft Print to PDF"</li>
+                                        <li>Click "Save" to get your PDF report</li>
+                                    </ol>
+                                </div>
+                            </AlertDescription>
                         </Alert>
                     )}
 
                     {pdfError && (
                         <Alert variant="destructive" className="mb-4">
                             <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>PDF Generation Error</AlertTitle>
+                            <AlertTitle>Report Generation Error</AlertTitle>
                             <AlertDescription>{pdfError}</AlertDescription>
                         </Alert>
                     )}
