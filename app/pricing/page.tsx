@@ -107,32 +107,6 @@ export default function PricingPage() {
         </section>
 
 
-        {isSignedIn && (
-          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
-            <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
-            <div className="space-y-2">
-              <div><strong>User ID:</strong> {user?.id}</div>
-              <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
-              <div><strong>Premium Status:</strong> <span className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ Premium' : '❌ Free'}</span></div>
-
-              <div className="mt-2">
-                <strong>Server-Side Debug:</strong>
-                <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
-                  {JSON.stringify(debug, null, 2)}
-                </pre>
-              </div>
-
-              <div className="mt-2">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-2 py-1 bg-blue-500 text-white rounded text-xs"
-                >
-                  Refresh Status
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Clerk Pricing Table */}
         <section className="w-full py-12 md:py-24 lg:py-32">
@@ -149,7 +123,7 @@ export default function PricingPage() {
 
                   {/* Clerk's built-in PricingTable component */}
                   <PricingTable
-                  // This will automatically handle all billing with your Clerk plans
+
                   />
                 </div>
               ) : (
