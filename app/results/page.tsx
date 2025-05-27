@@ -304,7 +304,7 @@ export default function ResultsPage() {
                         </div>
                     )}
 
-                    {/* CLIENT-SIDE CLERK DEBUG - TypeScript Safe */}
+                    {/* CLIENT-SIDE CLERK DEBUG - Only using verified UserResource properties */}
                     {isSignedIn && process.env.NODE_ENV === 'development' && (
                         <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left text-xs">
                             <h3 className="font-bold mb-2">🔍 CLIENT-SIDE CLERK DEBUG:</h3>
@@ -312,10 +312,10 @@ export default function ResultsPage() {
                                 <div><strong>Client User ID:</strong> {user?.id}</div>
                                 <div><strong>Client Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
 
-                                {/* Check public metadata */}
+                                {/* Only use confirmed UserResource properties */}
                                 <div><strong>Public Metadata:</strong> {JSON.stringify(user?.publicMetadata || {})}</div>
 
-                                {/* Show all user properties that might be subscription-related */}
+                                {/* Show all available user properties */}
                                 <div className="mt-2">
                                     <strong>Available User Properties:</strong>
                                     <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
@@ -323,19 +323,15 @@ export default function ResultsPage() {
                                     </pre>
                                 </div>
 
-                                {/* Try to access any subscription-like properties safely */}
+                                {/* Safe subscription check */}
                                 <div className="mt-2">
-                                    <strong>Subscription-Related Data:</strong>
+                                    <strong>User Object Sample:</strong>
                                     <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
                                         {JSON.stringify({
-                                            publicMetadata: user?.publicMetadata || {},
-                                            privateMetadata: user?.privateMetadata || {},
-                                            // Check if any subscription properties exist (safely)
-                                            hasAnySubscriptionProps: Object.keys(user || {}).some(key =>
-                                                key.toLowerCase().includes('sub') ||
-                                                key.toLowerCase().includes('bill') ||
-                                                key.toLowerCase().includes('plan')
-                                            )
+                                            id: user?.id,
+                                            publicMetadata: user?.publicMetadata,
+                                            createdAt: user?.createdAt,
+                                            updatedAt: user?.updatedAt
                                         }, null, 2)}
                                     </pre>
                                 </div>
