@@ -1,11 +1,10 @@
 // app/api/generate-pdf/route.js
-// EXTERNAL PDF SERVICE - Bypasses Puppeteer issues on Vercel
+// DIRECT PDF DOWNLOAD - Returns PDF directly without blob storage
 
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { put } from '@vercel/blob';
 
-// Generate HTML template for external PDF service
+// Generate clean HTML template for PDF
 function generateReportHTML(analysisResult, url, userEmail) {
     const { overall_score, parameters, recommendations } = analysisResult;
 
@@ -71,6 +70,7 @@ function generateReportHTML(analysisResult, url, userEmail) {
             }
             .section {
                 margin: 40px 0;
+                page-break-inside: avoid;
             }
             .section h2 {
                 color: #1e40af;
@@ -85,6 +85,7 @@ function generateReportHTML(analysisResult, url, userEmail) {
                 padding: 20px;
                 margin: 15px 0;
                 background: #f9fafb;
+                page-break-inside: avoid;
             }
             .parameter-header {
                 display: flex;
@@ -145,6 +146,10 @@ function generateReportHTML(analysisResult, url, userEmail) {
                 color: #6b7280;
                 font-size: 0.9rem;
             }
+            @media print {
+                body { margin: 0; padding: 15px; }
+                .section { page-break-inside: avoid; }
+            }
         </style>
     </head>
     <body>
@@ -202,130 +207,73 @@ function generateReportHTML(analysisResult, url, userEmail) {
 
         <div class="footer">
             <p><strong>LLM Ready</strong> - AI-Powered Website Optimization</p>
-            <p>This report was generated automatically.</p>
+            <p>This report was generated automatically on ${new Date().toLocaleDateString()}</p>
         </div>
     </body>
     </html>
     `;
 }
 
-// Use PDFShift API (free tier available)
-async function generatePDFWithExternalService(htmlContent) {
+// Convert HTML to PDF using external API
+async function htmlToPdf(htmlContent) {
     try {
-        console.log('🔄 Using PDFShift external service...');
+        console.log('🔄 Converting HTML to PDF...');
 
-        const response = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+        // Using htmlcsstoimage.com API (free tier available)
+        const response = await fetch('https://htmlcsstoimage.com/demo_run', {
             method: 'POST',
             headers: {
-                'Authorization': `Basic ${Buffer.from('api:' + (process.env.PDFSHIFT_API_KEY || 'sk_test_123')).toString('base64')}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                source: htmlContent,
-                landscape: false,
-                format: 'A4',
-                margin: '20px',
-                print_background: true,
-                wait_for: 'load'
+                html: htmlContent,
+                css: '',
+                google_fonts: 'Arial',
+                selector: 'body',
+                device_scale: 1,
+                format: 'pdf',
+                width: 800,
+                height: 1200,
+                quality: 100
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`PDFShift API error: ${response.status} ${response.statusText}`);
+        if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            console.log('✅ PDF generated with external API');
+            return Buffer.from(arrayBuffer);
+        } else {
+            throw new Error(`External API failed: ${response.status}`);
         }
-
-        return await response.arrayBuffer();
     } catch (error) {
-        console.error('❌ PDFShift failed, using fallback...');
+        console.log('⚠️ External API failed, using HTML fallback...');
         throw error;
     }
 }
 
-// Fallback: Generate simple text-based PDF using jsPDF
-async function generateFallbackPDF(analysisResult, url) {
-    try {
-        console.log('🔄 Using fallback PDF generation...');
+// Create downloadable HTML file as fallback
+function createDownloadableHTML(htmlContent, filename) {
+    console.log('✅ Creating downloadable HTML file');
 
-        // Simple text-based content for fallback
-        const textContent = `
-LLM READINESS REPORT
+    // Add download instructions to the HTML
+    const downloadableHTML = htmlContent.replace(
+        '<body>',
+        `<body>
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+            <h3 style="color: #92400e; margin: 0 0 10px 0;">📄 Download Instructions</h3>
+            <p style="color: #92400e; margin: 0; font-size: 14px;">
+                To save this report as a PDF: Press <strong>Ctrl+P</strong> (or Cmd+P on Mac), 
+                then select "Save as PDF" as the destination.
+            </p>
+        </div>`
+    );
 
-Website: ${url}
-Generated: ${new Date().toLocaleDateString()}
-
-Overall Score: ${analysisResult.overall_score}/100
-
-ANALYSIS PARAMETERS:
-${analysisResult.parameters.map(param =>
-            `• ${param.name}: ${param.score}/100\n  ${param.description}`
-        ).join('\n\n')}
-
-RECOMMENDATIONS:
-${analysisResult.recommendations.map(rec =>
-            `• ${rec.title} (${rec.difficulty} difficulty, ${rec.impact} impact)\n  ${rec.description}`
-        ).join('\n\n')}
-
----
-Generated by LLM Ready - AI-Powered Website Optimization
-        `;
-
-        // Create a simple HTML version for basic PDF conversion
-        const simpleHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial; padding: 20px; line-height: 1.6; }
-                h1 { color: #1e40af; }
-                .score { font-size: 2em; color: #059669; font-weight: bold; }
-                .section { margin: 20px 0; }
-            </style>
-        </head>
-        <body>
-            <h1>LLM Readiness Report</h1>
-            <p><strong>Website:</strong> ${url}</p>
-            <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
-            
-            <div class="section">
-                <h2>Overall Score</h2>
-                <div class="score">${analysisResult.overall_score}/100</div>
-            </div>
-            
-            <div class="section">
-                <h2>Analysis Parameters</h2>
-                ${analysisResult.parameters.map(param => `
-                    <div style="margin: 15px 0; padding: 10px; border-left: 3px solid #3b82f6;">
-                        <strong>${param.name}:</strong> ${param.score}/100<br>
-                        <small>${param.description}</small>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="section">
-                <h2>Recommendations</h2>
-                ${analysisResult.recommendations.map(rec => `
-                    <div style="margin: 15px 0; padding: 10px; border: 1px solid #e5e7eb;">
-                        <strong>${rec.title}</strong><br>
-                        <small>Difficulty: ${rec.difficulty} | Impact: ${rec.impact}</small><br>
-                        ${rec.description}
-                    </div>
-                `).join('')}
-            </div>
-        </body>
-        </html>
-        `;
-
-        // Return the simple HTML as a buffer (browsers can save as PDF)
-        return Buffer.from(simpleHTML, 'utf8');
-    } catch (error) {
-        console.error('❌ Fallback PDF generation failed:', error);
-        throw error;
-    }
+    return Buffer.from(downloadableHTML, 'utf8');
 }
 
 export async function POST(request) {
     try {
-        console.log('🔄 Starting PDF generation (external service)...');
+        console.log('🔄 Starting direct PDF generation...');
 
         // CLERK BILLING CHECK
         const { has, userId } = await auth();
@@ -364,42 +312,46 @@ export async function POST(request) {
         // GENERATE HTML
         const htmlContent = generateReportHTML(analysisResult, url, email);
 
-        let pdfBuffer;
-
-        // Try external service first, fallback to simple HTML
-        try {
-            pdfBuffer = await generatePDFWithExternalService(htmlContent);
-            console.log('✅ PDF generated with external service');
-        } catch (externalError) {
-            console.log('⚠️ External service failed, using fallback...');
-            pdfBuffer = await generateFallbackPDF(analysisResult, url);
-            console.log('✅ PDF generated with fallback method');
-        }
-
         // GENERATE FILENAME
         const timestamp = Date.now();
         const sanitizedUrl = url.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30);
-        const filename = `llm-report-${sanitizedUrl}-${timestamp}.pdf`;
+        const filename = `llm-report-${sanitizedUrl}-${timestamp}`;
 
-        console.log('🔄 Uploading to Vercel Blob...');
+        let fileBuffer;
+        let contentType;
+        let downloadFilename;
 
-        // UPLOAD TO BLOB
-        const blob = await put(filename, pdfBuffer, {
-            access: 'public',
-            contentType: 'application/pdf',
-        });
+        // Try PDF conversion, fallback to HTML
+        try {
+            fileBuffer = await htmlToPdf(htmlContent);
+            contentType = 'application/pdf';
+            downloadFilename = `${filename}.pdf`;
+            console.log('✅ PDF generated successfully');
+        } catch (pdfError) {
+            console.log('⚠️ PDF conversion failed, providing HTML download...');
+            fileBuffer = createDownloadableHTML(htmlContent, filename);
+            contentType = 'text/html';
+            downloadFilename = `${filename}.html`;
+            console.log('✅ HTML download ready');
+        }
 
-        console.log('✅ PDF generation completed successfully');
+        console.log('🔄 Returning file for download...');
 
-        return NextResponse.json({
-            success: true,
-            downloadUrl: blob.url,
-            filename: filename,
-            message: 'PDF report generated successfully'
+        // RETURN FILE DIRECTLY
+        return new NextResponse(fileBuffer, {
+            status: 200,
+            headers: {
+                'Content-Type': contentType,
+                'Content-Disposition': `attachment; filename="${downloadFilename}"`,
+                'Content-Length': fileBuffer.length.toString(),
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
         });
 
     } catch (error) {
-        console.error('❌ PDF generation failed:', error);
+        console.error('❌ Direct PDF generation failed:', error);
 
         return NextResponse.json(
             {
