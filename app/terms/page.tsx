@@ -11,11 +11,11 @@ export default function TermsOfService() {
             <main className="flex-1">
                 <div className="container mx-auto px-4 py-8 max-w-4xl">
                     <div className="prose prose-lg max-w-none">
-                        <h1 className="text-4xl font-bold text-gray-900 mb-8">Terms of Service</h1>
+                        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-8">Terms of Service</h1>
                         <p className="text-gray-600 mb-8">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Welcome to LLM Ready</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Welcome to LLM Ready</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 These Terms of Service ("Terms") govern your use of LLM Ready (available at llmcheck.app),
                                 an AI-powered website analysis service that evaluates your website's readiness for Large Language Models
@@ -24,7 +24,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Service Description</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">1. Service Description</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 LLM Ready provides automated analysis of websites to assess their optimization for Large Language Models,
                                 AI search engines, and related technologies. Our service includes:
@@ -39,7 +39,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. User Accounts and Registration</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">2. User Accounts and Registration</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 To access certain features of our service, you must create an account through our authentication provider, Clerk.
                                 You agree to:
@@ -53,12 +53,12 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Subscription Plans and Billing</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">3. Subscription Plans and Billing</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 LLM Ready offers both free and premium subscription plans:
                             </p>
                             <div className="mb-4">
-                                <h3 className="text-xl font-medium text-gray-900 mb-2">Free Plan</h3>
+                                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Free Plan</h3>
                                 <ul className="list-disc list-inside  text-gray-700 dark:text-gray-300 space-y-1 mb-4">
                                     <li>Limited number of website analyses per month</li>
                                     <li>Basic analysis reports</li>
@@ -66,7 +66,7 @@ export default function TermsOfService() {
                                 </ul>
                             </div>
                             <div className="mb-4">
-                                <h3 className="text-xl font-medium text-gray-900 mb-2">Premium Plan</h3>
+                                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Premium Plan</h3>
                                 <ul className="list-disc list-inside  text-gray-700 dark:text-gray-300 space-y-1 mb-4">
                                     <li>Unlimited website analyses</li>
                                     <li>Detailed analysis reports with advanced insights</li>
@@ -82,7 +82,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Acceptable Use</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">4. Acceptable Use</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 You agree to use LLM Ready only for lawful purposes and in accordance with these Terms. You may not:
                             </p>
@@ -97,7 +97,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Data and Privacy</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">5. Data and Privacy</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 We take your privacy seriously. Our collection and use of personal information is governed by our
                                 Privacy Policy, which is incorporated into these Terms by reference. By using our service, you consent to:
@@ -110,7 +110,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Intellectual Property</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">6. Intellectual Property</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 LLM Ready and all related content, features, and technology are owned by us and protected by copyright,
                                 trademark, and other intellectual property laws. You are granted a limited, non-exclusive, non-transferable
@@ -123,7 +123,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Disclaimer of Warranties</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">7. Disclaimer of Warranties</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 LLM Ready is provided "as is" without warranties of any kind. We do not guarantee:
                             </p>
@@ -140,7 +140,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Limitation of Liability</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">8. Limitation of Liability</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special,
                                 consequential, or punitive damages, including but not limited to loss of profits, data, or business
@@ -153,7 +153,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">9. Termination</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">9. Termination</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 You may terminate your account at any time by contacting us or using the account deletion features
                                 in your profile. We may suspend or terminate your access to our service at our discretion if you
@@ -166,7 +166,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Changes to Terms</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">10. Changes to Terms</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 We reserve the right to modify these Terms at any time. We will notify users of significant changes
                                 by email or through our service. Your continued use of LLM Ready after changes constitute acceptance
@@ -175,7 +175,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Contact Information</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">11. Contact Information</h2>
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 If you have questions about these Terms of Service, please contact us:
                             </p>
@@ -187,7 +187,7 @@ export default function TermsOfService() {
                         </section>
 
                         <section className="mb-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Governing Law</h2>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">12. Governing Law</h2>
                             <p className=" text-gray-700 dark:text-gray-300 leading-relaxed">
                                 These Terms shall be governed by and construed in accordance with the laws of the United States.
                                 Any disputes arising under these Terms shall be resolved through binding arbitration in accordance
