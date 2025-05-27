@@ -1,8 +1,9 @@
 // app/api/generate-pdf/route.js
-// PDF generation endpoint for premium users
+// PDF generation endpoint for premium users with Vercel Blob storage
 
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
+import { put } from '@vercel/blob';
 import puppeteer from 'puppeteer';
 
 // Function to check if user is premium (reuse your existing logic)
@@ -323,21 +324,33 @@ export async function POST(request) {
 
         await browser.close();
 
-        console.log('✅ PDF generated successfully');
+        // Generate filename
+        const timestamp = new Date().toISOString().split('T')[0];
+        const sanitizedUrl = url.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 50);
+        const filename = `llm-report-${sanitizedUrl}-${timestamp}.pdf`;
 
-        // Return PDF as response
-        return new NextResponse(pdfBuffer, {
-            headers: {
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="llm-readiness-report-${new Date().toISOString().split('T')[0]}.pdf"`,
-                'Content-Length': pdfBuffer.length.toString(),
-            },
+        console.log('🔄 Uploading PDF to Vercel Blob...');
+
+        // Upload to Vercel Blob
+        const blob = await put(filename, pdfBuffer, {
+            access: 'public',
+            contentType: 'application/pdf',
+        });
+
+        console.log('✅ PDF uploaded successfully:', blob.url);
+
+        // Return download URL
+        return NextResponse.json({
+            success: true,
+            downloadUrl: blob.url,
+            filename: filename,
+            message: 'PDF report generated successfully'
         });
 
     } catch (error) {
         console.error('❌ PDF generation failed:', error);
         return NextResponse.json(
-            { error: 'Failed to generate PDF report' },
+            { error: 'Failed to generate PDF report', details: error.message },
             { status: 500 }
         );
     }
