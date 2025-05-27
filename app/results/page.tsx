@@ -304,6 +304,50 @@ export default function ResultsPage() {
                         </div>
                     )}
 
+                    {/* CLIENT-SIDE CLERK DEBUG */}
+                    {isSignedIn && process.env.NODE_ENV === 'development' && (
+                        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left text-xs">
+                            <h3 className="font-bold mb-2">🔍 CLIENT-SIDE CLERK DEBUG:</h3>
+                            <div className="space-y-2">
+                                <div><strong>Client User ID:</strong> {user?.id}</div>
+                                <div><strong>Client Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
+                                <div><strong>Client Has Subscription:</strong> {user?.hasSubscription ? '✅ Yes' : '❌ No'}</div>
+
+                                {/* Show all user properties */}
+                                <div className="mt-2">
+                                    <strong>All Client User Properties:</strong>
+                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-40">
+                                        {JSON.stringify(
+                                            Object.keys(user || {}).reduce((acc, key) => {
+                                                if (key.toLowerCase().includes('sub') ||
+                                                    key.toLowerCase().includes('bill') ||
+                                                    key.toLowerCase().includes('plan') ||
+                                                    key.toLowerCase().includes('metadata')) {
+                                                    acc[key] = user[key];
+                                                }
+                                                return acc;
+                                            }, {}),
+                                            null,
+                                            2
+                                        )}
+                                    </pre>
+                                </div>
+
+                                {/* Try to access subscriptions directly */}
+                                <div className="mt-2">
+                                    <strong>Direct Subscription Access:</strong>
+                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
+                                        {JSON.stringify({
+                                            subscriptions: user?.subscriptions || 'undefined',
+                                            billingSubscriptions: user?.billingSubscriptions || 'undefined',
+                                            hasSubscription: user?.hasSubscription || 'undefined',
+                                            publicMetadata: user?.publicMetadata || 'undefined'
+                                        }, null, 2)}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Remaining analyses notice for free users */}
                     {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
                         <div className="mb-6 p-4 bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 rounded-lg">

@@ -1,12 +1,11 @@
 // app/api/subscription-status/route.js
-// Enhanced version with better debugging - PRODUCTION SAFE
+// COMPREHENSIVE DEBUG - This will show us EVERYTHING Clerk provides
 
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 
 export async function GET() {
     try {
-        // Get current user server-side
         const user = await currentUser();
 
         if (!user) {
@@ -16,112 +15,121 @@ export async function GET() {
             }, { status: 401 });
         }
 
-        console.log('🔍 Checking subscription for user:', user.id);
+        console.log('🔍 FULL USER OBJECT DEBUG for user:', user.id);
 
-        // Define your premium plan IDs here - ONLY these will be considered premium
+        // Log the ENTIRE user object to see what Clerk actually provides
+        console.log('📋 Complete user object keys:', Object.keys(user));
+        console.log('📋 Complete user object:', JSON.stringify(user, null, 2));
+
+        // Define premium plan IDs
         const premiumPlanIds = [
-            'cplan_2xc1rcBfJvymVdviAlaryVOSHhF',  // Your current plan ID
-            // Add any other premium plan IDs you might have
+            'cplan_2xc1rcBfJvymVdviAlaryVOSHhF',
         ];
 
-        console.log('📋 Looking for premium plan IDs:', premiumPlanIds);
-
-        // Get all subscription-related data
-        const metadata = user.publicMetadata || {};
+        // Extract all possible subscription-related data
         const subscriptions = user.subscriptions || [];
         const billingSubscriptions = user.billingSubscriptions || [];
+        const publicMetadata = user.publicMetadata || {};
+        const privateMetadata = user.privateMetadata || {};
+        const unsafeMetadata = user.unsafeMetadata || {};
 
-        console.log('📝 Public metadata:', metadata);
-        console.log('💳 User subscriptions:', subscriptions);
-        console.log('💳 User billing subscriptions:', billingSubscriptions);
+        // Check for any property that might contain subscription info
+        const allUserProps = {};
+        for (const [key, value] of Object.entries(user)) {
+            if (key.toLowerCase().includes('sub') ||
+                key.toLowerCase().includes('bill') ||
+                key.toLowerCase().includes('plan') ||
+                key.toLowerCase().includes('premium') ||
+                key.toLowerCase().includes('active')) {
+                allUserProps[key] = value;
+            }
+        }
 
-        // STRICT premium checks - only these specific conditions grant premium access
+        // Multiple premium check methods
+        const checks = {
+            // Method 1: Standard subscription check
+            subscriptions: subscriptions.some(sub =>
+                sub.status === 'active' && premiumPlanIds.includes(sub.planId)
+            ),
 
-        // Method 1: Check regular subscriptions array for exact plan ID match
-        const isPremiumFromSubscriptions = subscriptions.some(sub => {
-            const isActive = sub.status === 'active';
-            const isPremiumPlan = premiumPlanIds.includes(sub.planId);
-            const result = isActive && isPremiumPlan;
+            // Method 2: Billing subscription check
+            billingSubscriptions: billingSubscriptions.some(sub =>
+                sub.status === 'active' && premiumPlanIds.includes(sub.planId || sub.plan_id)
+            ),
 
-            console.log(`🔍 Subscription check: ID=${sub.planId}, status=${sub.status}, isActive=${isActive}, isPremium=${isPremiumPlan}, result=${result}`);
-            return result;
-        });
+            // Method 3: Any active subscription (looser check)
+            anyActiveSubscription: [
+                ...subscriptions,
+                ...billingSubscriptions
+            ].some(sub => sub.status === 'active'),
 
-        // Method 2: Check billing subscriptions array for exact plan ID match
-        const isPremiumFromBillingSubscriptions = billingSubscriptions.some(sub => {
-            const isActive = sub.status === 'active';
-            const planId = sub.planId || sub.plan_id;
-            const isPremiumPlan = premiumPlanIds.includes(planId);
-            const result = isActive && isPremiumPlan;
+            // Method 4: hasSubscription property
+            hasSubscriptionProp: user.hasSubscription === true,
 
-            console.log(`🔍 Billing subscription check: ID=${planId}, status=${sub.status}, isActive=${isActive}, isPremium=${isPremiumPlan}, result=${result}`);
-            return result;
-        });
+            // Method 5: Metadata checks
+            publicMetadataPremium: publicMetadata.premiumUser === true,
+            privateMetadataPremium: privateMetadata.premiumUser === true,
+            unsafeMetadataPremium: unsafeMetadata.premiumUser === true,
 
-        // Method 3: Check metadata for explicit premium flag (manual override only)
-        const hasMetadataPremium = metadata.premiumUser === true;
-
-        // Method 4: Check for general subscription flag (as fallback)  
-        const hasGeneralSubscription = user.hasSubscription === true;
-
-        // PRODUCTION SAFE: Only grant premium if we have explicit confirmation
-        const isPremium = isPremiumFromSubscriptions ||
-            isPremiumFromBillingSubscriptions ||
-            hasMetadataPremium;
-
-        // Note: Removed hasGeneralSubscription from final check for stricter validation
-
-        console.log('✅ Final subscription check result:', {
-            isPremiumFromSubscriptions,
-            isPremiumFromBillingSubscriptions,
-            hasMetadataPremium,
-            hasGeneralSubscription, // Still logged for debugging
-            finalResult: isPremium
-        });
-
-        // Enhanced debugging for production troubleshooting
-        const debugInfo = {
-            userId: user.id,
-            email: user.emailAddresses?.[0]?.emailAddress,
-            premiumPlanIds,
-            checks: {
-                isPremiumFromSubscriptions,
-                isPremiumFromBillingSubscriptions,
-                hasMetadataPremium,
-                hasGeneralSubscription
-            },
-            subscriptionDetails: subscriptions.map(sub => ({
-                id: sub.id,
-                planId: sub.planId,
-                status: sub.status,
-                name: sub.name,
-                isMatchingPlan: premiumPlanIds.includes(sub.planId),
-                isActive: sub.status === 'active'
-            })),
-            billingSubscriptionDetails: billingSubscriptions.map(sub => ({
-                id: sub.id,
-                planId: sub.planId || sub.plan_id,
-                status: sub.status,
-                name: sub.name || sub.productName,
-                isMatchingPlan: premiumPlanIds.includes(sub.planId || sub.plan_id),
-                isActive: sub.status === 'active'
-            })),
-            metadata,
-            // Additional debugging - check what fields are available
-            availableUserFields: Object.keys(user).filter(key =>
-                key.toLowerCase().includes('subscription') ||
-                key.toLowerCase().includes('billing') ||
-                key.toLowerCase().includes('plan')
+            // Method 6: Check for any subscription-like properties
+            hasSubscriptionProps: Object.keys(user).some(key =>
+                key.toLowerCase().includes('subscription') && user[key]
             )
         };
 
+        // TEMPORARY: Use any active subscription as premium indicator
+        // This is for debugging only - we'll make it stricter once we find the data
+        const isPremium = checks.anyActiveSubscription ||
+            checks.hasSubscriptionProp ||
+            checks.publicMetadataPremium;
+
+        console.log('✅ Comprehensive check results:', checks);
+        console.log('🎯 Final premium status:', isPremium);
+
         return NextResponse.json({
             isPremium,
-            debug: debugInfo
+            debug: {
+                userId: user.id,
+                email: user.emailAddresses?.[0]?.emailAddress,
+
+                // All user object keys for debugging
+                allUserKeys: Object.keys(user),
+
+                // Subscription-related properties
+                subscriptionRelatedProps: allUserProps,
+
+                // Standard arrays
+                subscriptions: subscriptions.map(sub => ({
+                    id: sub.id,
+                    planId: sub.planId,
+                    status: sub.status,
+                    name: sub.name,
+                    allProps: sub
+                })),
+
+                billingSubscriptions: billingSubscriptions.map(sub => ({
+                    id: sub.id,
+                    planId: sub.planId || sub.plan_id,
+                    status: sub.status,
+                    name: sub.name,
+                    allProps: sub
+                })),
+
+                // Metadata
+                publicMetadata,
+                privateMetadata,
+                unsafeMetadata,
+
+                // All check results
+                checks,
+
+                // Raw user object (be careful with sensitive data)
+                rawUserObject: user
+            }
         });
 
     } catch (error) {
-        console.error('❌ Subscription status check failed:', error);
+        console.error('❌ Debug check failed:', error);
         return NextResponse.json({
             isPremium: false,
             error: error.message,
