@@ -1,80 +1,12 @@
 // app/api/generate-pdf/route.js
-// PROPER PDF GENERATION - Uses real subscription data, no hardcoded exceptions
+// FINAL SOLUTION - Using your exact plan slug for PDF generation
 
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { put } from '@vercel/blob';
 import puppeteer from 'puppeteer';
 
-// PROPER premium check - same logic as subscription-status route
-async function checkPremiumStatus(user) {
-    if (!user) return false;
-
-    try {
-        console.log('🔍 PDF Premium check for user:', user.id);
-
-        // Premium plan IDs
-        const premiumPlanIds = [
-            'cplan_2xc1rcBfJvymVdviAlaryVOSHhF',
-        ];
-
-        const publicMetadata = user.publicMetadata || {};
-        const subscriptions = user.subscriptions || [];
-        const billingSubscriptions = user.billingSubscriptions || [];
-
-        // Method 1: Check standard subscriptions
-        const isPremiumFromSubscriptions = subscriptions.some(sub => {
-            const isActive = sub.status === 'active' || sub.status === 'trialing';
-            const isPremiumPlan = premiumPlanIds.includes(sub.planId);
-            console.log(`PDF Check - Subscription: ${sub.planId}, status: ${sub.status}, active: ${isActive}, premium: ${isPremiumPlan}`);
-            return isActive && isPremiumPlan;
-        });
-
-        // Method 2: Check billing subscriptions
-        const isPremiumFromBillingSubscriptions = billingSubscriptions.some(sub => {
-            const isActive = sub.status === 'active' || sub.status === 'trialing';
-            const planId = sub.planId || sub.plan_id;
-            const isPremiumPlan = premiumPlanIds.includes(planId);
-            console.log(`PDF Check - Billing subscription: ${planId}, status: ${sub.status}, active: ${isActive}, premium: ${isPremiumPlan}`);
-            return isActive && isPremiumPlan;
-        });
-
-        // Method 3: Check public metadata
-        const hasMetadataPremium = publicMetadata.premiumUser === true;
-
-        // Method 4: Check for ANY active subscriptions (temporary fallback)
-        const hasAnyActiveSubscription = [
-            ...subscriptions,
-            ...billingSubscriptions
-        ].some(sub => sub.status === 'active' || sub.status === 'trialing');
-
-        let isPremium = isPremiumFromSubscriptions ||
-            isPremiumFromBillingSubscriptions ||
-            hasMetadataPremium;
-
-        // TEMPORARY FALLBACK: Grant access if user has any active subscription
-        if (!isPremium && hasAnyActiveSubscription) {
-            console.log('🔧 PDF Generation: Using fallback for active subscription');
-            isPremium = true;
-        }
-
-        console.log('✅ PDF Premium check result:', {
-            isPremiumFromSubscriptions,
-            isPremiumFromBillingSubscriptions,
-            hasMetadataPremium,
-            hasAnyActiveSubscription,
-            finalResult: isPremium
-        });
-
-        return isPremium;
-
-    } catch (error) {
-        console.error('❌ PDF Premium check error:', error);
-        return false;
-    }
-}
-
-// Generate HTML template for PDF (keeping the same)
+// Generate HTML template for PDF (same as before)
 function generateReportHTML(analysisResult, url, userEmail) {
     const { overall_score, parameters, recommendations } = analysisResult;
 
@@ -312,28 +244,30 @@ function generateReportHTML(analysisResult, url, userEmail) {
 
 export async function POST(request) {
     try {
-        // Check authentication
-        const user = await currentUser();
-        if (!user) {
+        // OFFICIAL CLERK BILLING METHOD
+        const { has, userId } = await auth();
+
+        if (!userId) {
             return NextResponse.json(
                 { error: 'Authentication required' },
                 { status: 401 }
             );
         }
 
-        console.log('🔄 PDF generation request for user:', user.id);
+        console.log('🔄 PDF generation request for user:', userId);
 
-        // Check premium status using PROPER subscription detection
-        const isPremium = await checkPremiumStatus(user);
-        if (!isPremium) {
-            console.log('❌ PDF generation denied: No premium subscription found for user:', user.id);
+        // OFFICIAL: Use has() with your exact plan slug
+        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
+
+        if (!hasPremiumPlan) {
+            console.log('❌ PDF generation denied: User does not have llm_check_premium plan');
             return NextResponse.json(
                 { error: 'Premium subscription required' },
                 { status: 403 }
             );
         }
 
-        console.log('✅ PDF generation approved for premium user:', user.id);
+        console.log('✅ PDF generation approved for premium user:', userId);
 
         // Parse request body
         const { analysisResult, url, email } = await request.json();
@@ -348,7 +282,7 @@ export async function POST(request) {
         console.log('🔄 Generating PDF report...');
 
         // Generate HTML content
-        const htmlContent = generateReportHTML(analysisResult, url, email || user.emailAddresses?.[0]?.emailAddress);
+        const htmlContent = generateReportHTML(analysisResult, url, email);
 
         // Launch Puppeteer and generate PDF
         const browser = await puppeteer.launch({
