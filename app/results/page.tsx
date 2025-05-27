@@ -47,7 +47,7 @@ function useIsPremium() {
             try {
                 console.log('🔍 Fetching subscription status from server...');
 
-                const response = await fetch('/api/subscription-status');
+                const response = await fetch('/api/subscription-check');
                 const data = await response.json();
 
                 console.log('✅ Server response:', data);
