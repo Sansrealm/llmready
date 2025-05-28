@@ -8,8 +8,29 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Maximum number of analyses for free users
-const MAX_FREE_ANALYSES = 3;
+// Usage limits for different user types
+const MAX_GUEST_ANALYSES = 3;
+const MAX_FREE_ANALYSES = 10;
+const MAX_PREMIUM_ANALYSES = 100;
+
+// Premium plan ID
+const PREMIUM_PLAN_ID = 'llm_check_premium';
+
+/**
+ * Check if monthly usage should be reset
+ * @param {string} lastResetDate - ISO date string of last reset
+ * @returns {boolean} - Whether usage count should be reset
+ */
+function shouldResetUsageCount(lastResetDate) {
+  if (!lastResetDate) return true;
+  
+  const lastReset = new Date(lastResetDate);
+  const currentDate = new Date();
+  
+  // Reset if the current month is different from the last reset month
+  return lastReset.getMonth() !== currentDate.getMonth() || 
+         lastReset.getFullYear() !== currentDate.getFullYear();
+}
 
 export async function POST(request) {
   try {
@@ -23,30 +44,73 @@ export async function POST(request) {
     // Check user's subscription status and analysis count
     let isPremium = false;
     let analysisCount = 0;
+    let remainingAnalyses = 0;
+    let monthlyLimit = MAX_GUEST_ANALYSES;
 
     if (userId) {
       // Get user data from Clerk
       const user = await clerkClient.users.getUser(userId);
-      isPremium = user.publicMetadata?.premiumUser === true;
-      analysisCount = user.publicMetadata?.analysisCount || 0;
-
-      // Check if free user has reached limit
-      if (!isPremium && analysisCount >= MAX_FREE_ANALYSES) {
+      
+      // Check if user is premium by checking active subscriptions
+      const subscriptions = user.privateMetadata?.subscriptions || [];
+      isPremium = subscriptions.some(sub => 
+        sub.planId === PREMIUM_PLAN_ID && 
+        sub.status === 'active'
+      );
+      
+      // Set monthly limit based on user type
+      monthlyLimit = isPremium ? MAX_PREMIUM_ANALYSES : MAX_FREE_ANALYSES;
+      
+      // Get or initialize usage metadata
+      let usageMetadata = user.privateMetadata?.analysisCount || {
+        current: 0,
+        lastReset: new Date().toISOString()
+      };
+      
+      // Check if we need to reset the monthly counter
+      if (shouldResetUsageCount(usageMetadata.lastReset)) {
+        usageMetadata = {
+          current: 0,
+          lastReset: new Date().toISOString()
+        };
+      }
+      
+      // Get current analysis count
+      analysisCount = usageMetadata.current || 0;
+      
+      // Check if user has reached their limit
+      if (analysisCount >= monthlyLimit) {
         return NextResponse.json(
-          { error: "You've reached the maximum number of analyses for free users. Please upgrade to Premium for unlimited analyses." },
+          { 
+            error: isPremium 
+              ? `You've reached the maximum number of ${monthlyLimit} analyses for this month. Your limit will reset at the beginning of next month.` 
+              : `You've reached the maximum number of ${monthlyLimit} analyses for free users this month. Please upgrade to Premium for ${MAX_PREMIUM_ANALYSES} analyses per month.`,
+            isPremium,
+            analysisCount,
+            monthlyLimit,
+            remainingAnalyses: 0
+          },
           { status: 403 }
         );
       }
-
-      // Increment analysis count for non-premium users
-      if (!isPremium) {
-        await clerkClient.users.updateUser(userId, {
-          publicMetadata: {
-            ...user.publicMetadata,
-            analysisCount: analysisCount + 1,
-          },
-        });
-      }
+      
+      // Increment analysis count
+      const newCount = analysisCount + 1;
+      remainingAnalyses = monthlyLimit - newCount;
+      
+      // Update user metadata with new count
+      await clerkClient.users.updateUser(userId, {
+        privateMetadata: {
+          ...user.privateMetadata,
+          analysisCount: {
+            current: newCount,
+            lastReset: usageMetadata.lastReset
+          }
+        }
+      });
+      
+      // Update local count for response
+      analysisCount = newCount;
     }
 
     // Log authentication status
@@ -121,9 +185,14 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid JSON from OpenAI", raw }, { status: 500 });
     }
 
-    // Add remaining analyses count for free users
-    if (userId && !isPremium) {
-      analysisResult.remainingAnalyses = MAX_FREE_ANALYSES - (analysisCount + 1);
+    // Add usage information to the response
+    if (userId) {
+      analysisResult.usageInfo = {
+        isPremium,
+        analysisCount,
+        monthlyLimit,
+        remainingAnalyses
+      };
     }
 
     return NextResponse.json(analysisResult);

@@ -1,4 +1,4 @@
-//app/page.tsx - Updated with server-side subscription check
+//app/page.tsx - Updated with server-side subscription check and usage limits
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Info } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 
@@ -24,6 +24,7 @@ function useIsPremium() {
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [debug, setDebug] = useState<any>({});
+  const [usageInfo, setUsageInfo] = useState<any>(null);
 
   useEffect(() => {
     async function checkSubscriptionStatus() {
@@ -42,6 +43,11 @@ function useIsPremium() {
 
         setIsPremium(data.isPremium || false);
         setDebug(data.debug || {});
+        
+        // Get usage info if available
+        if (data.usageInfo) {
+          setUsageInfo(data.usageInfo);
+        }
 
       } catch (error) {
         console.error('❌ Failed to check subscription status:', error);
@@ -58,6 +64,7 @@ function useIsPremium() {
     isPremium,
     isLoading,
     debug,
+    usageInfo,
     refresh: () => {
       if (user) {
         setIsLoading(true);
@@ -80,7 +87,7 @@ export default function Home() {
   const router = useRouter();
 
   // Use the same server-side subscription check as pricing page
-  const { isPremium, isLoading: premiumLoading, debug } = useIsPremium();
+  const { isPremium, isLoading: premiumLoading, debug, usageInfo } = useIsPremium();
 
   // Load guest usage count from localStorage
   useEffect(() => {
@@ -123,7 +130,7 @@ export default function Home() {
 
     // For signed-in users, check if they're premium to determine limits
     if (!isSignedIn) {
-      if (analysisCount >= 1) {
+      if (analysisCount >= 3) { // Updated to allow 3 analyses for non-logged users
         setShowLoginAlert(true);
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
         return;
@@ -154,7 +161,11 @@ export default function Home() {
     }
   };
 
-  const isLimitReached = isLoaded && !isSignedIn && analysisCount >= 1;
+  // Check if user has reached their limit
+  const isLimitReached = isLoaded && (
+    (!isSignedIn && analysisCount >= 3) || // Guest limit (3 analyses)
+    (isSignedIn && !isPremium && usageInfo && usageInfo.remainingAnalyses <= 0) // Free user limit
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -194,6 +205,16 @@ export default function Home() {
                       {isPremium ? 'Premium ✅' : 'Free'}
                     </span>
                   </p>
+                  
+                  {/* Display remaining analyses for logged-in users */}
+                  {usageInfo && (
+                    <p className="text-sm mt-1">
+                      <span className="text-gray-600">Remaining analyses:</span>{' '}
+                      <span className={`font-medium ${usageInfo.remainingAnalyses > 5 ? 'text-green-600' : usageInfo.remainingAnalyses > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {usageInfo.remainingAnalyses} / {usageInfo.monthlyLimit}
+                      </span>
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -211,6 +232,14 @@ export default function Home() {
                         {JSON.stringify(debug, null, 2)}
                       </pre>
                     </div>
+                    {usageInfo && (
+                      <div className="mt-2">
+                        <strong>Usage Info:</strong>
+                        <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
+                          {JSON.stringify(usageInfo, null, 2)}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -248,26 +277,56 @@ export default function Home() {
                     </Select>
                   </div>
 
-                  {/* Updated usage info based on subscription status */}
-                  {!isSignedIn && analysisCount === 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free users can analyze 1 website. Create an account for more.
-                    </p>
+                  {/* Usage info based on user type */}
+                  {!isSignedIn && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <Info className="h-4 w-4" />
+                      <p>
+                        Guest users can analyze up to 3 websites. 
+                        <span className="ml-1">
+                          {analysisCount > 0 && `(${3 - analysisCount} remaining)`}
+                        </span>
+                      </p>
+                    </div>
                   )}
 
                   {isSignedIn && !premiumLoading && !isPremium && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free plan users get limited analyses. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade to Premium</Link> for unlimited access.
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <Info className="h-4 w-4" />
+                      <p>
+                        Free plan: 10 analyses per month. 
+                        {usageInfo && (
+                          <span className="ml-1">
+                            ({usageInfo.remainingAnalyses} remaining)
+                          </span>
+                        )}
+                        {' '}
+                        <Link href="/pricing" className="text-blue-500 hover:underline">
+                          Upgrade to Premium
+                        </Link> for 100/month.
+                      </p>
+                    </div>
                   )}
 
-                  {/* {isSignedIn && !premiumLoading && isPremium && (
-                    // <p className="text-sm text-green-600 dark:text-green-400">
-                    //   Premium plan: Unlimited website analyses ✅
-                    // </p>
-                  )} */}
+                  {isSignedIn && !premiumLoading && isPremium && (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <Info className="h-4 w-4" />
+                      <p>
+                        Premium plan: 100 analyses per month.
+                        {usageInfo && (
+                          <span className="ml-1">
+                            ({usageInfo.remainingAnalyses} remaining)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
-                  <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached || premiumLoading} className="w-full">
+                  <Button 
+                    type="submit" 
+                    disabled={!isLoaded || isSubmitting || isLimitReached || premiumLoading} 
+                    className="w-full"
+                  >
                     {isSubmitting
                       ? "Analyzing..."
                       : premiumLoading
@@ -277,16 +336,35 @@ export default function Home() {
                           : "Analyze"}
                   </Button>
 
-                  {isLimitReached && (
+                  {/* Limit reached messaging for guests */}
+                  {!isSignedIn && isLimitReached && (
                     <div className="mt-4 text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                       <p className="text-sm text-green-800 dark:text-green-300 font-medium">
-                        Want unlimited website checks?
+                        Want more website checks?
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Unlock full access to LLM readiness audits with premium
+                        Create an account to get 10 analyses per month
                       </p>
                       <Button
                         className="mt-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                        asChild
+                      >
+                        <Link href="/login">Sign Up or Log In</Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Limit reached messaging for free users */}
+                  {isSignedIn && !premiumLoading && !isPremium && usageInfo && usageInfo.remainingAnalyses <= 0 && (
+                    <div className="mt-4 text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                        Monthly analysis limit reached
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Upgrade to Premium for 100 analyses per month
+                      </p>
+                      <Button
+                        className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                         asChild
                       >
                         <Link href="/pricing">Upgrade to Premium</Link>
@@ -294,14 +372,14 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Show upgrade CTA for signed-in free users */}
-                  {isSignedIn && !premiumLoading && !isPremium && (
+                  {/* Show upgrade CTA for signed-in free users with remaining analyses */}
+                  {isSignedIn && !premiumLoading && !isPremium && usageInfo && usageInfo.remainingAnalyses > 0 && (
                     <div className="mt-4 text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                       <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
                         Premium Benefits Available
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Get unlimited analyses, advanced insights, and more
+                        Get 100 analyses per month, advanced insights, and more
                       </p>
                       <Button
                         className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
