@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import type { Metadata } from "next"
 
 // Updated premium check that uses server-side API (same as pricing page)
 function useIsPremium() {
@@ -66,6 +67,11 @@ function useIsPremium() {
       }
     }
   };
+}
+
+export const metadata: Metadata = {
+  title: "Free LLM Website Analysis - Check Your AI SEO Readiness | LLM Check",
+  description: "Get a free analysis of how well your website performs with Large Language Models. Improve your AI SEO, schema markup, and content optimization. Instant results in 30 seconds.",
 }
 
 export default function Home() {
