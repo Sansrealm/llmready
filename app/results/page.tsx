@@ -11,7 +11,7 @@ import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import type { Metadata } from "next"
+
 
 type AnalysisResult = {
     overall_score: number;
@@ -79,15 +79,6 @@ function useIsPremium() {
             }
         }
     };
-}
-
-export const metadata: Metadata = {
-    title: "LLM Analysis Results - Your Website AI Readiness Score | LLM Check",
-    description: "View your website's LLM readiness score and get personalized recommendations to improve your AI SEO performance and search visibility.",
-    robots: {
-        index: false, // Don't index individual result pages
-        follow: true,
-    },
 }
 
 export default function ResultsPage() {
