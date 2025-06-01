@@ -3,9 +3,11 @@
 
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import Script from "next/script";
 
 export default function TermsOfService() {
     return (
+
         <div className="flex min-h-screen flex-col">
             <Navbar />
             <main className="flex-1">
@@ -181,7 +183,7 @@ export default function TermsOfService() {
                             </p>
                             <div className="mb-8">
                                 <p className=" text-gray-700 dark:text-gray-300 mb-2"><strong>Website:</strong> <a href="https://llmcheck.app" className="text-blue-600 hover:underline">llmcheck.app</a></p>
-                                <p className=" text-gray-700 dark:text-gray-300"><strong>Support:</strong> support@llmcheck.app</p>
+                                <p className=" text-gray-700 dark:text-gray-300"><strong>Support:</strong> <a href="#tally-open=wo1QWX&tally-emoji-text=👋&tally-emoji-animation=wave">Contact Us</a></p>
                             </div>
                         </section>
 
@@ -197,6 +199,11 @@ export default function TermsOfService() {
                 </div>
             </main>
             <Footer />
+            <Script
+                src="https://tally.so/widgets/embed.js"
+                strategy="lazyOnload"
+                async
+            />
         </div>
     );
 }
