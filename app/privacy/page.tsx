@@ -220,8 +220,7 @@ export default function PrivacyPolicy() {
                             <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
                                 If you have questions about this Privacy Policy or our privacy practices, please contact us:
                             </p>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>Email:</strong> privacy@llmcheck.app</p>
+                            <div className="mb-8">
                                 <p className="text-gray-700 dark:text-gray-300 mb-2"><strong>Website:</strong> <a href="https://llmcheck.app" className="text-blue-600 hover:underline">www.llmcheck.app</a></p>
                             </div>
                         </section>
