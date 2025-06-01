@@ -179,8 +179,7 @@ export default function TermsOfService() {
                             <p className=" text-gray-700 dark:text-gray-300 dark:text-gray-300">
                                 If you have questions about these Terms of Service, please contact us:
                             </p>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className=" text-gray-700 dark:text-gray-300 mb-2"><strong>Email:</strong> legal@llmcheck.app</p>
+                            <div className="mb-8">
                                 <p className=" text-gray-700 dark:text-gray-300 mb-2"><strong>Website:</strong> <a href="https://llmcheck.app" className="text-blue-600 hover:underline">llmcheck.app</a></p>
                                 <p className=" text-gray-700 dark:text-gray-300"><strong>Support:</strong> support@llmcheck.app</p>
                             </div>
