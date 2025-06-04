@@ -217,7 +217,6 @@ export default function GuidePage() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
                       strokeLinecap="round"
@@ -234,7 +233,6 @@ export default function GuidePage() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
                       strokeLinecap="round"
@@ -244,6 +242,84 @@ export default function GuidePage() {
                     />
                   </svg>
                   <span>Last updated: June 4, 2025</span>
+                </div>
+                
+                <div className="flex items-center gap-3 ml-auto">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Share:</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('utm_source', 'twitter');
+                        url.searchParams.set('utm_medium', 'social');
+                        url.searchParams.set('utm_campaign', 'guide_share');
+                        window.open(
+                          `https://twitter.com/intent/tweet?text=${encodeURIComponent('The Complete Guide to LLM Optimization - Learn how to optimize your website for AI-powered search')}&url=${encodeURIComponent(url.toString())}`,
+                          '_blank'
+                        );
+                      }}
+                      className="p-2 text-gray-500 hover:text-blue-400 dark:text-gray-400 dark:hover:text-blue-300 transition-colors"
+                      aria-label="Share on Twitter"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('utm_source', 'linkedin');
+                        url.searchParams.set('utm_medium', 'social');
+                        url.searchParams.set('utm_campaign', 'guide_share');
+                        window.open(
+                          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url.toString())}`,
+                          '_blank'
+                        );
+                      }}
+                      className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-500 transition-colors"
+                      aria-label="Share on LinkedIn"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('utm_source', 'facebook');
+                        url.searchParams.set('utm_medium', 'social');
+                        url.searchParams.set('utm_campaign', 'guide_share');
+                        window.open(
+                          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url.toString())}`,
+                          '_blank'
+                        );
+                      }}
+                      className="p-2 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                      aria-label="Share on Facebook"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('utm_source', 'copy');
+                        url.searchParams.set('utm_medium', 'direct');
+                        url.searchParams.set('utm_campaign', 'guide_share');
+                        navigator.clipboard.writeText(url.toString()).then(() => {
+                          // You might want to add a toast notification here
+                          alert('Link copied to clipboard!');
+                        });
+                      }}
+                      className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                      aria-label="Copy link"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 
