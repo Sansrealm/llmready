@@ -5,7 +5,7 @@ import Script from "next/script"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ClerkProvider } from "@clerk/nextjs"
-import { Analytics } from "@/components/analytics"
+import { Analytics } from "@/components/Analytics"
 
 const inter = Inter({ subsets: ["latin"] })
 
