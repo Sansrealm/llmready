@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { GuideContent } from "./components/GuideContent";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Toast } from "@/components/Toast";
 
 // Types for our table of contents
 interface TOCItem {
@@ -22,6 +23,7 @@ export default function GuidePage() {
   const [activeSection, setActiveSection] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [toc, setToc] = useState<TOCItem[]>([]);
+  const [showToast, setShowToast] = useState(false);
 
   // Calculate reading progress and update active section
   useEffect(() => {
@@ -308,8 +310,7 @@ export default function GuidePage() {
                         url.searchParams.set('utm_medium', 'direct');
                         url.searchParams.set('utm_campaign', 'guide_share');
                         navigator.clipboard.writeText(url.toString()).then(() => {
-                          // You might want to add a toast notification here
-                          alert('Link copied to clipboard!');
+                          setShowToast(true);
                         });
                       }}
                       className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
@@ -346,6 +347,15 @@ export default function GuidePage() {
       
       {/* Theme Toggle */}
       <ThemeToggle />
+
+      {/* Toast Notification */}
+      {showToast && (
+        <Toast
+          message="Link copied to clipboard!"
+          onClose={() => setShowToast(false)}
+          type="success"
+        />
+      )}
     </div>
   );
 } 
