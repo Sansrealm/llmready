@@ -18,48 +18,10 @@ interface TOCItem {
   level: number;
 }
 
-interface Toast {
-  id: number;
-  message: string;
-  type: 'success' | 'error';
-}
-
-// Add this right after the imports
-const toastAnimationStyles = `
-  @keyframes slide-up {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  @keyframes fade-out {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
-  }
-`;
-
 export default function GuidePage() {
   const [activeSection, setActiveSection] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [toc, setToc] = useState<TOCItem[]>([]);
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(toast => toast.id !== id));
-    }, 3000);
-  };
 
   // Calculate reading progress and update active section
   useEffect(() => {
@@ -148,8 +110,6 @@ export default function GuidePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-gray-950">
-      <style jsx global>{toastAnimationStyles}</style>
-      
       <Navbar />
       
       {/* Reading Progress Bar */}
@@ -160,47 +120,6 @@ export default function GuidePage() {
           className="h-full bg-green-600 dark:bg-green-500 transition-all duration-200"
           style={{ width: `${progress}%` }}
         />
-      </div>
-
-      {/* Toast Container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={cn(
-              "px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out",
-              "flex items-center gap-2 text-sm font-medium",
-              "animate-slide-up",
-              toast.type === 'success' 
-                ? "bg-green-50 text-green-800 dark:bg-green-900/50 dark:text-green-200"
-                : "bg-red-50 text-red-800 dark:bg-red-900/50 dark:text-red-200"
-            )}
-            style={{
-              animation: 'slide-up 0.2s ease-out'
-            }}
-          >
-            {toast.type === 'success' ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            )}
-            {toast.message}
-          </div>
-        ))}
       </div>
 
       <main className="flex-1 container px-4 md:px-6 py-12 max-w-7xl mx-auto">
@@ -388,13 +307,10 @@ export default function GuidePage() {
                         url.searchParams.set('utm_source', 'copy');
                         url.searchParams.set('utm_medium', 'direct');
                         url.searchParams.set('utm_campaign', 'guide_share');
-                        navigator.clipboard.writeText(url.toString())
-                          .then(() => {
-                            showToast('Link copied to clipboard!');
-                          })
-                          .catch(() => {
-                            showToast('Failed to copy link', 'error');
-                          });
+                        navigator.clipboard.writeText(url.toString()).then(() => {
+                          // You might want to add a toast notification here
+                          alert('Link copied to clipboard!');
+                        });
                       }}
                       className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                       aria-label="Copy link"
