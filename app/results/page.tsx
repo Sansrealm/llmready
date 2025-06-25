@@ -461,7 +461,63 @@ export default function ResultsPage() {
                             </div>
 
                             {/* Recommendations */}
-                            <div>
+                            <div className="relative">
+    <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+    
+    {/* Mask overlay for non-signed-in users */}
+    {!isSignedIn && (
+        <div className="absolute inset-0 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+            <div className="text-center p-8 max-w-md">
+                <div className="mb-4">
+                    <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
+                    Unlock Detailed Recommendations
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Sign in to access personalized recommendations and insights to improve your website's LLM readiness.
+                </p>
+                <Button asChild className="w-full">
+                    <Link href="/login">Sign In to View Recommendations</Link>
+                </Button>
+            </div>
+        </div>
+    )}
+    
+    {/* Recommendations content - blurred when not signed in */}
+    <div className={`space-y-4 ${!isSignedIn ? 'blur-sm pointer-events-none' : ''}`}>
+        {analysisResult.recommendations.map((rec, index) => (
+            <div key={index} className="bg-white dark:bg-gray-950 rounded-lg border p-4">
+                <h3 className="text-lg font-medium mb-2">{rec.title}</h3>
+                <div className="flex gap-2 mb-2">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        Difficulty: {rec.difficulty}
+                    </span>
+                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                        Impact: {rec.impact}
+                    </span>
+                </div>
+                <p className={`text-sm ${rec.isPremium && isSignedIn && !isPremium ? "blur-sm" : ""}`}>
+                    {rec.description}
+                </p>
+                {/* Premium upgrade message for signed-in non-premium users */}
+                {rec.isPremium && isSignedIn && !isPremium && (
+                    <div className="mt-2 text-center">
+                        <p className="text-sm text-gray-500">
+                            <Link href="/pricing" className="text-blue-500 hover:underline">
+                                Upgrade to premium
+                            </Link>{" "}
+                            for detailed recommendations
+                        </p>
+                    </div>
+                )}
+            </div>
+        ))}
+    </div>
+</div>
+                            {/* <div>
                                 <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
                                 <div className="space-y-4">
                                     {analysisResult.recommendations.map((rec, index) => (
@@ -497,7 +553,7 @@ export default function ResultsPage() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </div> */}
 
                             {/* Call to action */}
                             <div className="mt-8 text-center">
