@@ -186,17 +186,29 @@ export default function ExtensionAuth() {
     return (
         <div style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            maxWidth: '400px',
-            margin: '50px auto',
-            padding: '20px',
-            textAlign: 'center',
-            background: '#f8fafc'
+            minHeight: '100vh',
+            background: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
         }}>
-            <div style={{
+            {/* Loading, Success, and Error states with minimal styling */}
+            <div id="loading" style={{
+                color: '#6b7280',
+                textAlign: 'center',
+                fontSize: '16px'
+            }}>
+                Loading authentication...
+            </div>
+
+            <div id="success" style={{
+                color: '#059669',
+                textAlign: 'center',
+                padding: '20px',
                 background: 'white',
-                padding: '30px',
-                borderRadius: '12px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                display: 'none'
             }}>
                 <div style={{
                     color: '#059669',
@@ -204,40 +216,44 @@ export default function ExtensionAuth() {
                     fontWeight: 'bold',
                     marginBottom: '10px'
                 }}>
-                    LLM Check
+                    ✅ LLM Check
                 </div>
-                <h2>Extension Authentication</h2>
+                <p>Authentication successful! You can close this window.</p>
+            </div>
 
-                <div id="loading" style={{
-                    color: '#6b7280',
-                    margin: '20px 0'
-                }}>
-                    Loading authentication...
-                </div>
-
-                <div id="success" style={{
-                    color: '#059669',
-                    margin: '20px 0',
-                    display: 'none'
-                }}>
-                    Authentication successful! You can close this window.
-                </div>
-
-                <div id="error" style={{
+            <div id="error" style={{
+                color: '#dc2626',
+                textAlign: 'center',
+                padding: '20px',
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                display: 'none'
+            }}>
+                <div style={{
                     color: '#dc2626',
-                    margin: '20px 0',
-                    display: 'none'
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    marginBottom: '10px'
                 }}>
-                    Authentication failed. Please try again.
+                    ❌ LLM Check
                 </div>
+                <p>Authentication failed. Please try again.</p>
+            </div>
 
-                {/* Clerk auth components will be mounted here */}
-                <div id="clerk-sign-in" style={{ margin: '20px 0' }}></div>
-                <div id="clerk-sign-up" style={{ margin: '20px 0' }}></div>
+            {/* Clerk auth components - let them handle their own styling */}
+            <div id="clerk-sign-in"></div>
+            <div id="clerk-sign-up"></div>
 
-                <div id="signed-in-content" style={{ display: 'none' }}>
-                    <p>Welcome! Syncing with extension...</p>
-                </div>
+            <div id="signed-in-content" style={{
+                display: 'none',
+                textAlign: 'center',
+                padding: '20px',
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}>
+                <p>Welcome! Syncing with extension...</p>
             </div>
         </div>
     );
