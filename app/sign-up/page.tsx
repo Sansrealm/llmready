@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-export default function ExtensionAuth() {
+export default function ExtensionSignUp() {
     useEffect(() => {
         // Load Clerk script dynamically
         const script = document.createElement('script');
@@ -35,13 +35,13 @@ export default function ExtensionAuth() {
                 return;
             }
 
-            // Mount sign-in component with proper sign-up navigation
-            const signInDiv = document.getElementById('clerk-sign-in');
-            if (signInDiv) {
-                clerk.mountSignIn(signInDiv, {
+            // Mount sign-up component
+            const signUpDiv = document.getElementById('clerk-sign-up');
+            if (signUpDiv) {
+                clerk.mountSignUp(signUpDiv, {
                     routing: 'virtual',
-                    afterSignInUrl: window.location.href,
-                    signUpUrl: '/sign-up', // Navigate to sign-up page
+                    signInUrl: '/auth', // Navigate back to sign-in
+                    afterSignUpUrl: window.location.href,
                     appearance: {
                         elements: {
                             rootBox: 'w-full flex justify-center',
@@ -96,14 +96,10 @@ export default function ExtensionAuth() {
             };
 
             // Hide auth components and show success
-            const signInEl = document.getElementById('clerk-sign-in');
             const signUpEl = document.getElementById('clerk-sign-up');
-            const signedInEl = document.getElementById('signed-in-content');
             const successEl = document.getElementById('success');
 
-            if (signInEl) signInEl.style.display = 'none';
             if (signUpEl) signUpEl.style.display = 'none';
-            if (signedInEl) signedInEl.style.display = 'block';
             if (successEl) successEl.style.display = 'block';
 
             // Send data to parent window (Chrome extension popup)
@@ -191,7 +187,7 @@ export default function ExtensionAuth() {
                 }}>
                     ✅ LLM Check
                 </div>
-                <p>Authentication successful! You can close this window.</p>
+                <p>Account created successfully! You can close this window.</p>
             </div>
 
             {/* Error state - centered */}
@@ -214,29 +210,16 @@ export default function ExtensionAuth() {
                 }}>
                     ❌ LLM Check
                 </div>
-                <p>Authentication failed. Please try again.</p>
+                <p>Account creation failed. Please try again.</p>
             </div>
 
-            {/* Clerk auth component - properly centered */}
-            <div id="clerk-sign-in" style={{
+            {/* Clerk sign-up component - properly centered */}
+            <div id="clerk-sign-up" style={{
                 width: '100%',
                 maxWidth: '400px',
                 display: 'flex',
                 justifyContent: 'center'
             }}></div>
-
-            <div id="signed-in-content" style={{
-                display: 'none',
-                textAlign: 'center',
-                padding: '20px',
-                background: 'white',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                maxWidth: '400px',
-                width: '100%'
-            }}>
-                <p>Welcome! Syncing with extension...</p>
-            </div>
         </div>
     );
 }
