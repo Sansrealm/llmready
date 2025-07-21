@@ -35,23 +35,19 @@ export default function ExtensionAuth() {
                 return;
             }
 
-            // Mount sign-in component
+            // Mount sign-in component and let Clerk handle sign-up navigation internally
             const signInDiv = document.getElementById('clerk-sign-in');
             if (signInDiv) {
                 clerk.mountSignIn(signInDiv, {
                     routing: 'virtual',
-                    signUpUrl: '#sign-up',
+                    // Remove custom sign-up URL to let Clerk handle it internally
                     afterSignInUrl: window.location.href,
-                });
-            }
-
-            // Mount sign-up component  
-            const signUpDiv = document.getElementById('clerk-sign-up');
-            if (signUpDiv) {
-                clerk.mountSignUp(signUpDiv, {
-                    routing: 'virtual',
-                    signInUrl: '#sign-in',
-                    afterSignUpUrl: window.location.href,
+                    appearance: {
+                        elements: {
+                            rootBox: 'w-full',
+                            card: 'w-full max-w-md mx-auto'
+                        }
+                    }
                 });
             }
 
@@ -156,33 +152,6 @@ export default function ExtensionAuth() {
         }
     };
 
-    const handleRouting = () => {
-        const hash = window.location.hash;
-        const signInDiv = document.getElementById('clerk-sign-in');
-        const signUpDiv = document.getElementById('clerk-sign-up');
-
-        if (hash === '#sign-up') {
-            if (signInDiv) signInDiv.style.display = 'none';
-            if (signUpDiv) signUpDiv.style.display = 'block';
-        } else {
-            if (signInDiv) signInDiv.style.display = 'block';
-            if (signUpDiv) signUpDiv.style.display = 'none';
-        }
-    };
-
-    useEffect(() => {
-        // Handle URL routing for sign-in/sign-up
-        handleRouting();
-
-        // Listen for hash changes
-        const hashChangeHandler = () => handleRouting();
-        window.addEventListener('hashchange', hashChangeHandler);
-
-        return () => {
-            window.removeEventListener('hashchange', hashChangeHandler);
-        };
-    }, []);
-
     return (
         <div style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -243,7 +212,6 @@ export default function ExtensionAuth() {
 
             {/* Clerk auth components - let them handle their own styling */}
             <div id="clerk-sign-in"></div>
-            <div id="clerk-sign-up"></div>
 
             <div id="signed-in-content" style={{
                 display: 'none',
