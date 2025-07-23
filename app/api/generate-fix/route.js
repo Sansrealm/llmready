@@ -46,23 +46,53 @@ const AI_PROMPTS = {
   `,
 
     'schema-markup': (content, context) => `
-    Generate JSON-LD schema markup for this webpage:
+    Generate JSON-LD schema markup for this webpage based on the ACTUAL content and analysis provided:
     
     URL: ${context.url}
-    Title: ${context.pageTitle || ''}
     Industry: ${context.industry || 'General'}
-    Content preview: ${content.substring(0, 800)}
+    Page Title: ${context.pageTitle || ''}
+    Meta Description: ${context.metaDescription || ''}
+    Overall Score: ${context.overallScore || 'Unknown'}
     
-    Choose the most appropriate schema type (Article, Product, Service, Organization, WebPage, etc.) based on the content.
-    Create complete, valid JSON-LD markup with all relevant properties.
+    COMPREHENSIVE CONTENT ANALYSIS:
+    ${content}
     
-    Return only the JSON-LD code wrapped in <script> tags that can be copied directly into the <head> section:
+    ALL PARAMETERS ANALYZED:
+    ${context.allParameters?.map(p => `${p.name} (Score: ${p.score}): ${p.description}`).join('\n') || 'None'}
+    
+    Instructions:
+    1. ANALYZE the actual content and parameters above to understand what this business/website does
+    2. Choose the most appropriate schema type based on the business/content:
+       - "Organization" for companies, agencies, consultancies
+       - "ProfessionalService" for service-based businesses
+       - "LocalBusiness" if location-specific services
+       - "WebPage" only for purely informational content
+    3. For UX/design/consulting agencies → use "Organization" with "ProfessionalService" serviceType
+    4. Extract REAL information from the analysis:
+       - Business name (from page title/content)
+       - What they actually do (from parameter descriptions)
+       - Services offered (inferred from parameter issues and content)
+    5. Include relevant schema properties:
+       - name, description, url (required)
+       - serviceType (for service businesses)
+       - knowsAbout (relevant skills/services)
+       - sameAs (if social media found)
+    6. Do NOT make generic assumptions - base everything on the provided analysis
+    
+    Return ONLY the complete JSON-LD code wrapped in script tags:
     
     <script type="application/ld+json">
     {
-      // Your schema markup here
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "...",
+      "description": "...",
+      "url": "${context.url}",
+      // Add other relevant properties based on actual analysis
     }
     </script>
+    
+    Make the schema accurately represent what this business does based on the comprehensive analysis provided.
   `,
 
     'internal-links': (content, context) => `
