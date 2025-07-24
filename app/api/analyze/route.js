@@ -1,137 +1,279 @@
+// api/analyze/route.js - Enhanced to capture full content for fix generation
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import puppeteer from 'puppeteer';
 
-// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Maximum number of analyses for free users
-const MAX_FREE_ANALYSES = 3;
+// Enhanced scraping to capture full content for fix generation
+async function scrapeWebsite(url) {
+  let browser;
+  try {
+    console.log(`🔍 Scraping: ${url}`);
+
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+    // Set timeout and wait for network idle
+    await page.goto(url, {
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
+
+    // Get the full HTML content
+    const html = await page.content();
+    const $ = cheerio.load(html);
+
+    // Remove script and style elements for cleaner content
+    $('script, style, nav, footer, .sidebar, #sidebar, .nav, .menu').remove();
+
+    // Extract comprehensive content
+    const title = $('title').text().trim() || '';
+    const metaDescription = $('meta[name="description"]').attr('content') || '';
+
+    // Get all headings with structure
+    const headings = [];
+    $('h1, h2, h3, h4, h5, h6').each((i, el) => {
+      const level = parseInt(el.tagName.charAt(1));
+      const text = $(el).text().trim();
+      if (text) {
+        headings.push({ level, text });
+      }
+    });
+
+    // Get all paragraph content
+    const paragraphs = [];
+    $('p').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 20) { // Filter out very short paragraphs
+        paragraphs.push(text);
+      }
+    });
+
+    // Extract schema markup
+    const schemaMarkup = [];
+    $('script[type="application/ld+json"]').each((i, el) => {
+      try {
+        const jsonData = JSON.parse($(el).html());
+        schemaMarkup.push(jsonData);
+      } catch (e) {
+        console.warn('Invalid JSON-LD found:', $(el).html());
+      }
+    });
+
+    // Get full text content (main content areas only)
+    const mainContent = $('main, .main, .content, article, .article, .post, .entry-content').first();
+    let fullContent = '';
+
+    if (mainContent.length > 0) {
+      fullContent = mainContent.text().trim();
+    } else {
+      // Fallback: get body content excluding common non-content areas
+      $('header, nav, footer, aside, .header, .nav, .footer, .sidebar, .advertisement, .ads').remove();
+      fullContent = $('body').text().trim();
+    }
+
+    // Clean up whitespace and limit size (but keep much more than before)
+    fullContent = fullContent
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .trim()
+      .substring(0, 8000); // Increased from 1000 to 8000 characters
+
+    // Calculate word count
+    const wordCount = fullContent.split(/\s+/).filter(word => word.length > 0).length;
+
+    console.log(`✅ Scraped ${url}: ${title} (${wordCount} words, ${fullContent.length} chars)`);
+
+    return {
+      title,
+      metaDescription,
+      headings,
+      paragraphs: paragraphs.slice(0, 10), // Limit to first 10 paragraphs for analysis
+      schemaMarkup,
+      fullContent, // This is the key enhancement - full content for fix generation
+      wordCount,
+      url
+    };
+
+  } catch (error) {
+    console.error('Scraping error:', error);
+    throw new Error(`Failed to scrape website: ${error.message}`);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
+// Enhanced analysis prompt that acknowledges full content availability
+function createAnalysisPrompt(content) {
+  return `You are an expert SEO and AI optimization specialist. Analyze this website for LLM readiness and SEO optimization.
+
+WEBSITE DATA:
+- URL: ${content.url}
+- Title: "${content.title}"
+- Meta Description: "${content.metaDescription}"
+- Word Count: ${content.wordCount}
+- Headings (${content.headings.length}): ${content.headings.map(h => `H${h.level}: ${h.text}`).join(', ')}
+- Schema Markup: ${content.schemaMarkup.length > 0 ? 'Present' : 'None'}
+- Content Preview: "${content.fullContent.substring(0, 1000)}..." 
+
+ANALYSIS FRAMEWORK:
+Rate each parameter 0-100 and provide specific, actionable feedback based on the actual content shown.
+
+Required Parameters:
+1. Title Tag Optimization (SEO title effectiveness)
+2. Meta Description Quality (clarity and appeal)
+3. Heading Structure (H1-H6 hierarchy and SEO)
+4. Content Quality (readability and structure for LLMs)
+5. Schema Markup (structured data implementation)
+6. Keyword Integration (natural keyword usage)
+7. Content Depth (comprehensive topic coverage)
+8. Technical SEO (basic on-page elements)
+
+IMPORTANT: Base your analysis ONLY on the actual content provided. Don't make assumptions about content not shown.
+
+Response Format (JSON):
+{
+  "overallScore": [0-100 weighted average],
+  "parameters": [
+    {
+      "name": "Title Tag Optimization",
+      "score": [0-100],
+      "description": "Specific assessment based on actual title",
+      "issues": ["specific issue 1", "specific issue 2"]
+    }
+    // ... other parameters
+  ],
+  "recommendations": [
+    "Priority recommendation 1 based on actual content",
+    "Priority recommendation 2 based on actual content"
+  ]
+}
+
+Focus on actionable, specific feedback that can be used to generate targeted improvements.`;
+}
 
 export async function POST(request) {
   try {
-    // Get authentication status from Clerk
-    const { userId } = auth();
+    const { url, email, industry } = await request.json();
 
-    // Get request data
-    const requestData = await request.json();
-    const { url, email, industry } = requestData;
-
-    // Check user's subscription status and analysis count
-    let isPremium = false;
-    let analysisCount = 0;
-
-    if (userId) {
-      // Get user data from Clerk
-      const user = await clerkClient.users.getUser(userId);
-      isPremium = user.publicMetadata?.premiumUser === true;
-      analysisCount = user.publicMetadata?.analysisCount || 0;
-
-      // Check if free user has reached limit
-      if (!isPremium && analysisCount >= MAX_FREE_ANALYSES) {
-        return NextResponse.json(
-          { error: "You've reached the maximum number of analyses for free users. Please upgrade to Premium for unlimited analyses." },
-          { status: 403 }
-        );
-      }
-
-      // Increment analysis count for non-premium users
-      if (!isPremium) {
-        await clerkClient.users.updateUser(userId, {
-          publicMetadata: {
-            ...user.publicMetadata,
-            analysisCount: analysisCount + 1,
-          },
-        });
-      }
+    if (!url) {
+      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    // Log authentication status
-    console.log(`🔐 User authentication status: ${userId ? (isPremium ? 'Premium' : 'Free') : 'Guest'}`);
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
 
-    // 1. Fetch website content
-    const response = await fetch(url);
-    const html = await response.text();
+    console.log(`🔍 Starting enhanced analysis for: ${url}`);
 
-    // 2. Parse HTML
-    const $ = cheerio.load(html);
-    const title = $('title').text();
-    const metaDescription = $('meta[name="description"]').attr('content') || '';
-    const headings = $('h1, h2, h3').map((i, el) => $(el).text()).get();
-    const paragraphs = $('p').map((i, el) => $(el).text()).get().slice(0, 10);
-    const hasSchema = $('script[type="application/ld+json"]').length > 0;
-    const hasMobileViewport = $('meta[name="viewport"]').length > 0;
-    const images = $('img').length;
-    const imagesWithAlt = $('img[alt]').length;
+    // Enhanced scraping with full content capture
+    const scrapedContent = await scrapeWebsite(url);
 
-    // 3. OpenAI prompt
-    const analysisPrompt = `
-      Analyze this website for LLM readiness:
-      URL: ${url}
-      Title: ${title}
-      Meta Description: ${metaDescription}
-      Headings: ${headings.join(', ')}
-      Content Sample: ${paragraphs.join(' ').substring(0, 1000)}
-      Has Schema Markup: ${hasSchema}
-      Has Mobile Viewport: ${hasMobileViewport}
-      Images: ${images}, With Alt Text: ${imagesWithAlt}
+    // Enhanced analysis using the full content
+    const prompt = createAnalysisPrompt(scrapedContent);
 
-      Provide an analysis of how well this website is optimized for Large Language Models (LLMs).
-      Return a JSON object with this shape:
-
-      {
-        "overall_score": (0-100),
-        "parameters": [
-          { "name": "...", "score": 0-100, "isPremium": ${!userId || isPremium ? false : true}, "description": "..." }
-        ],
-        "recommendations": [
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!userId || isPremium ? false : true} }
-        ]
-      }
-    `;
+    console.log('🤖 Analyzing with enhanced prompts...');
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: 'gpt-4o',
       messages: [
-        { role: "system", content: "You are an expert in SEO and LLM optimization." },
-        { role: "user", content: analysisPrompt }
+        {
+          role: 'system',
+          content: 'You are an expert SEO and LLM optimization specialist. Always respond with valid JSON only. Base your analysis strictly on the provided content - do not make assumptions about unseen content.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
       ],
-      response_format: { type: "json_object" }
+      temperature: 0.3,
+      max_tokens: 2000,
     });
 
-    const raw = completion.choices[0].message.content;
-    console.log("🧠 GPT response received");
+    const responseText = completion.choices[0]?.message?.content;
+    if (!responseText) {
+      throw new Error('No response from OpenAI');
+    }
 
-    let analysisResult;
+    // Parse the analysis response
+    let analysisData;
     try {
-      analysisResult = JSON.parse(raw);
-      if (
-        typeof analysisResult !== "object" ||
-        typeof analysisResult.overall_score !== "number" ||
-        !Array.isArray(analysisResult.parameters) ||
-        !Array.isArray(analysisResult.recommendations)
-      ) {
-        throw new Error("Invalid analysis structure");
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
       }
-    } catch (err) {
-      console.error("❌ JSON parse or structure error:", err);
-      return NextResponse.json({ error: "Invalid JSON from OpenAI", raw }, { status: 500 });
+      analysisData = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('Failed to parse analysis response:', responseText);
+      throw new Error('Invalid response format from AI');
     }
 
-    // Add remaining analyses count for free users
-    if (userId && !isPremium) {
-      analysisResult.remainingAnalyses = MAX_FREE_ANALYSES - (analysisCount + 1);
-    }
+    // Construct enhanced result with full content for fix generation
+    const result = {
+      overallScore: analysisData.overallScore || 0,
+      url: scrapedContent.url,
+      title: scrapedContent.title,
+      parameters: analysisData.parameters || [],
+      recommendations: analysisData.recommendations || [],
+      scraped: scrapedContent, // Full scraped content including fullContent for fix generation
+      timestamp: new Date().toISOString(),
+      wordCount: scrapedContent.wordCount,
+      // Add analysis metadata
+      analysisMetadata: {
+        hasFullContent: scrapedContent.fullContent.length > 1000,
+        contentLength: scrapedContent.fullContent.length,
+        readyForFixGeneration: true
+      }
+    };
 
-    return NextResponse.json(analysisResult);
+    console.log(`✅ Analysis complete: ${result.overallScore}/100 (${scrapedContent.wordCount} words analyzed)`);
+
+    return NextResponse.json(result);
+
   } catch (error) {
-    console.error("🔥 Analysis error:", error);
-    return NextResponse.json(
-      { error: "Failed to analyze website", message: error.message },
-      { status: 500 }
-    );
+    console.error('Analysis error:', error);
+
+    // Provide helpful error messages
+    if (error.message.includes('net::ERR_NAME_NOT_RESOLVED')) {
+      return NextResponse.json({
+        error: 'Website not accessible',
+        details: 'The URL could not be reached. Please check if the website is online.'
+      }, { status: 400 });
+    }
+
+    if (error.message.includes('timeout')) {
+      return NextResponse.json({
+        error: 'Website timeout',
+        details: 'The website took too long to respond. Please try again.'
+      }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      error: 'Analysis failed',
+      details: error.message
+    }, { status: 500 });
   }
 }
