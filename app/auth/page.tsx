@@ -79,7 +79,7 @@ export default function ExtensionAuth() {
             console.log('🔐 Getting session token with extension-auth template...');
 
             const token = await clerk.session.getToken({
-                template: 'extension-auth' // 🚀 This is the key fix!
+                template: 'extension-auth' // 🚀 Clerk JWT template
             });
 
             if (!token) {
