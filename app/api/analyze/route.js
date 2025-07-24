@@ -1,4 +1,4 @@
-// api/analyze/route.js - Enhanced but COMPATIBLE with your existing extension
+// api/analyze/route.js - Enhanced to capture full content for fix generation
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
@@ -134,7 +134,7 @@ WEBSITE DATA:
 - Word Count: ${content.wordCount}
 - Headings (${content.headings.length}): ${content.headings.map(h => `H${h.level}: ${h.text}`).join(', ')}
 - Schema Markup: ${content.schemaMarkup.length > 0 ? 'Present' : 'None'}
-- Content Preview: "${content.fullContent.substring(0, 1000)}..." 
+- Content Preview: "${content.fullContent.substring(0, 3000)}..." 
 
 ANALYSIS FRAMEWORK:
 Rate each parameter 0-100 and provide specific, actionable feedback based on the actual content shown.
@@ -159,18 +159,13 @@ Response Format (JSON):
       "name": "Title Tag Optimization",
       "score": [0-100],
       "description": "Specific assessment based on actual title",
-      "isPremium": false
+      "issues": ["specific issue 1", "specific issue 2"]
     }
     // ... other parameters
   ],
   "recommendations": [
-    {
-      "title": "Priority recommendation title",
-      "description": "Detailed recommendation based on actual content",
-      "difficulty": "Easy|Medium|Hard",
-      "impact": "Low|Medium|High",
-      "isPremium": false
-    }
+    "Priority recommendation 1 based on actual content",
+    "Priority recommendation 2 based on actual content"
   ]
 }
 
@@ -236,9 +231,8 @@ export async function POST(request) {
       throw new Error('Invalid response format from AI');
     }
 
-    // FIXED: Construct result compatible with your existing extension format
+    // Construct enhanced result with full content for fix generation
     const result = {
-      // COMPATIBLE: Use your extension's expected field names
       overall_score: analysisData.overallScore || 0,  // underscore format
       pageTitle: scrapedContent.title,                // your expected field name
       metaDescription: scrapedContent.metaDescription, // your expected field name
@@ -259,7 +253,7 @@ export async function POST(request) {
       }
     };
 
-    console.log(`✅ Enhanced analysis complete: ${result.overall_score}/100 (${scrapedContent.wordCount} words analyzed)`);
+    console.log(`✅ Analysis complete: ${result.overallScore}/100 (${scrapedContent.wordCount} words analyzed)`);
 
     return NextResponse.json(result);
 
