@@ -134,7 +134,7 @@ WEBSITE DATA:
 - Word Count: ${content.wordCount}
 - Headings (${content.headings.length}): ${content.headings.map(h => `H${h.level}: ${h.text}`).join(', ')}
 - Schema Markup: ${content.schemaMarkup.length > 0 ? 'Present' : 'None'}
-- Content Preview: "${content.fullContent.substring(0, 3000)}..." 
+- Content Preview: "${content.fullContent.substring(0, 1000)}..." 
 
 ANALYSIS FRAMEWORK:
 Rate each parameter 0-100 and provide specific, actionable feedback based on the actual content shown.
@@ -233,19 +233,15 @@ export async function POST(request) {
 
     // Construct enhanced result with full content for fix generation
     const result = {
-      overall_score: analysisData.overallScore || 0,  // underscore format
-      pageTitle: scrapedContent.title,                // your expected field name
-      metaDescription: scrapedContent.metaDescription, // your expected field name
-      keywords: null, // Add if you have keyword extraction
+      overallScore: analysisData.overallScore || 0,
+      url: scrapedContent.url,
+      title: scrapedContent.title,
       parameters: analysisData.parameters || [],
       recommendations: analysisData.recommendations || [],
-
-      // ENHANCED: Add full content for fix generation (backwards compatible)
       scraped: scrapedContent, // Full scraped content including fullContent for fix generation
       timestamp: new Date().toISOString(),
       wordCount: scrapedContent.wordCount,
-
-      // Add analysis metadata for debugging
+      // Add analysis metadata
       analysisMetadata: {
         hasFullContent: scrapedContent.fullContent.length > 1000,
         contentLength: scrapedContent.fullContent.length,
