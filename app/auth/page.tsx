@@ -75,8 +75,43 @@ export default function ExtensionAuth() {
 
     const handleSuccessfulAuth = async (clerk: any) => {
         try {
-            // Get auth token
-            const token = await clerk.session.getToken();
+            // 🎯 CRITICAL FIX: Get token with extension-auth template
+            console.log('🔐 Getting session token with extension-auth template...');
+
+            const token = await clerk.session.getToken({
+                template: 'extension-auth' // 🚀 This is the key fix!
+            });
+
+            if (!token) {
+                throw new Error('Failed to get session token with extension-auth template');
+            }
+
+            console.log('✅ Session token obtained with extension-auth template');
+
+            // Parse token to verify it has proper expiry
+            try {
+                const tokenParts = token.split('.');
+                const tokenPayload = JSON.parse(atob(tokenParts[1]));
+                const now = Math.floor(Date.now() / 1000);
+                const lifetime = tokenPayload.exp - tokenPayload.iat;
+
+                console.log('🔍 Token details:', {
+                    issuedAt: new Date(tokenPayload.iat * 1000).toISOString(),
+                    expiresAt: new Date(tokenPayload.exp * 1000).toISOString(),
+                    lifetimeSeconds: lifetime,
+                    lifetimeMinutes: lifetime / 60,
+                    template: 'extension-auth'
+                });
+
+                // Verify we got the 1-hour token (3600 seconds)
+                if (lifetime !== 3600) {
+                    console.warn('⚠️ Token lifetime unexpected:', lifetime, 'seconds (expected 3600)');
+                } else {
+                    console.log('✅ Token has correct 1-hour lifetime');
+                }
+            } catch (parseError) {
+                console.warn('Could not parse token for verification:', parseError);
+            }
 
             // Get user info
             const user = clerk.user;
@@ -105,6 +140,8 @@ export default function ExtensionAuth() {
             if (signUpEl) signUpEl.style.display = 'none';
             if (signedInEl) signedInEl.style.display = 'block';
             if (successEl) successEl.style.display = 'block';
+
+            console.log('📤 Sending auth data to extension with extension-auth template token');
 
             // Send data to parent window (Chrome extension popup)
             if (window.opener) {
@@ -192,6 +229,9 @@ export default function ExtensionAuth() {
                     ✅ LLM Check
                 </div>
                 <p>Authentication successful! You can close this window.</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '10px' }}>
+                    Session valid for 1 hour with extension-auth template
+                </p>
             </div>
 
             {/* Error state - centered */}
@@ -236,6 +276,9 @@ export default function ExtensionAuth() {
                 width: '100%'
             }}>
                 <p>Welcome! Syncing with extension...</p>
+                <p style={{ fontSize: '12px', color: '#6b7280' }}>
+                    Using secure 1-hour session tokens
+                </p>
             </div>
         </div>
     );
