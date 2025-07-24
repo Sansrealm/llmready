@@ -1,4 +1,4 @@
-// api/analyze/route.js - Enhanced to capture full content for fix generation
+// api/analyze/route.js - Enhanced but COMPATIBLE with your existing extension
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
@@ -159,13 +159,18 @@ Response Format (JSON):
       "name": "Title Tag Optimization",
       "score": [0-100],
       "description": "Specific assessment based on actual title",
-      "issues": ["specific issue 1", "specific issue 2"]
+      "isPremium": false
     }
     // ... other parameters
   ],
   "recommendations": [
-    "Priority recommendation 1 based on actual content",
-    "Priority recommendation 2 based on actual content"
+    {
+      "title": "Priority recommendation title",
+      "description": "Detailed recommendation based on actual content",
+      "difficulty": "Easy|Medium|Hard",
+      "impact": "Low|Medium|High",
+      "isPremium": false
+    }
   ]
 }
 
@@ -231,17 +236,22 @@ export async function POST(request) {
       throw new Error('Invalid response format from AI');
     }
 
-    // Construct enhanced result with full content for fix generation
+    // FIXED: Construct result compatible with your existing extension format
     const result = {
-      overallScore: analysisData.overallScore || 0,
-      url: scrapedContent.url,
-      title: scrapedContent.title,
+      // COMPATIBLE: Use your extension's expected field names
+      overall_score: analysisData.overallScore || 0,  // underscore format
+      pageTitle: scrapedContent.title,                // your expected field name
+      metaDescription: scrapedContent.metaDescription, // your expected field name
+      keywords: null, // Add if you have keyword extraction
       parameters: analysisData.parameters || [],
       recommendations: analysisData.recommendations || [],
+
+      // ENHANCED: Add full content for fix generation (backwards compatible)
       scraped: scrapedContent, // Full scraped content including fullContent for fix generation
       timestamp: new Date().toISOString(),
       wordCount: scrapedContent.wordCount,
-      // Add analysis metadata
+
+      // Add analysis metadata for debugging
       analysisMetadata: {
         hasFullContent: scrapedContent.fullContent.length > 1000,
         contentLength: scrapedContent.fullContent.length,
@@ -249,7 +259,7 @@ export async function POST(request) {
       }
     };
 
-    console.log(`✅ Analysis complete: ${result.overallScore}/100 (${scrapedContent.wordCount} words analyzed)`);
+    console.log(`✅ Enhanced analysis complete: ${result.overall_score}/100 (${scrapedContent.wordCount} words analyzed)`);
 
     return NextResponse.json(result);
 
