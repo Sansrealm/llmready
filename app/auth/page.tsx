@@ -6,7 +6,7 @@ export default function ExtensionAuth() {
     useEffect(() => {
         // Load Clerk script dynamically
         const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@clerk/clerk-js@latest/dist/clerk.browser.js';
+        script.src = 'https://clerk.llmcheck.app/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
         script.onload = initializeClerk;
         document.head.appendChild(script);
 
