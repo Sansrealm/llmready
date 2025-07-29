@@ -1,47 +1,26 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 
 export async function GET() {
     try {
-        // Use Clerk's official auth() helper
-        const { has, userId } = await auth();
+        const { userId } = auth();
 
         if (!userId) {
-            return NextResponse.json({
-                isPremium: false,
-                error: 'Not authenticated'
-            }, { status: 401 });
+            // No user is signed in.
+            return NextResponse.json({ isPremium: false });
         }
 
-        console.log('🔍 Official Clerk billing check for user:', userId);
+        // Directly fetch the user's data from the Clerk API.
+        const user = await clerkClient.users.getUser(userId);
 
-        // OFFICIAL METHOD: Use has() with your exact plan slug
-        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
+        // Check the private metadata that your webhook sets.
+        const plan = user.privateMetadata?.plan;
+        const hasPremiumPlan = plan === 'llm_check_premium';
 
-        console.log('✅ Clerk has() result:', {
-            userId,
-            planSlug: 'llm_check_premium',
-            hasPremiumPlan
-        });
-
-        // Return the official Clerk billing status
-        return NextResponse.json({
-            isPremium: hasPremiumPlan,
-            method: 'clerk_billing_official',
-            debug: {
-                userId,
-                planSlug: 'llm_check_premium',
-                hasPremiumPlan,
-                timestamp: new Date().toISOString()
-            }
-        });
+        return NextResponse.json({ isPremium: hasPremiumPlan });
 
     } catch (error) {
-        console.error('❌ Clerk billing check failed:', error);
-        return NextResponse.json({
-            isPremium: false,
-            error: error.message,
-            debug: { error: error.toString() }
-        }, { status: 500 });
+        console.error("Error fetching subscription status:", error);
+        return NextResponse.json({ isPremium: false, error: "Failed to fetch status" }, { status: 500 });
     }
 }
