@@ -1,62 +1,73 @@
-// app/api/webhooks/clerk/route.js
-// Simplified webhook handler for debugging
+// In app/api/webhooks/clerk/route.js
 
+import { Webhook } from 'svix';
+import { headers } from 'next/headers';
+import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-export async function POST(request) {
-    try {
-        console.log('📨 Clerk webhook received');
+export async function POST(req) {
+    // You can find this in the Clerk Dashboard -> Webhooks -> choose the webhook
+    const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
-        // Get the request body
-        const payload = await request.json();
-
-        console.log('📋 Webhook event type:', payload.type);
-        console.log('📋 Webhook data:', JSON.stringify(payload, null, 2));
-
-        // Handle user events
-        if (payload.type === 'user.updated' || payload.type === 'user.created') {
-            const userData = payload.data;
-            console.log('👤 User event for:', userData.id);
-            console.log('📧 User email:', userData.email_addresses?.[0]?.email_address);
-            console.log('📝 Public metadata:', userData.public_metadata);
-
-            // Look for subscription data in the user object
-            const userKeys = Object.keys(userData);
-            const subscriptionKeys = userKeys.filter(key =>
-                key.toLowerCase().includes('subscription') ||
-                key.toLowerCase().includes('billing') ||
-                key.toLowerCase().includes('plan')
-            );
-
-            console.log('🔍 Found subscription-related keys:', subscriptionKeys);
-
-            subscriptionKeys.forEach(key => {
-                console.log(`📋 ${key}:`, userData[key]);
-            });
-        }
-
-        // Handle session events
-        if (payload.type === 'session.created') {
-            console.log('🔐 Session created for user:', payload.data.user_id);
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Webhook received successfully'
-        });
-
-    } catch (error) {
-        console.error('❌ Webhook error:', error);
-        return NextResponse.json({
-            error: error.message
-        }, { status: 500 });
+    if (!WEBHOOK_SECRET) {
+        throw new Error('Please add CLERK_WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local');
     }
-}
 
-// Handle GET requests for webhook verification
-export async function GET() {
-    return NextResponse.json({
-        message: 'Clerk webhook endpoint is active',
-        timestamp: new Date().toISOString()
-    });
+    // Get the headers for signature verification
+    const headerPayload = headers();
+    const svix_id = headerPayload.get("svix-id");
+    const svix_timestamp = headerPayload.get("svix-timestamp");
+    const svix_signature = headerPayload.get("svix-signature");
+
+    // If there are no headers, error out
+    if (!svix_id || !svix_timestamp || !svix_signature) {
+        return new Response('Error occured -- no svix headers', { status: 400 });
+    }
+
+    // Get the body
+    const payload = await req.json();
+    const body = JSON.stringify(payload);
+
+    // Create a new Svix instance with your secret.
+    const wh = new Webhook(WEBHOOK_SECRET);
+    let evt;
+
+    // Verify the payload with the headers
+    try {
+        evt = wh.verify(body, {
+            "svix-id": svix_id,
+            "svix-timestamp": svix_timestamp,
+            "svix-signature": svix_signature,
+        });
+    } catch (err) {
+        console.error('Error verifying webhook:', err);
+        return new Response('Error occured', { status: 400 });
+    }
+
+    // Get the event type
+    const eventType = evt.type;
+    console.log(`🔔 Webhook received with type: ${eventType}`);
+
+    // --- HANDLE THE SUBSCRIPTION EVENTS ---
+    // Listen for when a subscription is first created or updated
+    if (eventType === 'subscription.created' || eventType === 'subscription.updated') {
+        const { user_id, plan_id, status } = evt.data;
+
+        // Check if the subscription is active and matches your premium plan slug
+        if (status === 'active' && plan_id === 'llm_check_premium') {
+            try {
+                await clerkClient.users.updateUserMetadata(user_id, {
+                    privateMetadata: {
+                        'plan': 'llm_check_premium'
+                    }
+                });
+                console.log(`✅ User ${user_id} metadata updated to premium.`);
+            } catch (err) {
+                console.error('Error updating user metadata:', err);
+                return new Response('Error updating metadata', { status: 500 });
+            }
+        }
+    }
+
+    return new Response('', { status: 200 });
 }
