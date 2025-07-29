@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function GET() {
     try {
+        // Use Clerk's official auth() helper
         const { has, userId } = await auth();
 
         if (!userId) {
@@ -12,32 +13,35 @@ export async function GET() {
             }, { status: 401 });
         }
 
-        // Define an array of all possible "premium" plan slugs
-        const premiumPlanSlugs = [
-            'llm_check_premium',          // Your public plan
-            'prem01'      // 👈 Replace this with the slug for your private $1 plan
-        ];
+        console.log('🔍 Official Clerk billing check for user:', userId);
 
-        // Check if the user has an active subscription for ANY of the plans in the array
-        const hasPremiumPlan = has({ plan: premiumPlanSlugs });
+        // OFFICIAL METHOD: Use has() with your exact plan slug
+        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
 
-        console.log('✅ Clerk multi-plan check result:', {
+        console.log('✅ Clerk has() result:', {
             userId,
-            checkedSlugs: premiumPlanSlugs,
+            planSlug: 'llm_check_premium',
             hasPremiumPlan
         });
 
-        // Return the final, accurate billing status
+        // Return the official Clerk billing status
         return NextResponse.json({
             isPremium: hasPremiumPlan,
-            method: 'clerk_multi_plan_check'
+            method: 'clerk_billing_official',
+            debug: {
+                userId,
+                planSlug: 'llm_check_premium',
+                hasPremiumPlan,
+                timestamp: new Date().toISOString()
+            }
         });
 
     } catch (error) {
         console.error('❌ Clerk billing check failed:', error);
         return NextResponse.json({
             isPremium: false,
-            error: error.message
+            error: error.message,
+            debug: { error: error.toString() }
         }, { status: 500 });
     }
 }
