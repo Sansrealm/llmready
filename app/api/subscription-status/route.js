@@ -1,38 +1,47 @@
 import { NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 
 export async function GET() {
     try {
-        const { userId, has } = auth();
+        // Use Clerk's official auth() helper
+        const { has, userId } = await auth();
 
         if (!userId) {
-            return NextResponse.json({ isPremium: false });
+            return NextResponse.json({
+                isPremium: false,
+                error: 'Not authenticated'
+            }, { status: 401 });
         }
 
-        // --- METHOD 1: Try the standard session-based check first ---
-        // This should work for your web app.
-        if (has({ plan: 'llm_check_premium' })) {
-            console.log('✅ Premium status confirmed via has() helper.');
-            return NextResponse.json({ isPremium: true });
-        }
+        console.log('🔍 Official Clerk billing check for user:', userId);
 
-        // --- METHOD 2: Fallback to a direct API check ---
-        // This is the robust method for the extension or if the has() helper fails.
-        console.log('has() returned false. Falling back to direct clerkClient lookup.');
-        const user = await clerkClient.users.getUser(userId);
-        const plan = user.privateMetadata?.plan;
+        // OFFICIAL METHOD: Use has() with your exact plan slug
+        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
 
-        if (plan === 'llm_check_premium') {
-            console.log('✅ Premium status confirmed via privateMetadata.');
-            return NextResponse.json({ isPremium: true });
-        }
+        console.log('✅ Clerk has() result:', {
+            userId,
+            planSlug: 'llm_check_premium',
+            hasPremiumPlan
+        });
 
-        // If both checks fail, the user is not premium.
-        console.log('❌ User is not premium after both checks.');
-        return NextResponse.json({ isPremium: false });
+        // Return the official Clerk billing status
+        return NextResponse.json({
+            isPremium: hasPremiumPlan,
+            method: 'clerk_billing_official',
+            debug: {
+                userId,
+                planSlug: 'llm_check_premium',
+                hasPremiumPlan,
+                timestamp: new Date().toISOString()
+            }
+        });
 
     } catch (error) {
-        console.error("Error fetching subscription status:", error);
-        return NextResponse.json({ isPremium: false, error: "Failed to fetch status" }, { status: 500 });
+        console.error('❌ Clerk billing check failed:', error);
+        return NextResponse.json({
+            isPremium: false,
+            error: error.message,
+            debug: { error: error.toString() }
+        }, { status: 500 });
     }
 }
