@@ -75,6 +75,8 @@ export default function RootLayout({
   `}
           </Script>
 
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5740140678935322"
+            crossOrigin="anonymous"></script>
 
         </head>
         <body className={`${inter.className} bg-background text-foreground`}>
