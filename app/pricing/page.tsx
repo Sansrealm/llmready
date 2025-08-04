@@ -10,7 +10,7 @@ import Footer from "@/components/footer";
 import { useAuth, useUser } from "@clerk/nextjs";
 
 // Import Clerk's PricingTable component
-// import { PricingTable } from "@clerk/nextjs";
+import { PricingTable } from "@clerk/nextjs";
 
 // Updated premium check that uses server-side API
 function useIsPremium() {
@@ -108,124 +108,23 @@ export default function PricingPage() {
 
 
 
-
-        {/* REPLACE THIS ENTIRE SECTION - Clerk Pricing Table */}
+        {/* Clerk Pricing Table */}
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-4xl">
               {isSignedIn ? (
                 <div className="space-y-6">
-
-                  {/* Clear Current Plan Status */}
-                  <div className="text-center mb-8">
-                    {isPremium ? (
-                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">
-                          ✅ You're on Premium
-                        </h3>
-                        <p className="text-green-700 dark:text-green-300">
-                          Unlimited analyses and advanced features active
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <h2 className="text-2xl font-bold mb-4">Choose Your Plan</h2>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          Upgrade to Premium for advanced LLM optimization features
-                        </p>
-                      </div>
-                    )}
+                  <div className="text-center">
+                    <h2 className="text-2xl font-bold mb-4">Choose Your Plan</h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Upgrade to Premium for advanced LLM optimization features
+                    </p>
                   </div>
 
-                  {/* Simple Two-Column Layout */}
-                  <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                  {/* Clerk's built-in PricingTable component */}
+                  <PricingTable
 
-                    {/* Free Plan */}
-                    <div className={`border rounded-lg p-6 ${!isPremium ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200'}`}>
-                      <div className="text-center">
-                        <h3 className="text-xl font-semibold mb-2">Free</h3>
-                        <div className="text-3xl font-bold mb-4">$0</div>
-                        {!isPremium && (
-                          <div className="mb-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                            Current Plan
-                          </div>
-                        )}
-                        <ul className="text-sm space-y-2 mb-6 text-left">
-                          <li>✓ Basic website analysis</li>
-                          <li>✓ Content quality score</li>
-                          <li>✓ Basic recommendations</li>
-                          <li>✓ Limited analyses per month</li>
-                        </ul>
-                      </div>
-                    </div>
-
-                    {/* Premium Plan */}
-                    <div className={`border rounded-lg p-6 relative ${isPremium ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-purple-500'}`}>
-                      <div className="text-center">
-                        <h3 className="text-xl font-semibold mb-2">Premium</h3>
-
-                        {/* Clear Pricing Display */}
-                        <div className="mb-4">
-                          <div className="text-lg font-semibold text-gray-600">Monthly: <span className="text-2xl font-bold text-gray-900">$9</span>/mo</div>
-                          <div className="text-lg font-semibold text-green-600 mt-1">Annual: <span className="text-2xl font-bold text-green-700">$7.20</span>/mo</div>
-                          <div className="text-sm text-green-600">(Billed annually - Save 20%)</div>
-                        </div>
-
-                        {isPremium && (
-                          <div className="mb-4 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                            Current Plan
-                          </div>
-                        )}
-
-                        <ul className="text-sm space-y-2 mb-6 text-left">
-                          <li>✓ Unlimited website analyses</li>
-                          <li>✓ Advanced insights & PDF reports</li>
-                          <li>✓ Email delivery</li>
-                          <li>✓ Schema analysis</li>
-                          <li>✓ Weekly monitoring</li>
-                          <li>✓ Priority support</li>
-                        </ul>
-
-                        {/* Action Button */}
-                        {!isPremium ? (
-                          <Link
-                            href="/pricing/subscribe"
-                            className="block w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-center transition-colors"
-                          >
-                            Upgrade to Premium
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/account"
-                            className="block w-full px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 font-medium text-center transition-colors"
-                          >
-                            Manage Subscription
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Management Links for Premium Users */}
-                  {isPremium && (
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-center">
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Manage your subscription
-                      </p>
-                      <div className="space-x-4">
-                        <Link href="/account" className="text-sm text-blue-600 hover:underline">
-                          Update billing
-                        </Link>
-                        <Link href="/account" className="text-sm text-blue-600 hover:underline">
-                          Switch to annual
-                        </Link>
-                        <Link href="/account" className="text-sm text-blue-600 hover:underline">
-                          Cancel subscription
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-
+                  />
                 </div>
               ) : (
                 <div className="text-center py-12">
