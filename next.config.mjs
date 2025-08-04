@@ -1,18 +1,36 @@
 /** @type {import('next').NextConfig} */
 
-// CSP configuration for Clerk security - SAFE VERSION
+// CSP configuration for Clerk security - UPDATED VERSION
 const CLERK_FRONTEND_API = 'https://clerk.llmcheck.app';
 const MAIN_API_DOMAIN = 'https://www.llmcheck.app';
 
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'production' ? '' : "'unsafe-eval'"
-  } ${CLERK_FRONTEND_API} https://challenges.cloudflare.com;
-  connect-src 'self' ${CLERK_FRONTEND_API} ${MAIN_API_DOMAIN};
-  img-src 'self' https://img.clerk.com data: blob:;
+  } ${CLERK_FRONTEND_API} 
+     https://challenges.cloudflare.com 
+     https://www.googletagmanager.com 
+     https://*.clerk.com 
+     https://*.clerk.dev;
+  connect-src 'self' 
+     ${CLERK_FRONTEND_API} 
+     ${MAIN_API_DOMAIN} 
+     https://*.clerk.com 
+     https://*.clerk.dev 
+     https://www.google-analytics.com 
+     https://api.clerk.com;
+  img-src 'self' 
+     https://img.clerk.com 
+     https://*.clerk.com 
+     https://www.googletagmanager.com 
+     https://www.google-analytics.com 
+     data: blob:;
   worker-src 'self' blob:;
   style-src 'self' 'unsafe-inline';
-  frame-src 'self' https://challenges.cloudflare.com;
+  frame-src 'self' 
+     https://challenges.cloudflare.com 
+     https://*.clerk.com 
+     https://*.clerk.dev;
   form-action 'self';
   font-src 'self' data:;
   media-src 'self';
@@ -26,8 +44,6 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-
-
 
   async headers() {
     return [
