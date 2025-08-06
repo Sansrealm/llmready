@@ -4,6 +4,13 @@ import { NextResponse } from 'next/server';
 import { verifyToken, clerkClient } from '@clerk/nextjs/server';
 
 export async function GET(request) {
+    // TEMPORARY DEBUG - Remove after fixing
+    console.log('🔍 Server environment check:', {
+        clerkPublishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.substring(0, 20) + '...',
+        hasSecretKey: !!process.env.CLERK_SECRET_KEY,
+        nodeEnv: process.env.NODE_ENV
+    });
+
     console.log('🔍 Extension subscription status API called');
 
     try {
@@ -19,7 +26,6 @@ export async function GET(request) {
                 debug: { authHeaderPresent: !!authHeader, authHeaderStart: authHeader?.substring(0, 10) }
             }, { status: 401 });
         }
-
         const token = authHeader.substring(7);
         console.log('🔑 Token extracted, length:', token.length);
 
