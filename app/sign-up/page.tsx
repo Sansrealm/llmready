@@ -131,7 +131,10 @@ export default function ExtensionSignUp() {
 
     const checkPremiumStatus = async (token: string) => {
         try {
-            const response = await fetch('https://www.llmcheck.app/api/subscription-status', {
+            console.log('🔍 Checking premium status for extension sync...');
+
+            // Use the same endpoint that the extension uses for consistency
+            const response = await fetch('https://www.llmcheck.app/api/extension-subscription-status', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -139,11 +142,14 @@ export default function ExtensionSignUp() {
 
             if (response.ok) {
                 const data = await response.json();
+                console.log('✅ Premium status check result:', data);
                 return data.isPremium || false;
+            } else {
+                console.warn('❌ Premium status check failed:', response.status);
+                return false;
             }
-            return false;
         } catch (error) {
-            console.warn('Failed to check premium status:', error);
+            console.warn('❌ Failed to check premium status:', error);
             return false;
         }
     };
