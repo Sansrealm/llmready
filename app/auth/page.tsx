@@ -21,7 +21,7 @@ export default function ExtensionAuth() {
 
     const initializeClerk = async () => {
         try {
-            const CLERK_PUBLISHABLE_KEY = 'pk_live_Y29tbXVuaWNhdGlvbi00NC05Mi5jbGVyay5hY2NvdW50cy5kZXYk';
+            const CLERK_PUBLISHABLE_KEY = 'pk_live_Y2xlcmsubGxtY2hlY2suYXBwJA';
 
             // Initialize Clerk
             const clerk = (window as any).Clerk;
