@@ -133,7 +133,6 @@ export default function ExtensionSignUp() {
         try {
             console.log('🔍 Checking premium status for extension sync...');
 
-            // Use the same endpoint that the extension uses for consistency
             const response = await fetch('https://www.llmcheck.app/api/extension-subscription-status', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
