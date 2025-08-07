@@ -76,8 +76,9 @@ export default function ExtensionSignUp() {
     const handleSuccessfulAuth = async (clerk: any) => {
         try {
             // Get auth token
-            const token = await clerk.session.getToken();
-
+            const token = await clerk.session.getToken({
+                template: 'extension-auth'
+            });
             // Get user info
             const user = clerk.user;
             const isPremium = await checkPremiumStatus(token);
