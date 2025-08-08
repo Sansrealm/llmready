@@ -4,9 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "scripts": {
-      "postinstall": "npx puppeteer browsers install chrome || echo 'Puppeteer installation failed'"
-    },
+    "postinstall": "npx puppeteer browsers install chrome || echo 'Puppeteer installation failed'",
     "start": "next start",
     "lint": "next lint"
   },

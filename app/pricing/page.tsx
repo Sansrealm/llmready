@@ -91,7 +91,7 @@ export default function PricingPage() {
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
                   Choose the plan that fits your needs. No hidden fees or surprises.
                 </p>
-                {/* Premium status indicator */}
+                {/* Premium status indicator - only for signed-in users */}
                 {isSignedIn && (
                   <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
                     <p className="text-sm">
@@ -106,40 +106,39 @@ export default function PricingPage() {
           </div>
         </section>
 
-
-
-        {/* Clerk Pricing Table */}
+        {/* Clerk Pricing Table - Now publicly accessible */}
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="mx-auto max-w-4xl">
-              {isSignedIn ? (
-                <div className="space-y-6">
-                  <div className="text-center">
-                    <h2 className="text-2xl font-bold mb-4">Choose Your Plan</h2>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Upgrade to Premium for advanced LLM optimization features
-                    </p>
-                  </div>
-
-                  {/* Clerk's built-in PricingTable component */}
-                  <PricingTable
-
-                  />
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold mb-4">Sign In to View Plans</h2>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Please sign in to access our subscription plans
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold mb-4">Choose Your Plan</h2>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Upgrade to Premium for advanced LLM optimization features
                   </p>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                  >
-                    Sign In
-                  </Link>
                 </div>
-              )}
+
+                {/* Clerk's built-in PricingTable component - now public */}
+                <PricingTable />
+
+                {/* Sign-in prompt for non-authenticated users */}
+                {!isSignedIn && (
+                  <div className="text-center mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-2">
+                      Ready to get started?
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Sign in to subscribe and start optimizing your website for AI
+                    </p>
+                    <Link
+                      href="/auth"
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-6 py-2"
+                    >
+                      Sign In to Subscribe
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -211,14 +210,9 @@ export default function PricingPage() {
                     <td className="py-4 text-center">✓</td>
                   </tr>
                   <tr className="border-b">
-                    <td className="py-4">Number of URLs</td>
-                    <td className="py-4 text-center">3</td>
+                    <td className="py-4">Number of Analyses</td>
+                    <td className="py-4 text-center">Limited</td>
                     <td className="py-4 text-center">Unlimited</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-4">PDF Reports</td>
-                    <td className="py-4 text-center">-</td>
-                    <td className="py-4 text-center">✓</td>
                   </tr>
                 </tbody>
               </table>
@@ -231,11 +225,9 @@ export default function PricingPage() {
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                  Frequently Asked Questions
-                </h2>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Frequently Asked Questions</h2>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed dark:text-gray-400">
-                  Everything you need to know about our service
+                  Got questions? We've got answers.
                 </p>
               </div>
             </div>
@@ -244,17 +236,17 @@ export default function PricingPage() {
                 <AccordionItem value="item-1">
                   <AccordionTrigger>What is LLM readiness?</AccordionTrigger>
                   <AccordionContent>
-                    LLM readiness refers to how well your website is optimized for Large Language Models like those
-                    powering AI search engines and assistants. It includes factors like content quality, metadata,
-                    schema markup, and structure that help AI systems understand and properly represent your content.
+                    LLM readiness refers to how well your website's content and structure can be understood and processed
+                    by Large Language Models like ChatGPT, Claude, and others. A website with high LLM readiness will have
+                    better visibility and more accurate representation when AI systems analyze or reference your content.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-2">
-                  <AccordionTrigger>Why does LLM readiness matter?</AccordionTrigger>
+                  <AccordionTrigger>How does the analysis work?</AccordionTrigger>
                   <AccordionContent>
-                    As AI-powered search becomes more prevalent, websites optimized for LLMs will have better visibility
-                    and representation in search results and AI assistants. This can lead to increased traffic, better
-                    user engagement, and improved conversion rates.
+                    Our analysis examines various aspects of your website including content structure, metadata, mobile
+                    responsiveness, and technical SEO factors. We use advanced algorithms to simulate how LLMs would
+                    interpret and extract information from your site, providing you with actionable recommendations.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-3">
@@ -299,18 +291,16 @@ export default function PricingPage() {
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
                 <Link
                   href="/"
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white text-blue-600 hover:bg-blue-50 h-11 px-8"
+                  className="inline-flex h-10 items-center justify-center rounded-md bg-white px-8 text-sm font-medium text-blue-600 shadow transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                 >
                   Try Free Analysis
                 </Link>
-                {!isSignedIn && (
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-800 text-white hover:bg-blue-700 h-11 px-8"
-                  >
-                    Get Premium
-                  </Link>
-                )}
+                <Link
+                  href={isSignedIn ? "#" : "/auth"}
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-white bg-transparent px-8 text-sm font-medium text-white shadow-sm transition-colors hover:bg-white hover:text-blue-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {isSignedIn ? "Manage Subscription" : "Sign Up for Premium"}
+                </Link>
               </div>
             </div>
           </div>
