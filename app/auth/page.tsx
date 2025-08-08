@@ -19,7 +19,7 @@ export default function ExtensionAuth() {
         };
     }, []);
 
-    const checkPremiumStatus = async (token) => {
+    const checkPremiumStatus = async (token: string) => {
         try {
             const response = await fetch('/api/extension-subscription-status', {
                 method: 'GET',
