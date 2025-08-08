@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-// CSP configuration for Clerk security - UPDATED VERSION
+// CSP configuration for Clerk security - UPDATED VERSION with better analytics support
 const CLERK_FRONTEND_API = 'https://clerk.llmcheck.app';
 const MAIN_API_DOMAIN = 'https://www.llmcheck.app';
 
@@ -10,6 +10,8 @@ const cspHeader = `
   } ${CLERK_FRONTEND_API} 
      https://challenges.cloudflare.com 
      https://www.googletagmanager.com 
+     https://www.google-analytics.com
+     https://analytics.google.com
      https://*.clerk.com 
      https://*.clerk.dev;
   connect-src 'self' 
@@ -18,12 +20,15 @@ const cspHeader = `
      https://*.clerk.com 
      https://*.clerk.dev 
      https://www.google-analytics.com 
+     https://analytics.google.com
+     https://stats.g.doubleclick.net
      https://api.clerk.com;
   img-src 'self' 
      https://img.clerk.com 
      https://*.clerk.com 
      https://www.googletagmanager.com 
      https://www.google-analytics.com 
+     https://analytics.google.com
      data: blob:;
   worker-src 'self' blob:;
   style-src 'self' 'unsafe-inline';
@@ -76,6 +81,53 @@ const nextConfig = {
             value: 'camera=(), microphone=(), geolocation=()',
           }
         ],
+      },
+      {
+        // Special headers for auth pages to ensure proper OTP flow
+        source: '/auth',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate'
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache'
+          },
+          {
+            key: 'Expires',
+            value: '0'
+          }
+        ],
+      },
+      {
+        // Special headers for sign-up page
+        source: '/sign-up',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate'
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache'
+          },
+          {
+            key: 'Expires',
+            value: '0'
+          }
+        ],
+      }
+    ];
+  },
+
+  async redirects() {
+    return [
+      // Redirect old login routes to new auth page
+      {
+        source: '/login',
+        destination: '/auth',
+        permanent: true,
       },
     ];
   },

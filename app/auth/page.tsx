@@ -19,6 +19,29 @@ export default function ExtensionAuth() {
         };
     }, []);
 
+    const checkPremiumStatus = async (token) => {
+        try {
+            const response = await fetch('/api/extension-subscription-status', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                console.warn('Premium status check failed:', response.status);
+                return false;
+            }
+
+            const data = await response.json();
+            return data.isPremium || false;
+        } catch (error) {
+            console.error('Premium status check error:', error);
+            return false;
+        }
+    };
+
     const initializeClerk = async () => {
         try {
             const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -35,18 +58,23 @@ export default function ExtensionAuth() {
                 return;
             }
 
-            // Mount sign-in component with proper sign-up navigation
+            // Mount sign-in component with updated props (no deprecated ones)
             const signInDiv = document.getElementById('clerk-sign-in');
             if (signInDiv) {
                 clerk.mountSignIn(signInDiv, {
                     routing: 'virtual',
-                    afterSignInUrl: window.location.href,
-                    signUpUrl: '/sign-up', // Navigate to sign-up page
+                    // Use new redirect props instead of deprecated ones
+                    fallbackRedirectUrl: window.location.href,
+                    signUpUrl: '/sign-up', // This is still valid for navigation
                     appearance: {
                         elements: {
                             rootBox: 'w-full flex justify-center',
                             card: 'w-full max-w-md'
                         }
+                    },
+                    // Ensure OTP flows work properly
+                    experimental: {
+                        useCachedCredentials: false
                     }
                 });
             }
@@ -68,18 +96,18 @@ export default function ExtensionAuth() {
             if (loadingEl) loadingEl.style.display = 'none';
             if (errorEl) {
                 errorEl.style.display = 'block';
-                errorEl.textContent = 'Failed to initialize authentication.';
+                errorEl.textContent = 'Failed to initialize authentication. Please refresh and try again.';
             }
         }
     };
 
     const handleSuccessfulAuth = async (clerk: any) => {
         try {
-            // 🎯 CRITICAL FIX: Get token with extension-auth template
+            // Get token with extension-auth template
             console.log('🔐 Getting session token with extension-auth template...');
 
             const token = await clerk.session.getToken({
-                template: 'extension-auth' // 🚀 Clerk JWT template
+                template: 'extension-auth'
             });
 
             if (!token) {
@@ -141,8 +169,6 @@ export default function ExtensionAuth() {
             if (signedInEl) signedInEl.style.display = 'block';
             if (successEl) successEl.style.display = 'block';
 
-            console.log('📤 Sending auth data to extension with extension-auth template token');
-
             // Send data to parent window (Chrome extension popup)
             if (window.opener) {
                 window.opener.postMessage({
@@ -165,57 +191,42 @@ export default function ExtensionAuth() {
             const errorEl = document.getElementById('error');
             if (errorEl) {
                 errorEl.style.display = 'block';
-                errorEl.textContent = 'Authentication succeeded but data sync failed.';
+                errorEl.textContent = 'Authentication succeeded but data sync failed. Please try refreshing.';
             }
-        }
-    };
-
-    const checkPremiumStatus = async (token: string) => {
-        try {
-            console.log('🔍 Checking premium status for extension sync...');
-
-            const response = await fetch('https://www.llmcheck.app/api/extension-subscription-status', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Premium status check result:', data);
-                return data.isPremium || false;
-            } else {
-                console.warn('❌ Premium status check failed:', response.status);
-                return false;
-            }
-        } catch (error) {
-            console.warn('❌ Failed to check premium status:', error);
-            return false;
         }
     };
 
     return (
         <div style={{
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             minHeight: '100vh',
-            background: '#f8fafc',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
             padding: '20px'
         }}>
             {/* Loading state - centered */}
             <div id="loading" style={{
-                color: '#6b7280',
+                color: 'white',
                 textAlign: 'center',
-                fontSize: '16px'
+                fontSize: '18px',
+                fontWeight: '500'
             }}>
-                Loading authentication...
+                <div style={{
+                    color: 'white',
+                    fontSize: '32px',
+                    fontWeight: 'bold',
+                    marginBottom: '20px'
+                }}>
+                    🔍 LLM Check
+                </div>
+                Initializing secure authentication...
             </div>
 
             {/* Success state - centered */}
             <div id="success" style={{
-                color: '#059669',
+                color: '#10b981',
                 textAlign: 'center',
                 padding: '20px',
                 background: 'white',
@@ -226,14 +237,17 @@ export default function ExtensionAuth() {
                 width: '100%'
             }}>
                 <div style={{
-                    color: '#059669',
+                    color: '#10b981',
                     fontSize: '24px',
                     fontWeight: 'bold',
                     marginBottom: '10px'
                 }}>
                     ✅ LLM Check
                 </div>
-                <p>Authentication successful! You can close this window.</p>
+                <p>Successfully authenticated!</p>
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                    You can close this window.
+                </p>
                 <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '10px' }}>
                     Session valid for 1 hour with extension-auth template
                 </p>
