@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-// CSP configuration for Clerk security - UPDATED VERSION with better analytics support
+// CSP configuration for Clerk + Stripe security - COMPLETE VERSION
 const CLERK_FRONTEND_API = 'https://clerk.llmcheck.app';
 const MAIN_API_DOMAIN = 'https://www.llmcheck.app';
 
@@ -13,7 +13,10 @@ const cspHeader = `
      https://www.google-analytics.com
      https://analytics.google.com
      https://*.clerk.com 
-     https://*.clerk.dev;
+     https://*.clerk.dev
+     https://js.stripe.com
+     https://*.stripe.com
+     https://checkout.stripe.com;
   connect-src 'self' 
      ${CLERK_FRONTEND_API} 
      ${MAIN_API_DOMAIN} 
@@ -22,21 +25,27 @@ const cspHeader = `
      https://www.google-analytics.com 
      https://analytics.google.com
      https://stats.g.doubleclick.net
-     https://api.clerk.com;
+     https://api.clerk.com
+     https://api.stripe.com
+     https://*.stripe.com
+     https://checkout.stripe.com;
   img-src 'self' 
      https://img.clerk.com 
      https://*.clerk.com 
      https://www.googletagmanager.com 
      https://www.google-analytics.com 
      https://analytics.google.com
+     https://*.stripe.com
      data: blob:;
   worker-src 'self' blob:;
   style-src 'self' 'unsafe-inline';
   frame-src 'self' 
      https://challenges.cloudflare.com 
      https://*.clerk.com 
-     https://*.clerk.dev;
-  form-action 'self';
+     https://*.clerk.dev
+     https://checkout.stripe.com
+     https://js.stripe.com;
+  form-action 'self' https://checkout.stripe.com;
   font-src 'self' data:;
   media-src 'self';
   object-src 'none';
@@ -115,6 +124,47 @@ const nextConfig = {
           {
             key: 'Expires',
             value: '0'
+          }
+        ],
+      },
+      {
+        // More relaxed CSP for pricing page to allow Stripe/Clerk integration
+        source: '/pricing',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: `
+              default-src 'self';
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' 
+                https://*.clerk.com 
+                https://*.clerk.dev 
+                https://js.stripe.com 
+                https://*.stripe.com 
+                https://checkout.stripe.com
+                ${CLERK_FRONTEND_API};
+              connect-src 'self' 
+                https://*.clerk.com 
+                https://*.clerk.dev 
+                https://api.stripe.com 
+                https://*.stripe.com 
+                https://checkout.stripe.com
+                ${CLERK_FRONTEND_API}
+                ${MAIN_API_DOMAIN};
+              frame-src 'self' 
+                https://*.clerk.com 
+                https://*.clerk.dev 
+                https://checkout.stripe.com 
+                https://js.stripe.com;
+              img-src 'self' 
+                https://*.clerk.com 
+                https://*.stripe.com 
+                data: blob:;
+              style-src 'self' 'unsafe-inline';
+              font-src 'self' data:;
+              form-action 'self' https://checkout.stripe.com;
+              object-src 'none';
+              base-uri 'self';
+            `.replace(/\s{2,}/g, ' ').trim(),
           }
         ],
       }
