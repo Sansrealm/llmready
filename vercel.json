@@ -3,5 +3,32 @@
         "env": {
             "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
         }
-    }
+    },
+    "rewrites": [
+        {
+            "source": "/ads.txt",
+            "destination": "/ads.txt",
+            "has": [
+                {
+                    "type": "host",
+                    "value": "llmcheck.app"
+                }
+            ]
+        }
+    ],
+    "headers": [
+        {
+            "source": "/ads.txt",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "text/plain; charset=utf-8"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=300"
+                }
+            ]
+        }
+    ]
 }
