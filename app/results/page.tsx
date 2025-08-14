@@ -1,7 +1,7 @@
-// RESULTS - Updated with PDF download functionality
+// app/results/page.tsx - Complete file with content validation for ads
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +31,7 @@ type AnalysisResult = {
     remainingAnalyses?: number;
 };
 
-// Updated premium check that uses server-side API (same as pricing page)
+// Premium check that uses server-side API
 function useIsPremium() {
     const { user, isLoaded } = useUser();
     const [isPremium, setIsPremium] = useState(false);
@@ -100,8 +100,52 @@ export default function ResultsPage() {
     const [pdfSuccess, setPdfSuccess] = useState<string | null>(null);
     const [pdfError, setPdfError] = useState<string | null>(null);
 
-    // Use the same server-side subscription check as pricing page
+    // Use the server-side subscription check
     const { isPremium, isLoading: premiumLoading, debug, refresh } = useIsPremium();
+
+    // 🔹 NEW: Content validation for ads
+    const hasEnoughContent = useMemo(() => {
+        if (!analysisResult) return false;
+
+        // Check for minimum content requirements
+        const hasValidScore = typeof analysisResult.overall_score === 'number';
+        const hasParameters = analysisResult.parameters && analysisResult.parameters.length >= 3;
+        const hasRecommendations = analysisResult.recommendations && analysisResult.recommendations.length >= 2;
+
+        // Check for substantial text content in parameters
+        const hasSubstantialParameters = analysisResult.parameters?.some(param =>
+            param.description && param.description.length > 50
+        );
+
+        // Check for substantial text content in recommendations  
+        const hasSubstantialRecommendations = analysisResult.recommendations?.some(rec =>
+            rec.description && rec.description.length > 100
+        );
+
+        // Minimum content threshold
+        const meetsMinimumThreshold = hasValidScore && hasParameters && hasRecommendations &&
+            hasSubstantialParameters && hasSubstantialRecommendations;
+
+        console.log('📊 Content validation:', {
+            hasValidScore,
+            hasParameters,
+            hasRecommendations,
+            hasSubstantialParameters,
+            hasSubstantialRecommendations,
+            meetsMinimumThreshold
+        });
+
+        return meetsMinimumThreshold;
+    }, [analysisResult]);
+
+    // 🔹 NEW: Comprehensive ad display validation
+    const shouldShowAds = useMemo(() => {
+        return !isPremium && // Not premium user
+            !loading && // Not in loading state
+            !error && // No error occurred
+            analysisResult && // Has analysis results
+            hasEnoughContent; // Has substantial content
+    }, [isPremium, loading, error, analysisResult, hasEnoughContent]);
 
     useEffect(() => {
         async function fetchAnalysis() {
@@ -147,8 +191,6 @@ export default function ResultsPage() {
     };
 
     // PDF generation function
-    // TypeScript-safe version of the generatePdfReport function
-
     const generatePdfReport = async () => {
         if (!isSignedIn) {
             router.push('/login');
@@ -160,19 +202,12 @@ export default function ResultsPage() {
             return;
         }
 
-        if (!analysisResult || !url) {
-            setPdfError('Missing analysis data for PDF generation');
-            return;
-        }
-
         try {
             setPdfGenerating(true);
             setPdfError(null);
             setPdfSuccess(null);
 
-            console.log('🔄 Starting PDF/HTML report generation...');
-
-            const response = await fetch('/api/generate-pdf', {
+            const response = await fetch('/api/generate-report', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -180,51 +215,27 @@ export default function ResultsPage() {
                 body: JSON.stringify({
                     analysisResult,
                     url,
-                    email: email || user?.emailAddresses?.[0]?.emailAddress,
+                    email,
+                    industry
                 }),
             });
 
             if (!response.ok) {
-                // Try to get error message from JSON response
-                try {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to generate report');
-                } catch (jsonError) {
-                    throw new Error(`Report generation failed (${response.status})`);
-                }
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate report');
             }
 
-            console.log('✅ Report generated successfully');
-
-            // Get the filename from response headers
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'llm-readiness-report.html';
-
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            // Get the HTML content as blob
             const blob = await response.blob();
-
-            // Create download link and trigger download
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = downloadUrl;
-            link.download = filename;
-
-            // Append to body, click, and cleanup
+            link.download = `llm-analysis-report-${new Date().getTime()}.html`;
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
-
-            // Cleanup the URL object
+            link.remove();
             window.URL.revokeObjectURL(downloadUrl);
 
-            setPdfSuccess('Report downloaded successfully! Open the HTML file and press Ctrl+P to save as PDF.');
+            setPdfSuccess('Report downloaded successfully! You can save it as PDF by opening the HTML file and pressing Ctrl+P to save as PDF.');
 
             // Clear success message after 8 seconds
             setTimeout(() => setPdfSuccess(null), 8000);
@@ -291,66 +302,44 @@ export default function ResultsPage() {
                         <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                             <p className="text-sm">
                                 Account Status: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
-                                    {isPremium ? 'Premium ✅' : 'Free'}
+                                    {isPremium ? 'Premium' : 'Free'}
                                 </span>
+                                {!isPremium && (
+                                    <span className="ml-2">
+                                        - <Link href="/pricing" className="text-blue-600 hover:underline">Upgrade for full features</Link>
+                                    </span>
+                                )}
                             </p>
                         </div>
                     )}
 
-                    {/* PDF Success/Error Messages */}
+                    {/* Success/Error messages for PDF generation */}
                     {pdfSuccess && (
-                        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-                            <CheckCircle className="h-4 w-4" />
-                            <AlertTitle>Report Downloaded Successfully! 📄</AlertTitle>
-                            <AlertDescription>
-                                <div className="mt-2">
-                                    <p className="font-semibold">To convert to PDF:</p>
-                                    <ol className="list-decimal list-inside mt-1 space-y-1 text-sm">
-                                        <li>Open the downloaded HTML file in your browser</li>
-                                        <li>Press <kbd className="px-2 py-1 bg-gray-200 rounded text-xs font-mono">Ctrl+P</kbd> (Windows) or <kbd className="px-2 py-1 bg-gray-200 rounded text-xs font-mono">Cmd+P</kbd> (Mac)</li>
-                                        <li>Select "Save as PDF" or "Microsoft Print to PDF"</li>
-                                        <li>Click "Save" to get your PDF report</li>
-                                    </ol>
-                                </div>
+                        <Alert className="mb-6 border-green-200 bg-green-50">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <AlertTitle className="text-green-800">Report Generated Successfully!</AlertTitle>
+                            <AlertDescription className="text-green-700">
+                                {pdfSuccess}
                             </AlertDescription>
                         </Alert>
                     )}
 
                     {pdfError && (
-                        <Alert variant="destructive" className="mb-4">
+                        <Alert variant="destructive" className="mb-6">
                             <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Report Generation Error</AlertTitle>
+                            <AlertTitle>Report Generation Failed</AlertTitle>
                             <AlertDescription>{pdfError}</AlertDescription>
                         </Alert>
                     )}
 
-                    {/* Debug info for testing */}
-                    {isSignedIn && process.env.NODE_ENV === 'development' && (
-                        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-left text-xs">
-                            <h3 className="font-bold mb-2">🔍 Server-Side Subscription Check:</h3>
-                            <div className="space-y-2">
-                                <div><strong>User ID:</strong> {user?.id}</div>
-                                <div><strong>Email:</strong> {user?.emailAddresses?.[0]?.emailAddress}</div>
-                                <div><strong>Premium Status:</strong> <span className={isPremium ? 'text-green-600' : 'text-red-600'}>{isPremium ? '✅ Premium' : '❌ Free'}</span></div>
-                                <div className="mt-2">
-                                    <strong>Server-Side Debug:</strong>
-                                    <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-32">
-                                        {JSON.stringify(debug, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Remaining analyses notice for free users */}
+                    {/* Remaining analyses for free users */}
                     {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
-                        <div className="mb-6 p-4 bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 rounded-lg">
-                            <p>
-                                You have <strong>{analysisResult.remainingAnalyses}</strong> analyses remaining in your free plan.{' '}
-                                <Link href="/pricing" className="underline font-medium">
+                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <p className="text-blue-700 dark:text-blue-300 text-sm">
+                                You have <strong>{analysisResult.remainingAnalyses}</strong> free analyses remaining this month.
+                                <Link href="/pricing" className="ml-2 text-blue-600 hover:text-blue-800 font-medium">
                                     Upgrade to Premium
-                                </Link>{' '}
-                                for unlimited analyses.
+                                </Link> for unlimited analyses.
                             </p>
                         </div>
                     )}
@@ -363,7 +352,7 @@ export default function ResultsPage() {
                         </Alert>
                     ) : analysisResult ? (
                         <div className="space-y-8">
-                            {/* Overall Score */}
+                            {/* Overall Score Section */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
                                 <h2 className="text-2xl font-bold mb-4">Overall LLM Readiness Score</h2>
                                 <div className="flex items-center space-x-4">
@@ -378,8 +367,6 @@ export default function ResultsPage() {
                                         style={{ width: `${analysisResult.overall_score}%` }}
                                     ></div>
                                 </div>
-                                {/* ⭐️ Ad Placement - Only show for non-premium users */}
-                                +                   {!isPremium && <AdComponent adSlot="7142437859" />}
 
                                 {/* Premium features buttons */}
                                 <div className="mt-6 flex flex-wrap gap-4">
@@ -393,68 +380,60 @@ export default function ResultsPage() {
                                         ) : (
                                             <Download className="mr-2 h-4 w-4" />
                                         )}
-                                        {pdfGenerating ? 'Generating PDF...' : 'Download PDF Report'}
-                                        {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
+                                        {pdfGenerating ? 'Generating...' : 'Download Report'}
                                     </Button>
 
-                                    {email && (
-                                        <Button
-                                            variant="outline"
-                                            onClick={sendEmailReport}
-                                            disabled={!isSignedIn || !isPremium}
-                                            className={!isSignedIn || !isPremium ? "opacity-70" : ""}
-                                        >
-                                            <Mail className="mr-2 h-4 w-4" />
-                                            Send Report to Email
-                                            {(!isSignedIn || !isPremium) && <span className="ml-2 text-xs">(Premium)</span>}
-                                        </Button>
+                                    <Button
+                                        onClick={sendEmailReport}
+                                        disabled={!isSignedIn || !isPremium || !email}
+                                        className={!isSignedIn || !isPremium ? "opacity-70" : ""}
+                                    >
+                                        <Mail className="mr-2 h-4 w-4" />
+                                        Email Report
+                                    </Button>
+
+                                    {!isSignedIn && (
+                                        <Link href="/login">
+                                            <Button variant="outline">
+                                                Sign In for Premium Features
+                                            </Button>
+                                        </Link>
                                     )}
 
-                                    {!isSignedIn ? (
-                                        <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
-                                            <Link href="/login">Sign in for Premium Features</Link>
-                                        </Button>
-                                    ) : !isPremium && (
-                                        <Button asChild className="bg-gradient-to-r from-blue-600 to-green-500">
-                                            <Link href="/pricing">Upgrade to Premium</Link>
-                                        </Button>
+                                    {isSignedIn && !isPremium && (
+                                        <Link href="/pricing">
+                                            <Button variant="outline">
+                                                Upgrade to Premium
+                                            </Button>
+                                        </Link>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Parameters */}
-                            <div>
-                                <h2 className="text-2xl font-bold mb-4">Analysis Parameters</h2>
-                                <div className="grid gap-4 md:grid-cols-2">
+                            {/* Parameters Section - SUBSTANTIAL CONTENT */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <h2 className="text-2xl font-bold mb-6">Detailed Analysis Parameters</h2>
+                                <div className="grid gap-6 md:grid-cols-2">
                                     {analysisResult.parameters.map((param, index) => (
-                                        <div key={index} className="bg-white dark:bg-gray-950 rounded-lg border p-4">
+                                        <div key={index} className="p-4 border rounded-lg">
                                             <div className="flex justify-between items-center mb-2">
-                                                <h3 className="text-lg font-medium">{param.name}</h3>
-                                                <span className="text-lg font-bold">{param.score}/100</span>
+                                                <h3 className="font-semibold">{param.name}</h3>
+                                                <div className="text-lg font-bold text-blue-600">
+                                                    {param.score}/100
+                                                </div>
                                             </div>
                                             <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                                                 <div
-                                                    className="bg-green-600 h-2 rounded-full"
+                                                    className="bg-blue-600 h-2 rounded-full"
                                                     style={{ width: `${param.score}%` }}
                                                 ></div>
                                             </div>
-                                            <p className={`text-sm ${param.isPremium && (!isSignedIn || !isPremium) ? "blur-sm" : ""}`}>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                                 {param.description}
                                             </p>
-                                            {param.isPremium && (!isSignedIn || !isPremium) && (
-                                                <div className="mt-2 text-center">
-                                                    <p className="text-sm text-gray-500">
-                                                        {!isSignedIn ? (
-                                                            <Link href="/login" className="text-blue-500 hover:underline">
-                                                                Sign in
-                                                            </Link>
-                                                        ) : (
-                                                            <Link href="/pricing" className="text-blue-500 hover:underline">
-                                                                Upgrade to premium
-                                                            </Link>
-                                                        )}{" "}
-                                                        for full insights
-                                                    </p>
+                                            {param.isPremium && !isPremium && (
+                                                <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
+                                                    🔒 Premium feature - upgrade for detailed insights
                                                 </div>
                                             )}
                                         </div>
@@ -462,119 +441,162 @@ export default function ResultsPage() {
                                 </div>
                             </div>
 
-                            {/* Recommendations */}
-                            <div className="relative">
-                                <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+                            {/* 🔹 CONDITIONAL AD PLACEMENT - After substantial content */}
+                            {shouldShowAds && (
+                                <div className="my-8">
+                                    <AdComponent adSlot="7142437859" />
+                                </div>
+                            )}
 
-                                {/* Mask overlay for non-signed-in users */}
-                                {!isSignedIn && (
-                                    <div className="absolute inset-0 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                                        <div className="text-center p-8 max-w-md">
-                                            <div className="mb-4">
-                                                <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                </svg>
+                            {/* 🔹 DEBUG INFO - Development only */}
+                            {process.env.NODE_ENV === 'development' && !shouldShowAds && (
+                                <div className="my-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm text-yellow-700">
+                                        🚫 <strong>Ads Hidden (Dev Mode)</strong> - Reasons:
+                                        {isPremium && ' Premium user,'}
+                                        {loading && ' Loading,'}
+                                        {error && ' Error state,'}
+                                        {!analysisResult && ' No results,'}
+                                        {!hasEnoughContent && ' Insufficient content'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Recommendations Section - MORE SUBSTANTIAL CONTENT */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <h2 className="text-2xl font-bold mb-6">Recommendations for Improvement</h2>
+                                <div className="space-y-6">
+                                    {analysisResult.recommendations.map((rec, index) => (
+                                        <div key={index} className="p-4 border rounded-lg">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="font-semibold text-lg">{rec.title}</h3>
+                                                <div className="flex gap-2">
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${rec.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                                                            rec.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-red-100 text-red-800'
+                                                        }`}>
+                                                        {rec.difficulty}
+                                                    </span>
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${rec.impact === 'High' ? 'bg-blue-100 text-blue-800' :
+                                                            rec.impact === 'Medium' ? 'bg-purple-100 text-purple-800' :
+                                                                'bg-gray-100 text-gray-800'
+                                                        }`}>
+                                                        {rec.impact} Impact
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
-                                                Unlock Detailed Recommendations
-                                            </h3>
-                                            <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                                Sign in to access personalized recommendations and insights to improve your website's LLM readiness.
+                                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                                                {rec.description}
                                             </p>
-                                            <Button asChild className="w-full">
-                                                <Link href="/login">Sign In to View Recommendations</Link>
-                                            </Button>
+                                            {rec.isPremium && !isPremium && (
+                                                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
+                                                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                                                        🔒 <strong>Premium Insight:</strong> Upgrade to access detailed implementation guides and advanced recommendations.
+                                                    </p>
+                                                    <Link href="/pricing" className="text-orange-600 hover:text-orange-800 text-sm font-medium">
+                                                        View Premium Plans →
+                                                    </Link>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Next Steps Section - ADDITIONAL CONTENT */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <h2 className="text-2xl font-bold mb-4">Next Steps</h2>
+                                <div className="space-y-4">
+                                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                                        Based on your analysis results, here are the recommended next steps to improve your website's LLM readiness and ensure better visibility in AI-powered search engines:
+                                    </p>
+                                    <ol className="list-decimal list-inside space-y-3 text-gray-600 dark:text-gray-400">
+                                        <li className="leading-relaxed">
+                                            <strong>Prioritize High-Impact Changes:</strong> Focus on recommendations marked as "High Impact" first, as these will provide the most significant improvements to your LLM readiness score.
+                                        </li>
+                                        <li className="leading-relaxed">
+                                            <strong>Implement Easy Fixes:</strong> Start with "Easy" difficulty recommendations to see immediate improvements without major development work.
+                                        </li>
+                                        <li className="leading-relaxed">
+                                            <strong>Enhance Content Structure:</strong> Improve your HTML semantic markup, add clear headings, and ensure your content follows a logical hierarchy that AI models can easily understand.
+                                        </li>
+                                        <li className="leading-relaxed">
+                                            <strong>Optimize Metadata:</strong> Update your title tags, meta descriptions, and schema markup to provide clear signals about your content's purpose and relevance.
+                                        </li>
+                                        <li className="leading-relaxed">
+                                            <strong>Re-analyze and Monitor:</strong> After implementing changes, run another analysis to measure improvements and track your progress over time.
+                                        </li>
+                                    </ol>
+
+                                    <div className="mt-6 grid gap-4 md:grid-cols-2">
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                            <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                                                💡 Pro Tip: Content Quality
+                                            </h4>
+                                            <p className="text-blue-600 dark:text-blue-400 text-sm">
+                                                Focus on creating comprehensive, well-structured content that directly answers user questions. AI models prioritize content that provides clear, factual information with proper citations and context.
+                                            </p>
+                                        </div>
+
+                                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                                                🎯 Quick Win: Technical SEO
+                                            </h4>
+                                            <p className="text-green-600 dark:text-green-400 text-sm">
+                                                Ensure your website loads quickly, is mobile-friendly, and has clean, semantic HTML structure. These technical factors significantly impact how AI models crawl and understand your content.
+                                            </p>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Recommendations content - blurred when not signed in */}
-                                <div className={`space-y-4 ${!isSignedIn ? 'blur-sm pointer-events-none' : ''}`}>
-                                    {analysisResult.recommendations.map((rec, index) => (
-                                        <div key={index} className="bg-white dark:bg-gray-950 rounded-lg border p-4">
-                                            <h3 className="text-lg font-medium mb-2">{rec.title}</h3>
-                                            <div className="flex gap-2 mb-2">
-                                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                                                    Difficulty: {rec.difficulty}
-                                                </span>
-                                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                                                    Impact: {rec.impact}
-                                                </span>
-                                            </div>
-                                            <p className={`text-sm ${rec.isPremium && isSignedIn && !isPremium ? "blur-sm" : ""}`}>
-                                                {rec.description}
-                                            </p>
-                                            {/* Premium upgrade message for signed-in non-premium users */}
-                                            {rec.isPremium && isSignedIn && !isPremium && (
-                                                <div className="mt-2 text-center">
-                                                    <p className="text-sm text-gray-500">
-                                                        <Link href="/pricing" className="text-blue-500 hover:underline">
-                                                            Upgrade to premium
-                                                        </Link>{" "}
-                                                        for detailed recommendations
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
                                 </div>
                             </div>
-                            {/* <div>
-                                <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+
+                            {/* Learn More Section - EVEN MORE CONTENT */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <h2 className="text-2xl font-bold mb-4">Learn More About LLM Optimization</h2>
                                 <div className="space-y-4">
-                                    {analysisResult.recommendations.map((rec, index) => (
-                                        <div key={index} className="bg-white dark:bg-gray-950 rounded-lg border p-4">
-                                            <h3 className="text-lg font-medium mb-2">{rec.title}</h3>
-                                            <div className="flex gap-2 mb-2">
-                                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                                                    Difficulty: {rec.difficulty}
-                                                </span>
-                                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                                                    Impact: {rec.impact}
-                                                </span>
-                                            </div>
-                                            <p className={`text-sm ${rec.isPremium && (!isSignedIn || !isPremium) ? "blur-sm" : ""}`}>
-                                                {rec.description}
+                                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                                        Understanding how Large Language Models interact with web content is crucial for future-proofing your digital presence. As AI-powered search becomes more prevalent, websites optimized for LLM understanding will have significant advantages in discoverability and user engagement.
+                                    </p>
+
+                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <h4 className="font-semibold mb-2">Content Structure</h4>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                Learn how to organize your content with proper headings, sections, and semantic markup that AI models can easily parse and understand.
                                             </p>
-                                            {rec.isPremium && (!isSignedIn || !isPremium) && (
-                                                <div className="mt-2 text-center">
-                                                    <p className="text-sm text-gray-500">
-                                                        {!isSignedIn ? (
-                                                            <Link href="/login" className="text-blue-500 hover:underline">
-                                                                Sign in
-                                                            </Link>
-                                                        ) : (
-                                                            <Link href="/pricing" className="text-blue-500 hover:underline">
-                                                                Upgrade to premium
-                                                            </Link>
-                                                        )}{" "}
-                                                        for detailed recommendations
-                                                    </p>
-                                                </div>
-                                            )}
                                         </div>
-                                    ))}
+
+                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <h4 className="font-semibold mb-2">Semantic SEO</h4>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                Discover advanced techniques for creating content that aligns with how AI models interpret meaning, context, and relationships between topics.
+                                            </p>
+                                        </div>
+
+                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <h4 className="font-semibold mb-2">Technical Implementation</h4>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                Explore the technical aspects of LLM optimization, including schema markup, structured data, and performance considerations.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 text-center">
+                                        <Link href="/guide" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                                            Read Our Complete LLM Optimization Guide →
+                                        </Link>
+                                    </div>
                                 </div>
-                            </div> */}
-
-                            {/* Call to action */}
-                            <div className="mt-8 text-center">
-                                <Button asChild className="mr-4">
-                                    <Link href="/">Analyze Another Website</Link>
-                                </Button>
-
-                                {!isSignedIn ? (
-                                    <Button asChild variant="outline">
-                                        <Link href="/login">Sign in for Premium Features</Link>
-                                    </Button>
-                                ) : !isPremium && (
-                                    <Button asChild variant="outline">
-                                        <Link href="/pricing">View Premium Features</Link>
-                                    </Button>
-                                )}
                             </div>
                         </div>
-                    ) : null}
+                    ) : (
+                        <div className="space-y-4">
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-32 w-full" />
+                            <Skeleton className="h-32 w-full" />
+                            {/* No ads during loading */}
+                        </div>
+                    )}
                 </div>
             </main>
             <Footer />
