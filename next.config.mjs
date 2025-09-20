@@ -17,6 +17,7 @@ const cspHeader = `
      https://js.stripe.com
      https://*.stripe.com
      https://checkout.stripe.com;
+     https://pagead2.googlesyndication.com;
   connect-src 'self' 
      ${CLERK_FRONTEND_API} 
      ${MAIN_API_DOMAIN} 

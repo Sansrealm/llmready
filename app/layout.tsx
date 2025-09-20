@@ -20,12 +20,21 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://llmcheck.app",
     siteName: "LLM Ready Analyzer",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: "en_US",
   },
 
   twitter: {
     card: "summary_large_image",
     title: "LLM Ready Analyzer - Optimize Your Website for AI Search",
     description: "Free AI website analysis tool. Check if your website is ready for Large Language Models and AI search engines.",
+    images: ["/og-image.png"],
   },
 
   keywords: [
@@ -47,7 +56,7 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
-} // ← Added missing closing brace and removed the comma
+}
 
 export default function RootLayout({
   children,
@@ -78,6 +87,11 @@ export default function RootLayout({
           <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5740140678935322"
             crossOrigin="anonymous"></script>
 
+          <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+          <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+          <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+          <link rel="shortcut icon" href="/favicon.ico" />
         </head>
         <body className={`${inter.className} bg-background text-foreground`}>
           {/* Google Tag Manager (noscript) */}
