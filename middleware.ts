@@ -1,6 +1,11 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export default clerkMiddleware();
+export default clerkMiddleware({
+    // Added publicRoutes array for stripe to clerk communication on new subs
+    publicRoutes: [
+        "/api/webhooks/stripe",
+    ]
+});
 
 export const config = {
     matcher: [
