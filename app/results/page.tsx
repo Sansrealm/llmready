@@ -12,6 +12,7 @@ import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import AdComponent from '@/components/AdComponent';
+import ScoreHistoryWidget from '@/components/score-history-widget';
 
 type AnalysisResult = {
     overall_score: number;
@@ -409,6 +410,15 @@ export default function ResultsPage() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Score History Widget - PREMIUM ONLY */}
+                            {url && (
+                                <ScoreHistoryWidget
+                                    url={url}
+                                    isPremium={isPremium}
+                                    isLoading={premiumLoading}
+                                />
+                            )}
 
                             {/* Parameters Section - SUBSTANTIAL CONTENT */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">

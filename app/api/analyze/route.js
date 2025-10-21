@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { saveAnalysis } from '@/lib/db';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -124,6 +125,23 @@ export async function POST(request) {
     // Add remaining analyses count for free users
     if (userId && !isPremium) {
       analysisResult.remainingAnalyses = MAX_FREE_ANALYSES - (analysisCount + 1);
+    }
+
+    // Save analysis to database (only for authenticated users)
+    if (userId) {
+      try {
+        await saveAnalysis({
+          userId: userId,
+          url: url,
+          overallScore: analysisResult.overall_score,
+          parameters: analysisResult.parameters,
+        });
+        console.log('✅ Analysis saved to database');
+      } catch (dbError) {
+        // Log error but don't block user from getting results
+        console.error('❌ Failed to save analysis to database:', dbError);
+        // Continue - user still gets their analysis results
+      }
     }
 
     return NextResponse.json(analysisResult);
