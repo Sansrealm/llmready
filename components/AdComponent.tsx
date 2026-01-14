@@ -1,6 +1,7 @@
 // components/AdComponent.tsx - Enhanced with content validation
 
 import { useEffect, useState } from 'react';
+import { DebugInfo } from '@/lib/types';
 
 declare global {
     interface Window {
@@ -24,7 +25,7 @@ const AdComponent: React.FC<AdComponentProps> = ({
     requiresContent = true
 }) => {
     const [shouldRenderAd, setShouldRenderAd] = useState(false);
-    const [debugInfo, setDebugInfo] = useState<any>({});
+    const [debugInfo, setDebugInfo] = useState<DebugInfo>({});
 
     useEffect(() => {
         const validateContent = () => {
@@ -101,12 +102,12 @@ const AdComponent: React.FC<AdComponentProps> = ({
             <div className="my-4 p-3 bg-red-50 border border-red-200 rounded text-sm">
                 <strong>🚫 Ad Blocked (Dev Only):</strong>
                 <ul className="mt-2 text-xs space-y-1">
-                    <li>Words: {debugInfo.wordCount} (need 500+)</li>
-                    <li>Height: {debugInfo.bodyHeight}px (need {minContentHeight}+)</li>
-                    <li>Headings: {debugInfo.headings} (need 3+)</li>
-                    <li>Paragraphs: {debugInfo.paragraphs} (need 5+)</li>
-                    <li>Content Sections: {debugInfo.contentSections} (need 2+)</li>
-                    <li>Analysis Elements: {debugInfo.analysisElements} (need 2+)</li>
+                    <li>Words: {String(debugInfo.wordCount)} (need 500+)</li>
+                    <li>Height: {String(debugInfo.bodyHeight)}px (need {minContentHeight}+)</li>
+                    <li>Headings: {String(debugInfo.headings)} (need 3+)</li>
+                    <li>Paragraphs: {String(debugInfo.paragraphs)} (need 5+)</li>
+                    <li>Content Sections: {String(debugInfo.contentSections)} (need 2+)</li>
+                    <li>Analysis Elements: {String(debugInfo.analysisElements)} (need 2+)</li>
                 </ul>
             </div>
         ) : null;
@@ -128,7 +129,7 @@ const AdComponent: React.FC<AdComponentProps> = ({
 
             {process.env.NODE_ENV === 'development' && (
                 <div className="mt-2 text-xs text-gray-500">
-                    ✅ Ad rendered: {debugInfo.wordCount} words, {debugInfo.bodyHeight}px height
+                    ✅ Ad rendered: {String(debugInfo.wordCount)} words, {String(debugInfo.bodyHeight)}px height
                 </div>
             )}
         </div>

@@ -1,4 +1,5 @@
 import { sql } from '@vercel/postgres';
+import { SiteMetric, DbAnalysis, TrendData } from './types';
 
 /**
  * Normalizes a URL for consistent storage and querying
@@ -47,7 +48,7 @@ export async function saveAnalysis({
   userId: string;
   url: string;
   overallScore: number;
-  parameters: any[];
+  parameters: SiteMetric[];
 }) {
   const normalizedUrl = normalizeUrl(url);
 
@@ -75,7 +76,7 @@ export async function getAnalysisHistory({
   userId: string;
   url: string;
   limit?: number;
-}) {
+}): Promise<DbAnalysis[]> {
   const normalizedUrl = normalizeUrl(url);
 
   const result = await sql`
@@ -92,13 +93,13 @@ export async function getAnalysisHistory({
     LIMIT ${limit}
   `;
 
-  return result.rows;
+  return result.rows as DbAnalysis[];
 }
 
 /**
  * Calculates trend statistics for a URL's analysis history
  */
-export function calculateTrend(analyses: any[]) {
+export function calculateTrend(analyses: DbAnalysis[]): TrendData {
   if (analyses.length === 0) {
     return {
       trend: 'none',
@@ -113,7 +114,7 @@ export function calculateTrend(analyses: any[]) {
   const firstScore = analyses[analyses.length - 1].overall_score;
   const change = latestScore - firstScore;
 
-  let trend: 'improving' | 'declining' | 'stable';
+  let trend: TrendData['trend'];
   if (change > 5) {
     trend = 'improving';
   } else if (change < -5) {

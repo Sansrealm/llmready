@@ -13,31 +13,14 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import AdComponent from '@/components/AdComponent';
 import ScoreHistoryWidget from '@/components/score-history-widget';
-
-type AnalysisResult = {
-    overall_score: number;
-    parameters: Array<{
-        name: string;
-        score: number;
-        isPremium: boolean;
-        description: string;
-    }>;
-    recommendations: Array<{
-        title: string;
-        description: string;
-        difficulty: string;
-        impact: string;
-        isPremium: boolean;
-    }>;
-    remainingAnalyses?: number;
-};
+import { AnalysisResult, DebugInfo } from '@/lib/types';
 
 // Premium check that uses server-side API
 function useIsPremium() {
     const { user, isLoaded } = useUser();
     const [isPremium, setIsPremium] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [debug, setDebug] = useState<any>({});
+    const [debug, setDebug] = useState<DebugInfo>({});
 
     useEffect(() => {
         async function checkSubscriptionStatus() {
@@ -208,7 +191,7 @@ export default function ResultsPage() {
             setPdfError(null);
             setPdfSuccess(null);
 
-            const response = await fetch('/api/generate-report', {
+            const response = await fetch('/api/generate-pdf', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

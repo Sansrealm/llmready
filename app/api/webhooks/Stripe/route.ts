@@ -1,15 +1,16 @@
 // API route for handling Stripe webhooks
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
+import { findUserByStripeSubscription, findUserByStripeCustomer } from '@/lib/stripe-utils';
 
 // Initialize Stripe with the secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // Stripe webhook secret for verifying webhook events
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     console.log('Webhook event received');
 
     try {
@@ -30,9 +31,10 @@ export async function POST(request) {
             event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
             console.log('Webhook verified, event type:', event.type);
         } catch (err) {
-            console.error('Webhook signature verification failed:', err.message);
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            console.error('Webhook signature verification failed:', errorMessage);
             return NextResponse.json(
-                { error: `Webhook signature verification failed: ${err.message}` },
+                { error: `Webhook signature verification failed: ${errorMessage}` },
                 { status: 400 }
             );
         }
@@ -58,12 +60,13 @@ export async function POST(request) {
 
                     // Find user by email
                     try {
-                        const users = await clerkClient.users.getUserList({
+                        const client = await clerkClient();
+                        const response = await client.users.getUserList({
                             emailAddress: [userEmail],
                         });
 
-                        if (users.length > 0) {
-                            userId = users[0].id;
+                        if (response.data && response.data.length > 0) {
+                            userId = response.data[0].id;
                             console.log('Found user by email:', userId);
                         } else {
                             console.error('No user found with email:', userEmail);
@@ -95,12 +98,13 @@ export async function POST(request) {
 
                     // Find user by email
                     try {
-                        const users = await clerkClient.users.getUserList({
+                        const client = await clerkClient();
+                        const response = await client.users.getUserList({
                             emailAddress: [userEmail],
                         });
 
-                        if (users.length > 0) {
-                            userId = users[0].id;
+                        if (response.data && response.data.length > 0) {
+                            userId = response.data[0].id;
                             console.log('Found user by customer email:', userId);
                         } else {
                             console.error('No user found with customer email:', userEmail);
@@ -111,8 +115,9 @@ export async function POST(request) {
                         }
                     } catch (error) {
                         console.error('Error finding user by customer email:', error);
+                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                         return NextResponse.json(
-                            { error: 'Error finding user: ' + error.message },
+                            { error: 'Error finding user: ' + errorMessage },
                             { status: 500 }
                         );
                     }
@@ -130,7 +135,8 @@ export async function POST(request) {
 
                 // Update user metadata in Clerk to mark as premium
                 try {
-                    await clerkClient.users.updateUser(userId, {
+                    const client = await clerkClient();
+                    await client.users.updateUser(userId, {
                         publicMetadata: {
                             premiumUser: true,
                             subscriptionId: session.subscription,
@@ -142,8 +148,9 @@ export async function POST(request) {
                     console.log('User metadata updated successfully');
                 } catch (error) {
                     console.error('Error updating user metadata:', error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     return NextResponse.json(
-                        { error: 'Error updating user metadata: ' + error.message },
+                        { error: 'Error updating user metadata: ' + errorMessage },
                         { status: 500 }
                     );
                 }
@@ -156,71 +163,38 @@ export async function POST(request) {
 
                 // Find the user with this subscription ID
                 try {
-                    const users = await clerkClient.users.getUserList({
-                        query: JSON.stringify({
-                            publicMetadata: { subscriptionId: subscription.id },
-                        }),
-                    });
+                    // Try to find by subscription ID first
+                    let result = await findUserByStripeSubscription(subscription.id);
 
-                    if (users.length === 0) {
-                        console.error('No user found with subscription ID:', subscription.id);
+                    // Fallback to customer ID if not found
+                    if (!result.found && subscription.customer) {
+                        const customerId = typeof subscription.customer === 'string'
+                            ? subscription.customer
+                            : subscription.customer.id;
+                        result = await findUserByStripeCustomer(customerId);
+                    }
 
-                        // Try to find by customer ID as fallback
-                        const customerId = subscription.customer;
-                        if (customerId) {
-                            const usersByCustomer = await clerkClient.users.getUserList({
-                                query: JSON.stringify({
-                                    publicMetadata: { customerId: customerId },
-                                }),
-                            });
-
-                            if (usersByCustomer.length === 0) {
-                                console.error('No user found with customer ID:', customerId);
-                                return NextResponse.json(
-                                    { error: 'No user found with this subscription or customer ID' },
-                                    { status: 400 }
-                                );
-                            }
-
-                            const userId = usersByCustomer[0].id;
-                            console.log('Found user by customer ID:', userId);
-
-                            // Update user metadata based on subscription status
-                            const isActive =
-                                subscription.status === 'active' ||
-                                subscription.status === 'trialing';
-
-                            await clerkClient.users.updateUser(userId, {
-                                publicMetadata: {
-                                    premiumUser: isActive,
-                                    subscriptionStatus: subscription.status,
-                                    subscriptionId: subscription.id, // Update subscription ID
-                                    updatedAt: new Date().toISOString(),
-                                },
-                            });
-
-                            console.log('User subscription status updated by customer ID:', isActive);
-                            break;
-                        }
-
+                    // If still not found, return error
+                    if (!result.found) {
                         return NextResponse.json(
-                            { error: 'No user found with this subscription ID' },
+                            { error: 'No user found with this subscription or customer ID' },
                             { status: 400 }
                         );
                     }
 
-                    const userId = users[0].id;
-                    console.log('Found user with subscription:', userId);
+                    const userId = result.userId!;
 
                     // Update user metadata based on subscription status
                     const isActive =
                         subscription.status === 'active' ||
                         subscription.status === 'trialing';
 
-                    await clerkClient.users.updateUser(userId, {
+                    const client = await clerkClient();
+                    await client.users.updateUser(userId, {
                         publicMetadata: {
                             premiumUser: isActive,
                             subscriptionStatus: subscription.status,
+                            subscriptionId: subscription.id,
                             updatedAt: new Date().toISOString(),
                         },
                     });
@@ -228,8 +202,9 @@ export async function POST(request) {
                     console.log('User subscription status updated:', isActive);
                 } catch (error) {
                     console.error('Error updating subscription status:', error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     return NextResponse.json(
-                        { error: 'Error updating subscription status: ' + error.message },
+                        { error: 'Error updating subscription status: ' + errorMessage },
                         { status: 500 }
                     );
                 }
@@ -242,59 +217,30 @@ export async function POST(request) {
 
                 // Find the user with this subscription ID
                 try {
-                    const users = await clerkClient.users.getUserList({
-                        query: JSON.stringify({
-                            publicMetadata: { subscriptionId: subscription.id },
-                        }),
-                    });
+                    // Try to find by subscription ID first
+                    let result = await findUserByStripeSubscription(subscription.id);
 
-                    if (users.length === 0) {
-                        console.error('No user found with subscription ID:', subscription.id);
+                    // Fallback to customer ID if not found
+                    if (!result.found && subscription.customer) {
+                        const customerId = typeof subscription.customer === 'string'
+                            ? subscription.customer
+                            : subscription.customer.id;
+                        result = await findUserByStripeCustomer(customerId);
+                    }
 
-                        // Try to find by customer ID as fallback
-                        const customerId = subscription.customer;
-                        if (customerId) {
-                            const usersByCustomer = await clerkClient.users.getUserList({
-                                query: JSON.stringify({
-                                    publicMetadata: { customerId: customerId },
-                                }),
-                            });
-
-                            if (usersByCustomer.length === 0) {
-                                console.error('No user found with customer ID:', customerId);
-                                return NextResponse.json(
-                                    { error: 'No user found with this subscription or customer ID' },
-                                    { status: 400 }
-                                );
-                            }
-
-                            const userId = usersByCustomer[0].id;
-                            console.log('Found user by customer ID:', userId);
-
-                            // Update user metadata to remove premium status
-                            await clerkClient.users.updateUser(userId, {
-                                publicMetadata: {
-                                    premiumUser: false,
-                                    subscriptionStatus: 'canceled',
-                                    updatedAt: new Date().toISOString(),
-                                },
-                            });
-
-                            console.log('User premium status removed by customer ID');
-                            break;
-                        }
-
+                    // If still not found, return error
+                    if (!result.found) {
                         return NextResponse.json(
-                            { error: 'No user found with this subscription ID' },
+                            { error: 'No user found with this subscription or customer ID' },
                             { status: 400 }
                         );
                     }
 
-                    const userId = users[0].id;
-                    console.log('Found user with subscription:', userId);
+                    const userId = result.userId!;
 
                     // Update user metadata to remove premium status
-                    await clerkClient.users.updateUser(userId, {
+                    const client = await clerkClient();
+                    await client.users.updateUser(userId, {
                         publicMetadata: {
                             premiumUser: false,
                             subscriptionStatus: 'canceled',
@@ -305,8 +251,9 @@ export async function POST(request) {
                     console.log('User premium status removed');
                 } catch (error) {
                     console.error('Error removing premium status:', error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     return NextResponse.json(
-                        { error: 'Error removing premium status: ' + error.message },
+                        { error: 'Error removing premium status: ' + errorMessage },
                         { status: 500 }
                     );
                 }
@@ -320,8 +267,9 @@ export async function POST(request) {
         return NextResponse.json({ received: true });
     } catch (error) {
         console.error('Error processing webhook:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            { error: 'Webhook error: ' + error.message },
+            { error: 'Webhook error: ' + errorMessage },
             { status: 500 }
         );
     }

@@ -8,7 +8,7 @@ export async function GET() {
 
     try {
         // Test auth() function
-        const { userId, sessionId } = auth();
+        const { userId, sessionId } = await auth();
         console.log('auth() result:', { userId, sessionId });
 
         // Test currentUser() function

@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import { DebugInfo } from "@/lib/types";
 
 
 // Updated premium check that uses server-side API (same as pricing page)
@@ -24,11 +25,23 @@ function useIsPremium() {
   const { user, isLoaded } = useUser();
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [debug, setDebug] = useState<any>({});
+  const [debug, setDebug] = useState<DebugInfo>({});
+  // Step 2: Fix initial state flash - use null to indicate "not yet loaded"
+  const [canAnalyze, setCanAnalyze] = useState<boolean | null>(null);
+  const [remainingAnalyses, setRemainingAnalyses] = useState(0);
 
   useEffect(() => {
     async function checkSubscriptionStatus() {
-      if (!isLoaded || !user) {
+      // Step 1: Fetch immediately on mount, even for unauthenticated users
+      if (!isLoaded) {
+        return;
+      }
+
+      // For unauthenticated users, set defaults immediately
+      if (!user) {
+        setIsPremium(false);
+        setCanAnalyze(true); // Guests can analyze (handled separately)
+        setRemainingAnalyses(0);
         setIsLoading(false);
         return;
       }
@@ -41,12 +54,18 @@ function useIsPremium() {
 
         console.log('✅ Server response:', data);
 
+        // Step 1: Use server as source of truth - set ALL values from response
         setIsPremium(data.isPremium || false);
+        setCanAnalyze(data.canAnalyze); // Direct from server, no fallback
+        setRemainingAnalyses(data.remainingAnalyses || 0);
         setDebug(data.debug || {});
 
       } catch (error) {
         console.error('❌ Failed to check subscription status:', error);
+        // On error, assume they can't analyze (safe default)
         setIsPremium(false);
+        setCanAnalyze(false);
+        setRemainingAnalyses(0);
       } finally {
         setIsLoading(false);
       }
@@ -57,6 +76,8 @@ function useIsPremium() {
 
   return {
     isPremium,
+    canAnalyze,
+    remainingAnalyses,
     isLoading,
     debug,
     refresh: () => {
@@ -83,7 +104,7 @@ export default function Home() {
   const router = useRouter();
 
   // Use the same server-side subscription check as pricing page
-  const { isPremium, isLoading: premiumLoading, debug } = useIsPremium();
+  const { isPremium, canAnalyze, remainingAnalyses, isLoading: premiumLoading, debug } = useIsPremium();
 
   // Load guest usage count from localStorage
   useEffect(() => {
@@ -124,7 +145,7 @@ export default function Home() {
       processedUrl = "https://" + processedUrl;
     }
 
-    // For signed-in users, check if they're premium to determine limits
+    // Check limits for both guest and signed-in free users
     if (!isSignedIn) {
       if (analysisCount >= 1) {
         setShowLoginAlert(true);
@@ -139,6 +160,10 @@ export default function Home() {
       const newCount = analysisCount + 1;
       setAnalysisCount(newCount);
       localStorage.setItem("guestAnalysisCount", newCount.toString());
+    } else if (!isPremium && canAnalyze === false) {
+      // Step 3: Signed-in free user has reached limit (strict server check)
+      setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), 100);
+      return;
     }
 
     // Proceed to results
@@ -157,7 +182,11 @@ export default function Home() {
     }
   };
 
-  const isLimitReached = isLoaded && !isSignedIn && analysisCount >= 1;
+  // Step 3: Refine isLimitReached - strictly use server-returned values
+  const isLimitReached = isLoaded && (
+    (!isSignedIn && analysisCount >= 1) || // Guest limit (localStorage)
+    (isSignedIn && !isPremium && !premiumLoading && canAnalyze === false) // Free user limit (server)
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -258,9 +287,9 @@ export default function Home() {
                     </p>
                   )}
 
-                  {isSignedIn && !premiumLoading && !isPremium && (
+                  {isSignedIn && !premiumLoading && !isPremium && canAnalyze === true && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free plan users get limited analyses. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade to Premium</Link> for unlimited access.
+                      You have <strong>{remainingAnalyses}</strong> free analyses remaining. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade to Premium</Link> for 25 analyses per month.
                     </p>
                   )}
 
@@ -270,11 +299,21 @@ export default function Home() {
                     // </p>
                   )} */}
 
-                  <Button type="submit" disabled={!isLoaded || isSubmitting || isLimitReached || premiumLoading} className="w-full">
+                  <Button
+                    type="submit"
+                    disabled={
+                      !isLoaded ||
+                      isSubmitting ||
+                      isLimitReached ||
+                      premiumLoading ||
+                      (isSignedIn && canAnalyze === null) // Step 2: Disable while loading server state
+                    }
+                    className="w-full"
+                  >
                     {isSubmitting
                       ? "Analyzing..."
-                      : premiumLoading
-                        ? "Loading..."
+                      : premiumLoading || (isSignedIn && canAnalyze === null)
+                        ? "Loading..." // Step 2: Show loading until server confirms
                         : isLimitReached
                           ? "Analysis Limit Reached"
                           : "Analyze"}
@@ -283,10 +322,16 @@ export default function Home() {
                   {isLimitReached && (
                     <div className="mt-4 text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                       <p className="text-sm text-green-800 dark:text-green-300 font-medium">
-                        Want unlimited website checks?
+                        {isSignedIn && !isPremium
+                          ? "You've reached the maximum limit of analyses"
+                          : "Want unlimited website checks?"
+                        }
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Unlock full access to LLM readiness audits with premium
+                        {isSignedIn && !isPremium
+                          ? "Upgrade to premium for 25 analyses per month"
+                          : "Unlock full access to LLM readiness audits with premium"
+                        }
                       </p>
                       <Button
                         className="mt-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
@@ -297,8 +342,8 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Show upgrade CTA for signed-in free users */}
-                  {isSignedIn && !premiumLoading && !isPremium && (
+                  {/* Show upgrade CTA for signed-in free users (only when not at limit) */}
+                  {isSignedIn && !premiumLoading && !isPremium && canAnalyze === true && (
                     <div className="mt-4 text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                       <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
                         Premium Benefits Available
