@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
-import { saveAnalysis } from '@/lib/db';
+import { saveAnalysis, getAnalysisByUrl } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest } from '@/lib/types';
 
 // Initialize OpenAI client
@@ -26,6 +26,48 @@ export async function POST(request: NextRequest) {
     // Get request data
     const requestData = await request.json() as AnalysisRequest;
     const { url, email, industry } = requestData;
+
+    // Check for cached analysis if requested
+    const searchParams = request.nextUrl.searchParams;
+    const useCached = searchParams.get('cached') === 'true';
+
+    if (useCached && subscription.isAuthenticated && subscription.userId) {
+      try {
+        const cachedAnalysis = await getAnalysisByUrl(subscription.userId, url);
+
+        if (cachedAnalysis) {
+          const cacheAge = Date.now() - new Date(cachedAnalysis.analyzed_at).getTime();
+          const oneDayMs = 24 * 60 * 60 * 1000;
+
+          // Return cached analysis if less than 24 hours old
+          if (cacheAge < oneDayMs) {
+            console.log(`✅ Returning cached analysis (age: ${Math.floor(cacheAge / 1000 / 60)} minutes)`);
+
+            const analysisResult: AnalysisResult = {
+              overall_score: cachedAnalysis.overall_score,
+              parameters: cachedAnalysis.parameters,
+              recommendations: [], // Recommendations are generated fresh each time
+            };
+
+            // Add remaining count for free users
+            if (!subscription.isPremium) {
+              analysisResult.remainingAnalyses = subscription.remainingAnalyses;
+            }
+
+            return NextResponse.json({
+              ...analysisResult,
+              cached: true,
+              analyzed_at: cachedAnalysis.analyzed_at,
+            });
+          } else {
+            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), generating fresh`);
+          }
+        }
+      } catch (cacheError) {
+        // Log error but continue to fresh analysis
+        console.error('⚠️ Cache lookup failed, continuing with fresh analysis:', cacheError);
+      }
+    }
 
     // Check if authenticated user can analyze
     if (subscription.isAuthenticated && !subscription.canAnalyze) {

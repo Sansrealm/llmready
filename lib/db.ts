@@ -130,3 +130,56 @@ export function calculateTrend(analyses: DbAnalysis[]): TrendData {
     latestScore,
   };
 }
+
+/**
+ * Retrieves the most recent analysis for a specific user and URL
+ * Used for cache checking before generating new analysis
+ */
+export async function getAnalysisByUrl(
+  userId: string,
+  url: string
+): Promise<DbAnalysis | null> {
+  const normalizedUrl = normalizeUrl(url);
+
+  const result = await sql`
+    SELECT
+      id,
+      url,
+      normalized_url,
+      overall_score,
+      parameters,
+      analyzed_at,
+      created_at
+    FROM analyses
+    WHERE user_id = ${userId}
+      AND normalized_url = ${normalizedUrl}
+    ORDER BY analyzed_at DESC
+    LIMIT 1
+  `;
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Retrieves a specific analysis by its ID
+ * Used for fetching cached analysis results
+ */
+export async function getAnalysisById(
+  analysisId: string
+): Promise<DbAnalysis | null> {
+  const result = await sql`
+    SELECT
+      id,
+      url,
+      normalized_url,
+      overall_score,
+      parameters,
+      analyzed_at,
+      created_at
+    FROM analyses
+    WHERE id = ${analysisId}
+    LIMIT 1
+  `;
+
+  return result.rows[0] || null;
+}

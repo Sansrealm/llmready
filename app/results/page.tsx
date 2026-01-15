@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Download, Mail, RefreshCw, Loader2, CheckCircle } from "lucide-react";
@@ -74,10 +75,50 @@ export default function ResultsPage() {
     const email = searchParams.get("email");
     const industry = searchParams.get("industry");
 
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Use React Query for analysis data fetching with caching
+    const {
+        data: analysisResult,
+        isLoading: loading,
+        error: queryError,
+        refetch,
+    } = useQuery({
+        queryKey: ['analysis', url, user?.id],
+        queryFn: async () => {
+            if (!url) throw new Error('URL is required');
+
+            console.log('🔄 Fetching analysis (with cache check)...');
+
+            const response = await fetch("/api/analyze?cached=true", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    url,
+                    email,
+                    industry,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to analyze website");
+            }
+
+            const data = await response.json();
+            console.log('✅ Analysis fetched', data.cached ? '(from cache)' : '(fresh)');
+            return data as AnalysisResult;
+        },
+        enabled: !!url, // Only run query if URL exists
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 30 * 60 * 1000, // 30 minutes
+        retry: 1,
+    });
+
+    // Convert React Query error to string for compatibility with existing code
+    const error = queryError ? (queryError as Error).message : null;
 
     // PDF generation states
     const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -130,42 +171,6 @@ export default function ResultsPage() {
             analysisResult && // Has analysis results
             hasEnoughContent; // Has substantial content
     }, [isPremium, loading, error, analysisResult, hasEnoughContent]);
-
-    useEffect(() => {
-        async function fetchAnalysis() {
-            if (!url) return;
-
-            try {
-                setLoading(true);
-                const response = await fetch("/api/analyze", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        url,
-                        email,
-                        industry,
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || "Failed to analyze website");
-                }
-
-                const data = await response.json();
-                setAnalysisResult(data);
-            } catch (err: any) {
-                console.error("Analysis error:", err);
-                setError(err instanceof Error ? err.message : 'An unknown error occurred');
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchAnalysis();
-    }, [url, email, industry]);
 
     // Enhanced refresh function
     const refreshSession = async () => {
