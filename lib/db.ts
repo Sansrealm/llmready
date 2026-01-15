@@ -157,7 +157,7 @@ export async function getAnalysisByUrl(
     LIMIT 1
   `;
 
-  return result.rows[0] || null;
+  return (result.rows[0] as DbAnalysis) || null;
 }
 
 /**
@@ -181,5 +181,5 @@ export async function getAnalysisById(
     LIMIT 1
   `;
 
-  return result.rows[0] || null;
+  return (result.rows[0] as DbAnalysis) || null;
 }
