@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
 import { findUserByStripeSubscription, findUserByStripeCustomer } from '@/lib/stripe-utils';
+import { addToRetryQueue, type WebhookMetadata } from '@/lib/queue/webhook-retry';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -147,12 +148,19 @@ export async function POST(request: NextRequest) {
 
                     console.log('User metadata updated successfully');
                 } catch (error) {
-                    console.error('Error updating user metadata:', error);
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    return NextResponse.json(
-                        { error: 'Error updating user metadata: ' + errorMessage },
-                        { status: 500 }
-                    );
+                    console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
+
+                    // Add to retry queue
+                    addToRetryQueue(userId, {
+                        premiumUser: true,
+                        subscriptionId: session.subscription as string,
+                        customerId: session.customer as string,
+                        updatedAt: new Date().toISOString(),
+                    }, errorMessage);
+
+                    console.log(`➕ Added to retry queue: ${userId}`);
+                    // Continue processing - webhook will still return 200 to Stripe
                 }
                 break;
             }
@@ -189,17 +197,34 @@ export async function POST(request: NextRequest) {
                         subscription.status === 'active' ||
                         subscription.status === 'trialing';
 
-                    const client = await clerkClient();
-                    await client.users.updateUser(userId, {
-                        publicMetadata: {
+                    // Try to update Clerk metadata
+                    try {
+                        const client = await clerkClient();
+                        await client.users.updateUser(userId, {
+                            publicMetadata: {
+                                premiumUser: isActive,
+                                subscriptionStatus: subscription.status,
+                                subscriptionId: subscription.id,
+                                updatedAt: new Date().toISOString(),
+                            },
+                        });
+
+                        console.log('User subscription status updated:', isActive);
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                        console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
+
+                        // Add to retry queue
+                        addToRetryQueue(userId, {
                             premiumUser: isActive,
                             subscriptionStatus: subscription.status,
                             subscriptionId: subscription.id,
                             updatedAt: new Date().toISOString(),
-                        },
-                    });
+                        }, errorMessage);
 
-                    console.log('User subscription status updated:', isActive);
+                        console.log(`➕ Added to retry queue: ${userId}`);
+                        // Continue processing - webhook will still return 200 to Stripe
+                    }
                 } catch (error) {
                     console.error('Error updating subscription status:', error);
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -239,16 +264,31 @@ export async function POST(request: NextRequest) {
                     const userId = result.userId!;
 
                     // Update user metadata to remove premium status
-                    const client = await clerkClient();
-                    await client.users.updateUser(userId, {
-                        publicMetadata: {
+                    try {
+                        const client = await clerkClient();
+                        await client.users.updateUser(userId, {
+                            publicMetadata: {
+                                premiumUser: false,
+                                subscriptionStatus: 'canceled',
+                                updatedAt: new Date().toISOString(),
+                            },
+                        });
+
+                        console.log('User premium status removed');
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                        console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
+
+                        // Add to retry queue
+                        addToRetryQueue(userId, {
                             premiumUser: false,
                             subscriptionStatus: 'canceled',
                             updatedAt: new Date().toISOString(),
-                        },
-                    });
+                        }, errorMessage);
 
-                    console.log('User premium status removed');
+                        console.log(`➕ Added to retry queue: ${userId}`);
+                        // Continue processing - webhook will still return 200 to Stripe
+                    }
                 } catch (error) {
                     console.error('Error removing premium status:', error);
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
