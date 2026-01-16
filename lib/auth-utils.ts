@@ -62,7 +62,64 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
     const isPremium = metadata.premiumUser === true;
 
     // Get analysis count (defaults to 0)
-    const analysisCount = metadata.analysisCount || 0;
+    let analysisCount = metadata.analysisCount || 0;
+
+    // Monthly reset logic for free users
+    // Premium users don't need resets as they have higher monthly limits
+    if (!isPremium) {
+      try {
+        // Initialize lastAnalysisReset if it doesn't exist (first-time user)
+        const lastResetDate = metadata.lastAnalysisReset
+          ? new Date(metadata.lastAnalysisReset)
+          : null;
+
+        const now = new Date();
+
+        // Calculate months elapsed since last reset using UTC dates
+        // This ensures consistency across all timezones
+        // Note: Uses calendar month difference (e.g., Dec 17 → Jan 16 = 1 month)
+        // This is consistent with typical subscription billing cycles
+        let shouldReset = false;
+
+        if (!lastResetDate) {
+          // First-time user: initialize the reset timestamp
+          shouldReset = true;
+          console.log(`🔧 Initializing analysis reset timestamp for user ${userId}`);
+        } else {
+          // Calculate months difference
+          const monthsSinceReset =
+            (now.getUTCFullYear() - lastResetDate.getUTCFullYear()) * 12 +
+            (now.getUTCMonth() - lastResetDate.getUTCMonth());
+
+          if (monthsSinceReset >= 1) {
+            shouldReset = true;
+            console.log(`🔄 Monthly reset triggered for user ${userId} (${monthsSinceReset} month(s) elapsed)`);
+          }
+        }
+
+        // Perform the reset if needed
+        if (shouldReset) {
+          const oldCount = analysisCount;
+          analysisCount = 0;
+
+          // Update Clerk metadata with reset values
+          await client.users.updateUser(userId, {
+            publicMetadata: {
+              ...user.publicMetadata,
+              analysisCount: 0,
+              lastAnalysisReset: now.toISOString(),
+            },
+          });
+
+          console.log(`✅ Analysis count reset: ${oldCount} → 0 (userId: ${userId}, timestamp: ${now.toISOString()})`);
+        }
+      } catch (resetError) {
+        // Log error but don't fail the entire request
+        // User will continue with their current count if reset fails
+        console.error(`❌ Error during monthly reset for user ${userId}:`, resetError);
+        console.error('User will continue with current analysis count until next attempt');
+      }
+    }
 
     // Determine limit based on user tier
     const limit = isPremium ? PREMIUM_USER_LIMIT : FREE_USER_LIMIT;
