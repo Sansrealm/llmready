@@ -323,21 +323,27 @@ export default function Home() {
                     <div className="mt-4 text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                       <p className="text-sm text-green-800 dark:text-green-300 font-medium">
                         {isSignedIn && !isPremium
-                          ? "You've reached the maximum limit of analyses"
-                          : "Want unlimited website checks?"
+                          ? "You've reached the free analysis limit"
+                          : !isSignedIn && analysisCount >= 1
+                            ? "Sign in for more free analysis"
+                            : "Want unlimited website checks?"
                         }
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {isSignedIn && !isPremium
-                          ? "Upgrade to premium for 25 analyses per month"
-                          : "Unlock full access to LLM readiness audits with premium"
+                          ? "Upgrade to Premium for 25 analyses per month"
+                          : !isSignedIn && analysisCount >= 1
+                            ? "Get 3 free analyses when you create an account"
+                            : "Unlock full access to LLM readiness audits with premium"
                         }
                       </p>
                       <Button
                         className="mt-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
                         asChild
                       >
-                        <Link href="/pricing">Upgrade to Premium</Link>
+                        <Link href={isSignedIn ? "/pricing" : "/login"}>
+                          {isSignedIn ? "Upgrade to Premium" : "Sign In"}
+                        </Link>
                       </Button>
                     </div>
                   )}
