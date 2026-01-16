@@ -12,6 +12,7 @@ import { QueryProvider } from "./providers/query-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://llmcheck.app'),
   title: "LLM Ready Analyzer - Optimize Your Website for AI Search | Free Website Analysis",
   description: "Analyze your website's readiness for Large Language Models and AI-powered search engines. Get instant insights, recommendations, and improve your AI SEO ranking. Free analysis available.",
 

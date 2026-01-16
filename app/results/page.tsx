@@ -381,6 +381,16 @@ export default function ResultsPage() {
                                         Email Report
                                     </Button>
 
+                                    <Button
+                                        onClick={() => refetch()}
+                                        disabled={loading}
+                                        variant="outline"
+                                        title="Bypass cache and get fresh analysis"
+                                    >
+                                        <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                        Re-analyze
+                                    </Button>
+
                                     {!isSignedIn && (
                                         <Link href="/login">
                                             <Button variant="outline">
