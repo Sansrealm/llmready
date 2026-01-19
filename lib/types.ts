@@ -102,6 +102,11 @@ export interface DbAnalysis {
   parameters: SiteMetric[];
   analyzed_at: string; // ISO timestamp
   created_at: string; // ISO timestamp
+  // Sharing fields
+  share_slug?: string | null;
+  is_public?: boolean;
+  shared_at?: string | null;
+  share_expires_at?: string | null;
 }
 
 /**
@@ -126,6 +131,14 @@ export interface AnalysisHistory {
   analyses: DbAnalysis[];
   total: number;
   trend: TrendData;
+}
+
+/**
+ * Response from creating a public share
+ */
+export interface ShareResponse {
+  share_slug: string;
+  expires_at: Date;
 }
 
 // ============================================================================

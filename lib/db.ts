@@ -1,5 +1,6 @@
 import { sql } from '@vercel/postgres';
-import { SiteMetric, DbAnalysis, TrendData } from './types';
+import crypto from 'crypto';
+import { SiteMetric, DbAnalysis, TrendData, ShareResponse } from './types';
 
 /**
  * Normalizes a URL for consistent storage and querying
@@ -182,4 +183,183 @@ export async function getAnalysisById(
   `;
 
   return (result.rows[0] as DbAnalysis) || null;
+}
+
+// ============================================================================
+// Sharing Functions
+// ============================================================================
+
+/**
+ * Generates a unique, URL-safe share slug for public sharing
+ * Uses cryptographically secure random bytes for uniqueness
+ *
+ * @returns {string} A 12-character lowercase alphanumeric slug
+ * @example "abc123xyz789"
+ */
+export function generateShareSlug(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let slug = '';
+  const bytes = crypto.randomBytes(12);
+  for (let i = 0; i < 12; i++) {
+    slug += chars[bytes[i] % chars.length];
+  }
+  return slug;
+}
+
+/**
+ * Creates a public share link for an analysis
+ * Verifies ownership, generates unique slug, and sets expiration
+ *
+ * @param {string} analysisId - The ID of the analysis to share
+ * @param {string} userId - The user ID (must own the analysis)
+ * @param {number} expiresInDays - Days until share link expires (default: 30)
+ * @returns {Promise<ShareResponse>} Share slug and expiration date
+ * @throws {Error} If analysis not found or user unauthorized
+ */
+export async function createPublicShare(
+  analysisId: string,
+  userId: string,
+  expiresInDays: number = 30
+): Promise<ShareResponse> {
+  // Verify ownership
+  const ownershipCheck = await sql`
+    SELECT id FROM analyses
+    WHERE id = ${analysisId} AND user_id = ${userId}
+  `;
+
+  if (ownershipCheck.rows.length === 0) {
+    throw new Error('Unauthorized: You don\'t own this analysis');
+  }
+
+  // Generate unique slug with retry logic for collisions
+  let slug: string;
+  let attempts = 0;
+  const maxAttempts = 5;
+
+  while (attempts < maxAttempts) {
+    slug = generateShareSlug();
+
+    try {
+      // Update with unique slug
+      const result = await sql`
+        UPDATE analyses
+        SET
+          is_public = TRUE,
+          share_slug = ${slug},
+          shared_at = NOW(),
+          share_expires_at = NOW() + INTERVAL '${expiresInDays} days'
+        WHERE id = ${analysisId} AND user_id = ${userId}
+        RETURNING share_slug, share_expires_at
+      `;
+
+      if (result.rows.length > 0) {
+        return {
+          share_slug: result.rows[0].share_slug,
+          expires_at: new Date(result.rows[0].share_expires_at),
+        };
+      }
+    } catch (error: unknown) {
+      // Check if it's a unique constraint violation
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+        attempts++;
+        continue; // Try again with new slug
+      }
+      throw error; // Re-throw other errors
+    }
+  }
+
+  throw new Error('Failed to generate unique share slug after multiple attempts');
+}
+
+/**
+ * Retrieves an analysis by its public share slug
+ * Only returns analyses that are public and not expired
+ * This function is intentionally public (no userId check)
+ *
+ * @param {string} slug - The share slug to lookup
+ * @returns {Promise<DbAnalysis | null>} The analysis if valid, null otherwise
+ */
+export async function getAnalysisByShareSlug(
+  slug: string
+): Promise<DbAnalysis | null> {
+  const result = await sql`
+    SELECT
+      id,
+      user_id,
+      url,
+      normalized_url,
+      overall_score,
+      parameters,
+      analyzed_at,
+      created_at,
+      share_slug,
+      is_public,
+      shared_at,
+      share_expires_at
+    FROM analyses
+    WHERE share_slug = ${slug}
+      AND is_public = TRUE
+      AND share_expires_at > NOW()
+    LIMIT 1
+  `;
+
+  return (result.rows[0] as DbAnalysis) || null;
+}
+
+/**
+ * Revokes sharing for an analysis (makes it private)
+ * Clears all sharing-related fields
+ *
+ * @param {string} analysisId - The ID of the analysis to revoke
+ * @param {string} userId - The user ID (must own the analysis)
+ * @returns {Promise<boolean>} True if successful
+ * @throws {Error} If analysis not found or user unauthorized
+ */
+export async function revokeShare(
+  analysisId: string,
+  userId: string
+): Promise<boolean> {
+  // Verify ownership
+  const ownershipCheck = await sql`
+    SELECT id FROM analyses
+    WHERE id = ${analysisId} AND user_id = ${userId}
+  `;
+
+  if (ownershipCheck.rows.length === 0) {
+    throw new Error('Unauthorized: You don\'t own this analysis');
+  }
+
+  // Revoke sharing
+  await sql`
+    UPDATE analyses
+    SET
+      is_public = FALSE,
+      share_slug = NULL,
+      shared_at = NULL,
+      share_expires_at = NULL
+    WHERE id = ${analysisId} AND user_id = ${userId}
+  `;
+
+  return true;
+}
+
+/**
+ * Checks if a share link has expired
+ * Helper function for API routes to validate share access
+ *
+ * @param {string} slug - The share slug to check
+ * @returns {Promise<boolean>} True if expired, false if valid or not found
+ */
+export async function isShareExpired(slug: string): Promise<boolean> {
+  const result = await sql`
+    SELECT share_expires_at < NOW() as expired
+    FROM analyses
+    WHERE share_slug = ${slug}
+  `;
+
+  if (result.rows.length === 0) {
+    return false; // Not found = not expired (handled elsewhere)
+  }
+
+  return result.rows[0].expired;
 }
