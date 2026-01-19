@@ -9,32 +9,65 @@ const fs = require('fs');
 const path = require('path');
 
 async function runMigration() {
-  console.log('🚀 Running database migration...\n');
+  console.log('🚀 Running database migrations...\n');
 
   try {
-    // Read the schema file
+    // Step 1: Run base schema
+    console.log('📄 Step 1: Running base schema (schema.sql)...');
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
-    console.log('📄 Loading schema from:', schemaPath);
-    console.log('');
-
-    // Execute the entire schema as one transaction
-    console.log('📊 Executing schema...\n');
-
     try {
       await sql.query(schema);
-      console.log('   ✅ Schema executed successfully\n');
+      console.log('✅ Base schema completed\n');
     } catch (err) {
       // Ignore "already exists" errors
       if (err.message.includes('already exists')) {
-        console.log('   ⚠️  Table or indexes already exist (skipping)\n');
+        console.log('⚠️  Base schema - tables/indexes already exist (skipping)\n');
       } else {
         throw err;
       }
     }
 
-    console.log('🎉 Migration completed successfully!\n');
+    // Step 2: Run migrations from migrations/ directory
+    const migrationsDir = path.join(__dirname, 'migrations');
+
+    if (fs.existsSync(migrationsDir)) {
+      console.log('📄 Step 2: Running migrations from migrations/...');
+
+      const migrationFiles = fs.readdirSync(migrationsDir)
+        .filter(file => file.endsWith('.sql'))
+        .sort(); // Sort alphabetically (001, 002, 003)
+
+      if (migrationFiles.length === 0) {
+        console.log('⚠️  No migration files found\n');
+      } else {
+        console.log(`Found ${migrationFiles.length} migration(s)\n`);
+
+        for (let i = 0; i < migrationFiles.length; i++) {
+          const file = migrationFiles[i];
+          console.log(`Running migration ${i + 1}/${migrationFiles.length}: ${file}`);
+
+          const migrationPath = path.join(migrationsDir, file);
+          const migration = fs.readFileSync(migrationPath, 'utf8');
+
+          try {
+            await sql.query(migration);
+            console.log(`✅ ${file} completed\n`);
+          } catch (err) {
+            if (err.message.includes('already exists')) {
+              console.log(`⚠️  ${file} - columns/indexes already exist (skipping)\n`);
+            } else {
+              console.error(`❌ ${file} failed:`, err.message, '\n');
+            }
+          }
+        }
+      }
+    } else {
+      console.log('⚠️  No migrations/ directory found, skipping additional migrations\n');
+    }
+
+    console.log('🎉 All migrations completed successfully!\n');
 
     // Verify the table was created
     console.log('🔍 Verifying table creation...');
