@@ -257,3 +257,33 @@ export function isDifficultyLevel(value: string): value is DifficultyLevel {
 export function isImpactLevel(value: string): value is ImpactLevel {
   return ['Low', 'Medium', 'High'].includes(value);
 }
+
+// ============================================================================
+// Guest Email Types
+// ============================================================================
+
+/**
+ * Guest email record from database
+ * Represents an unauthenticated user who provided their email during analysis
+ */
+export interface GuestEmail {
+  id: string;
+  email: string;
+  first_captured_at: string; // ISO timestamp
+  last_analysis_at: string; // ISO timestamp
+  analysis_count: number;
+  opted_out: boolean;
+  created_at: string; // ISO timestamp
+  updated_at: string; // ISO timestamp
+}
+
+/**
+ * Result from capturing a guest email
+ * Returned by captureGuestEmail() function
+ */
+export interface GuestEmailCaptureResult {
+  id: string;
+  email: string;
+  is_new: boolean; // TRUE if first capture, FALSE if returning user
+  analysis_count: number;
+}

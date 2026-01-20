@@ -259,12 +259,22 @@ export default function Home() {
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      type="email"
-                      placeholder="Email (optional)"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        placeholder="Email (optional)"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      {email && (
+                        <p className="text-xs text-muted-foreground">
+                          By using this service you agree to your email being used for product updates and offers.{' '}
+                          <Link href="/privacy" className="underline hover:text-foreground">
+                            Privacy Policy
+                          </Link>
+                        </p>
+                      )}
+                    </div>
                     <Select value={industry} onValueChange={setIndustry}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select industry" />

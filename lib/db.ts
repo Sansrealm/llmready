@@ -371,3 +371,126 @@ export async function isShareExpired(slug: string): Promise<boolean> {
 
   return result.rows[0].expired;
 }
+
+// ============================================================================
+// Guest Email Capture Functions
+// ============================================================================
+
+/**
+ * Captures or updates a guest email address after successful analysis
+ * Deduplicates on email - increments count if email exists
+ *
+ * Uses PostgreSQL's INSERT...ON CONFLICT for atomic upsert behavior.
+ * Stores emails in lowercase for consistency.
+ *
+ * @param {string} email - Guest email address
+ * @returns {Promise<Object>} The guest email record with capture metadata
+ *
+ * @example
+ * const result = await captureGuestEmail('user@example.com');
+ * console.log(result.is_new); // true if first time, false if returning
+ * console.log(result.analysis_count); // total analyses by this email
+ */
+export async function captureGuestEmail(email: string): Promise<{
+  id: string;
+  email: string;
+  is_new: boolean;
+  analysis_count: number;
+}> {
+  // Use INSERT ... ON CONFLICT for upsert behavior
+  const result = await sql`
+    INSERT INTO guest_emails (email, first_captured_at, last_analysis_at, analysis_count)
+    VALUES (${email.toLowerCase()}, NOW(), NOW(), 1)
+    ON CONFLICT (email)
+    DO UPDATE SET
+      last_analysis_at = NOW(),
+      analysis_count = guest_emails.analysis_count + 1,
+      updated_at = NOW()
+    RETURNING id, email, analysis_count,
+              (xmax = 0) AS is_new
+  `;
+
+  const record = result.rows[0];
+
+  console.log(`📧 Guest email ${record.is_new ? 'captured' : 'updated'}: ${email} (${record.analysis_count} analyses)`);
+
+  return {
+    id: record.id,
+    email: record.email,
+    is_new: record.is_new,
+    analysis_count: record.analysis_count,
+  };
+}
+
+/**
+ * Checks if a guest email has opted out of communications
+ *
+ * @param {string} email - Email address to check
+ * @returns {Promise<boolean>} TRUE if opted out, FALSE otherwise
+ */
+export async function isGuestEmailOptedOut(email: string): Promise<boolean> {
+  const result = await sql`
+    SELECT opted_out
+    FROM guest_emails
+    WHERE email = ${email.toLowerCase()}
+    LIMIT 1
+  `;
+
+  return result.rows[0]?.opted_out || false;
+}
+
+/**
+ * Marks a guest email as opted out (unsubscribe)
+ *
+ * Used by unsubscribe endpoint to honor opt-out requests.
+ * Sets opted_out = TRUE to exclude from future outreach queries.
+ *
+ * @param {string} email - Email address to opt out
+ * @returns {Promise<boolean>} TRUE if successful, FALSE if email not found
+ */
+export async function optOutGuestEmail(email: string): Promise<boolean> {
+  const result = await sql`
+    UPDATE guest_emails
+    SET opted_out = TRUE,
+        updated_at = NOW()
+    WHERE email = ${email.toLowerCase()}
+  `;
+
+  return (result.rowCount || 0) > 0;
+}
+
+/**
+ * Retrieves all guest emails for outreach (excluding opted-out)
+ *
+ * Returns emails sorted by most recent analysis for targeted campaigns.
+ * Automatically excludes opted-out users for GDPR compliance.
+ *
+ * @param {number} limit - Maximum number of emails to return (default 100)
+ * @param {number} offset - Pagination offset (default 0)
+ * @returns {Promise<Array>} Array of guest email records
+ */
+export async function getGuestEmailsForOutreach(
+  limit: number = 100,
+  offset: number = 0
+): Promise<Array<{
+  email: string;
+  first_captured_at: string;
+  last_analysis_at: string;
+  analysis_count: number;
+}>> {
+  const result = await sql`
+    SELECT email, first_captured_at, last_analysis_at, analysis_count
+    FROM guest_emails
+    WHERE opted_out = FALSE
+    ORDER BY last_analysis_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+
+  return result.rows as Array<{
+    email: string;
+    first_captured_at: string;
+    last_analysis_at: string;
+    analysis_count: number;
+  }>;
+}

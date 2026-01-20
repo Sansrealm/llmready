@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
-import { saveAnalysis, getAnalysisByUrl } from '@/lib/db';
+import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest } from '@/lib/types';
 
 // Initialize OpenAI client
@@ -196,6 +196,19 @@ export async function POST(request: NextRequest) {
         // Log error but don't block user from getting results
         console.error('❌ Failed to save analysis to database:', dbError);
         // Continue - user still gets their analysis results
+      }
+    }
+
+    // 8. Capture guest email if provided (Phase 1: Guest Email Capture)
+    // Only captures for unauthenticated users after successful analysis
+    if (!subscription.isAuthenticated && email) {
+      try {
+        await captureGuestEmail(email);
+        console.log('✅ Guest email captured for outreach');
+      } catch (emailError) {
+        // Log error but don't block analysis results
+        console.error('⚠️ Failed to capture guest email:', emailError);
+        // Continue - email capture is nice-to-have, not critical
       }
     }
 
