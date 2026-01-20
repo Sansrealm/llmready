@@ -174,12 +174,17 @@ export async function getAnalysisById(
   const result = await sql`
     SELECT
       id,
+      user_id,
       url,
       normalized_url,
       overall_score,
       parameters,
       analyzed_at,
-      created_at
+      created_at,
+      share_slug,
+      is_public,
+      shared_at,
+      share_expires_at
     FROM analyses
     WHERE id = ${analysisId}
     LIMIT 1

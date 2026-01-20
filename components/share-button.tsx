@@ -49,9 +49,8 @@ export function ShareButton({
 
       const data = await response.json();
 
-      // Copy to clipboard
-      const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
-      await navigator.clipboard.writeText(shareUrl);
+      // Copy to clipboard (API returns full URL)
+      await navigator.clipboard.writeText(data.shareUrl);
 
       toast.success("Share link copied to clipboard!");
       setHasShareLink(true);
