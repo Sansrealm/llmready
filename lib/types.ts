@@ -71,6 +71,7 @@ export interface Recommendation {
  * This is the main data structure for website analysis
  */
 export interface AnalysisResult {
+  id?: string; // Analysis ID from database (optional for backward compatibility)
   overall_score: number; // 0-100
   parameters: SiteMetric[];
   recommendations: Recommendation[];

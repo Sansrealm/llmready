@@ -50,10 +50,10 @@ export async function saveAnalysis({
   url: string;
   overallScore: number;
   parameters: SiteMetric[];
-}) {
+}): Promise<DbAnalysis> {
   const normalizedUrl = normalizeUrl(url);
 
-  await sql`
+  const result = await sql`
     INSERT INTO analyses (user_id, url, normalized_url, overall_score, parameters)
     VALUES (
       ${userId},
@@ -62,7 +62,10 @@ export async function saveAnalysis({
       ${overallScore},
       ${JSON.stringify(parameters)}
     )
+    RETURNING id, user_id, url, normalized_url, overall_score, parameters, analyzed_at, created_at
   `;
+
+  return result.rows[0] as DbAnalysis;
 }
 
 /**

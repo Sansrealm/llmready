@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
             }
 
             return NextResponse.json({
+              id: cachedAnalysis.id,
               ...analysisResult,
               cached: true,
               analyzed_at: cachedAnalysis.analyzed_at,
@@ -181,13 +182,16 @@ export async function POST(request: NextRequest) {
     // 7. Save analysis to database (only for authenticated users)
     if (subscription.isAuthenticated && subscription.userId) {
       try {
-        await saveAnalysis({
+        const savedAnalysis = await saveAnalysis({
           userId: subscription.userId,
           url: url,
           overallScore: analysisResult.overall_score,
           parameters: analysisResult.parameters,
         });
         console.log('✅ Analysis saved to database');
+
+        // Add the analysis ID to the result
+        analysisResult.id = savedAnalysis.id;
       } catch (dbError) {
         // Log error but don't block user from getting results
         console.error('❌ Failed to save analysis to database:', dbError);

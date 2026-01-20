@@ -7,13 +7,14 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Download, Mail, RefreshCw, Loader2, CheckCircle } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Loader2, CheckCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import AdComponent from '@/components/AdComponent';
 import ScoreHistoryWidget from '@/components/score-history-widget';
+import { ShareButton } from '@/components/share-button';
 import { AnalysisResult, DebugInfo } from '@/lib/types';
 
 // Premium check that uses server-side API
@@ -242,20 +243,6 @@ export default function ResultsPage() {
         }
     };
 
-    const sendEmailReport = async () => {
-        if (!isSignedIn) {
-            router.push('/login');
-            return;
-        }
-
-        if (!isPremium || !email) {
-            router.push('/pricing');
-            return;
-        }
-
-        // Email sending logic will be implemented in the next phase
-        alert("Email report sending will be implemented in the next phase");
-    };
 
     // Show loading screen while checking premium status
     if (premiumLoading || loading) {
@@ -372,14 +359,15 @@ export default function ResultsPage() {
                                         {pdfGenerating ? 'Generating...' : 'Download Report'}
                                     </Button>
 
-                                    <Button
-                                        onClick={sendEmailReport}
-                                        disabled={!isSignedIn || !isPremium || !email}
-                                        className={!isSignedIn || !isPremium ? "opacity-70" : ""}
-                                    >
-                                        <Mail className="mr-2 h-4 w-4" />
-                                        Email Report
-                                    </Button>
+                                    {analysisResult?.id && (
+                                        <ShareButton
+                                            analysisId={analysisResult.id}
+                                            isPremium={isPremium}
+                                            userEmail={email}
+                                            url={url || ''}
+                                            overallScore={analysisResult.overall_score}
+                                        />
+                                    )}
 
                                     <Button
                                         onClick={() => refetch()}
