@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,40 +35,37 @@ export default function ScoreHistoryWidget({
   isPremium: boolean;
   isLoading: boolean;
 }) {
-  const [historyData, setHistoryData] = useState<HistoryData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use React Query for history data fetching with caching
+  const {
+    data: historyData,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['analysis-history', url],
+    queryFn: async () => {
+      console.log('🔄 Fetching analysis history...');
 
-  useEffect(() => {
-    async function fetchHistory() {
-      if (!isPremium || premiumLoading) {
-        setLoading(false);
-        return;
+      const response = await fetch(
+        `/api/analysis-history?url=${encodeURIComponent(url)}&limit=10`
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch history");
       }
 
-      try {
-        setLoading(true);
-        const response = await fetch(
-          `/api/analysis-history?url=${encodeURIComponent(url)}&limit=10`
-        );
+      const data = await response.json();
+      console.log('✅ History fetched');
+      return data as HistoryData;
+    },
+    enabled: isPremium && !premiumLoading, // Only fetch if premium and not loading premium status
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    retry: 1,
+  });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to fetch history");
-        }
-
-        const data = await response.json();
-        setHistoryData(data);
-      } catch (err) {
-        console.error("Error fetching history:", err);
-        setError(err instanceof Error ? err.message : "Failed to load history");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchHistory();
-  }, [url, isPremium, premiumLoading]);
+  // Convert React Query error to string for compatibility
+  const error = queryError ? (queryError as Error).message : null;
 
   // Show upgrade prompt for non-premium users
   if (!isPremium && !premiumLoading) {

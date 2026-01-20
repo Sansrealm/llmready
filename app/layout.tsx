@@ -7,10 +7,12 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ClerkProvider } from "@clerk/nextjs"
 import { Analytics } from "@/components/Analytics"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { QueryProvider } from "./providers/query-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://llmcheck.app'),
   title: "LLM Ready Analyzer - Optimize Your Website for AI Search | Free Website Analysis",
   description: "Analyze your website's readiness for Large Language Models and AI-powered search engines. Get instant insights, recommendations, and improve your AI SEO ranking. Free analysis available.",
 
@@ -103,11 +105,13 @@ export default function RootLayout({
               style={{ display: 'none', visibility: 'hidden' }}
             />
           </noscript>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-            <Analytics />
-            {children}
-            <ThemeToggle />
-          </ThemeProvider>
+          <QueryProvider>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+              <Analytics />
+              {children}
+              <ThemeToggle />
+            </ThemeProvider>
+          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>

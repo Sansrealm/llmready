@@ -11,7 +11,7 @@ export async function POST(request) {
 
   try {
     // Get authentication status from Clerk
-    const { userId } = auth();
+    const { userId } = await auth();
     console.log('Auth check result:', userId ? 'User authenticated' : 'User not authenticated');
 
     // Check if user is authenticated

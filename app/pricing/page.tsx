@@ -8,6 +8,7 @@ import Link from "next/link";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { DebugInfo } from "@/lib/types";
 
 // Import Clerk's PricingTable component
 import { PricingTable } from "@clerk/nextjs";
@@ -17,7 +18,7 @@ function useIsPremium() {
   const { user, isLoaded } = useUser();
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [debug, setDebug] = useState<any>({});
+  const [debug, setDebug] = useState<DebugInfo>({});
 
   useEffect(() => {
     async function checkSubscriptionStatus() {

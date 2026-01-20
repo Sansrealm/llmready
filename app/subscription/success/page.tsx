@@ -14,7 +14,7 @@ export default function SubscriptionSuccessPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [sessionDetails, setSessionDetails] = useState<any>(null);
+    const [sessionDetails, setSessionDetails] = useState<Record<string, unknown> | null>(null);
     const [isPremiumState, setIsPremiumState] = useState(false);
     const [refreshing, setRefreshing] = useState(false); // Added missing state
 

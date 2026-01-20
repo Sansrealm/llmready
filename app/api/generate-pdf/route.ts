@@ -1,11 +1,16 @@
-// app/api/generate-pdf/route.js
+// app/api/generate-pdf/route.ts
 // SIMPLE HTML DOWNLOAD - Guaranteed to work, users can save as PDF
 
-import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { validatePremiumAccess } from '@/lib/auth-utils';
+import { AnalysisResult } from '@/lib/types';
 
 // Generate a beautiful, print-ready HTML report
-function generatePrintReadyHTML(analysisResult, url, userEmail) {
+function generatePrintReadyHTML(
+    analysisResult: AnalysisResult,
+    url: string,
+    userEmail: string | null
+): string {
     const { overall_score, parameters, recommendations } = analysisResult;
 
     return `
@@ -303,31 +308,22 @@ function generatePrintReadyHTML(analysisResult, url, userEmail) {
     `;
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     try {
         console.log('🔄 Starting HTML report generation...');
 
-        // CLERK BILLING CHECK
-        const { has, userId } = await auth();
+        // PREMIUM ACCESS & LIMIT VALIDATION
+        const access = await validatePremiumAccess();
 
-        if (!userId) {
+        if (!access.allowed) {
+            console.log('❌ PDF generation denied:', access.reason);
             return NextResponse.json(
-                { error: 'Authentication required' },
-                { status: 401 }
-            );
-        }
-
-        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
-
-        if (!hasPremiumPlan) {
-            console.log('❌ User does not have premium plan:', userId);
-            return NextResponse.json(
-                { error: 'Premium subscription required' },
+                { error: access.reason || 'Access denied' },
                 { status: 403 }
             );
         }
 
-        console.log('✅ Premium user confirmed:', userId);
+        console.log('✅ Premium user validated with limit check');
 
         // PARSE REQUEST
         const { analysisResult, url, email } = await request.json();
@@ -366,10 +362,11 @@ export async function POST(request) {
     } catch (error) {
         console.error('❌ HTML report generation failed:', error);
 
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
             {
                 error: 'Report generation failed',
-                details: error.message
+                details: errorMessage
             },
             { status: 500 }
         );
