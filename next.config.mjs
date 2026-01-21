@@ -5,10 +5,11 @@ const MAIN_API_DOMAIN = 'https://www.llmcheck.app';
 
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'production' ? '' : "'unsafe-eval'"} 
+  script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'production' ? '' : "'unsafe-eval'"}
     ${CLERK_FRONTEND_API}
     https://challenges.cloudflare.com
     https://www.googletagmanager.com
+    https://*.googletagmanager.com
     https://www.google-analytics.com
     https://analytics.google.com
     https://*.clerk.com
@@ -28,6 +29,8 @@ const cspHeader = `
     https://*.clerk.accounts.dev
     https://cute-manatee-15.clerk.accounts.dev
     https://clerk-telemetry.com     /* Added for Clerk internal metrics */
+    https://www.googletagmanager.com
+    https://*.googletagmanager.com
     https://www.google-analytics.com
     https://analytics.google.com
     https://stats.g.doubleclick.net
