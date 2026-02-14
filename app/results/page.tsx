@@ -16,6 +16,7 @@ import AdComponent from '@/components/AdComponent';
 import ScoreHistoryWidget from '@/components/score-history-widget';
 import { ShareButton } from '@/components/share-button';
 import { AnalysisResult, DebugInfo } from '@/lib/types';
+import AiVisibilityCheck from '@/components/ai-visibility-check';
 
 // Premium check that uses server-side API
 function useIsPremium() {
@@ -498,6 +499,18 @@ export default function ResultsPage() {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* AI Visibility Check Section */}
+                            {url && (
+                                <AiVisibilityCheck
+                                    url={url}
+                                    industry={industry}
+                                    isSignedIn={!!isSignedIn}
+                                    isPremium={isPremium}
+                                    userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
+                                    userId={user?.id ?? null}
+                                />
+                            )}
 
                             {/* Next Steps Section - ADDITIONAL CONTENT */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">

@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
-import { SiteMetric, DbAnalysis, TrendData, ShareResponse } from './types';
+import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry } from './types';
 
 /**
  * Normalizes a URL for consistent storage and querying
@@ -493,4 +493,46 @@ export async function getGuestEmailsForOutreach(
     last_analysis_at: string;
     analysis_count: number;
   }>;
+}
+
+// ============================================================================
+// Visibility Waitlist Functions
+// ============================================================================
+
+/**
+ * Saves a signup to the visibility waitlist.
+ * Upserts on email — updates url/industry/timestamp on repeat signup.
+ */
+export async function saveVisibilityWaitlistSignup({
+  email,
+  url,
+  industry,
+  userId,
+}: {
+  email: string;
+  url: string | null;
+  industry: string | null;
+  userId: string | null;
+}): Promise<{ id: string; email: string; is_new: boolean }> {
+  const result = await sql`
+    INSERT INTO visibility_waitlist (email, url, industry, user_id)
+    VALUES (${email.toLowerCase()}, ${url}, ${industry}, ${userId})
+    ON CONFLICT (email)
+    DO UPDATE SET
+      url = COALESCE(EXCLUDED.url, visibility_waitlist.url),
+      industry = COALESCE(EXCLUDED.industry, visibility_waitlist.industry),
+      user_id = COALESCE(EXCLUDED.user_id, visibility_waitlist.user_id),
+      created_at = NOW()
+    RETURNING id, email, (xmax = 0) AS is_new
+  `;
+
+  const record = result.rows[0];
+
+  console.log(`📋 Visibility waitlist ${record.is_new ? 'signup' : 'update'}: ${email}`);
+
+  return {
+    id: record.id,
+    email: record.email,
+    is_new: record.is_new,
+  };
 }

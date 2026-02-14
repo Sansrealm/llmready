@@ -287,3 +287,21 @@ export interface GuestEmailCaptureResult {
   is_new: boolean; // TRUE if first capture, FALSE if returning user
   analysis_count: number;
 }
+
+// ============================================================================
+// Visibility Waitlist Types
+// ============================================================================
+
+/**
+ * Visibility waitlist entry from database
+ * Tracks interest signups for the AI Visibility Tracking feature
+ */
+export interface VisibilityWaitlistEntry {
+  id: string;
+  email: string;
+  url: string | null;
+  industry: string | null;
+  user_id: string | null;
+  source: string;
+  created_at: string;
+}
