@@ -10,6 +10,7 @@ const cspHeader = `
     https://www.googletagmanager.com
     https://www.google-analytics.com
     https://analytics.google.com
+    https://clerk.llmcheck.app
     https://*.clerk.com
     https://*.clerk.dev
     https://*.clerk.accounts.dev
