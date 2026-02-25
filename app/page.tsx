@@ -14,9 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+import { ScreenshotCarousel } from "@/components/screenshot-carousel";
 import { DebugInfo } from "@/lib/types";
 
 
@@ -218,6 +219,8 @@ export default function Home() {
                 </p>
               </div>
 
+              <ScreenshotCarousel />
+
               {/* Premium status indicator for signed-in users */}
               {isSignedIn && !premiumLoading && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
@@ -247,7 +250,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="w-full max-w-md space-y-2">
+              <div id="analyze-form" className="w-full max-w-md space-y-2 mt-6 mb-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
                     <Input
@@ -377,9 +380,131 @@ export default function Home() {
                   )}
                 </form>
               </div>
+
+              {/* Feature showcase */}
+              <div className="w-full max-w-2xl mt-6">
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 text-center mb-5">
+                  Everything you need to win AI search
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
+                      <BarChart2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">LLM Readiness Score</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Instant score out of 100 showing exactly how AI-ready your site is today.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Code2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Structured Data Analysis</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Schema markup, metadata, and technical signals AI models use to understand your content.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Content Clarity Check</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Measures how clearly your content communicates to large language models like ChatGPT and Gemini.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Actionable Recommendations</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Prioritised fixes ranked by impact so you know exactly what to improve first.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                      <History className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                        Score History
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">Premium</span>
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Track your improvements over time and see how your score changes with every update.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 shadow-sm">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
+                      <Eye className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200 flex items-center gap-2">
+                        AI Visibility Check
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300">Coming Soon</span>
+                      </p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">See if your website is recommended by ChatGPT, Gemini, and Perplexity when users search for your products or services.</p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
             </div>
           </div>
         </section>
+
+        {/* Competitive advantage section */}
+        <section className="w-full py-16 bg-gray-950 dark:bg-black">
+          <div className="container px-4 md:px-6 mx-auto">
+            <div className="max-w-3xl mx-auto text-center space-y-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-green-500">
+                The AI search era is already here
+              </p>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl text-white leading-tight">
+                Your competitors are already showing up in AI results.{" "}
+                <span className="text-green-400">Are you?</span>
+              </h2>
+              <p className="text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto">
+                ChatGPT, Gemini, and Perplexity are now the first stop for millions of buying decisions.
+                Businesses that optimise for AI visibility today will dominate their category tomorrow —
+                those that don't will become invisible.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 text-left">
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-white">60%+</p>
+                  <p className="text-sm text-gray-400">of online searches now involve an AI assistant at some point in the journey</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-white">#1 position</p>
+                  <p className="text-sm text-gray-400">in AI results drives more trust than any traditional search ranking</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-white">Most sites</p>
+                  <p className="text-sm text-gray-400">fail basic AI readiness checks — a huge opportunity for those who act now</p>
+                </div>
+              </div>
+              <p className="text-base font-semibold text-green-400 pt-2">
+                Know where you stand. Fix what matters. Get ahead — and stay there.
+              </p>
+              <div className="pt-2">
+                <a
+                  href="#analyze-form"
+                  className="inline-block bg-green-500 hover:bg-green-400 text-black font-semibold px-8 py-3 rounded-lg transition-colors"
+                >
+                  Start Today — It&apos;s Free
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
       <Footer />
     </div>
