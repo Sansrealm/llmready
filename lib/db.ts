@@ -297,7 +297,7 @@ export async function createPublicShare(
           is_public = TRUE,
           share_slug = ${slug},
           shared_at = NOW(),
-          share_expires_at = NOW() + INTERVAL '${expiresInDays} days'
+          share_expires_at = NOW() + (${expiresInDays} * INTERVAL '1 day')
         WHERE id = ${analysisId} AND user_id = ${userId}
         RETURNING share_slug, share_expires_at
       `;
