@@ -9,9 +9,11 @@ import { AnalysisResult } from '@/lib/types';
 function generatePrintReadyHTML(
     analysisResult: AnalysisResult,
     url: string,
-    userEmail: string | null
+    userEmail: string | null,
+    industry?: string | null
 ): string {
-    const { overall_score, parameters, recommendations } = analysisResult;
+    const { overall_score, parameters, recommendations, visibilityQueries } = analysisResult;
+    const resolvedIndustry = industry || analysisResult.industry || null;
 
     return `
     <!DOCTYPE html>
@@ -255,6 +257,7 @@ function generatePrintReadyHTML(
         day: 'numeric'
     })}</p>
             ${userEmail ? `<p><strong>Report For:</strong> ${userEmail}</p>` : ''}
+            ${resolvedIndustry ? `<p><strong>Industry:</strong> ${resolvedIndustry.charAt(0).toUpperCase() + resolvedIndustry.slice(1)}</p>` : ''}
         </div>
 
         <div class="score-section">
@@ -298,6 +301,19 @@ function generatePrintReadyHTML(
             `).join('')}
         </div>
 
+        ${visibilityQueries && visibilityQueries.length > 0 ? `
+        <div class="section">
+            <h2>🔍 AI Visibility Queries</h2>
+            <p style="color:#6b7280;margin-bottom:20px;">These are the queries your potential customers are likely typing into ChatGPT, Gemini, and Perplexity. Use them to benchmark whether your brand is being recommended.</p>
+            ${visibilityQueries.map((q, i) => `
+                <div class="parameter-card" style="display:flex;align-items:flex-start;gap:16px;">
+                    <span style="background:#dbeafe;color:#1e40af;font-weight:700;font-size:1.1rem;padding:8px 14px;border-radius:8px;flex-shrink:0;">${i + 1}</span>
+                    <p style="margin:0;color:#374151;font-size:1rem;line-height:1.6;">${q}</p>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
         <div class="footer">
             <p><strong>LLM Check</strong> - AI-Powered Website Optimization</p>
             <p>Report generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
@@ -326,7 +342,7 @@ export async function POST(request: NextRequest) {
         console.log('✅ Premium user validated with limit check');
 
         // PARSE REQUEST
-        const { analysisResult, url, email } = await request.json();
+        const { analysisResult, url, email, industry } = await request.json();
 
         if (!analysisResult || !url) {
             return NextResponse.json(
@@ -338,7 +354,7 @@ export async function POST(request: NextRequest) {
         console.log('🔄 Generating beautiful HTML report...');
 
         // GENERATE HTML REPORT
-        const htmlContent = generatePrintReadyHTML(analysisResult, url, email);
+        const htmlContent = generatePrintReadyHTML(analysisResult, url, email, industry);
 
         // GENERATE FILENAME
         const timestamp = new Date().toISOString().split('T')[0];

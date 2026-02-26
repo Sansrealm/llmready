@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
 import { SiteMetric } from '@/lib/types';
+import { getAnalysisByShareSlug } from '@/lib/db';
 
 interface PageProps {
   params: Promise<{
@@ -36,24 +37,24 @@ interface SharedAnalysis {
   overall_score: number;
   parameters: SiteMetric[];
   analyzed_at: string;
-  shared_at?: string;
-  share_expires_at?: string;
+  shared_at?: string | null;
+  share_expires_at?: string | null;
 }
 
-// Fetch shared analysis from API
+// Fetch shared analysis directly from DB — avoids unreliable self-HTTP calls on Vercel
 async function getSharedAnalysis(slug: string): Promise<SharedAnalysis | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const response = await fetch(
-      `${baseUrl}/api/share/${slug}`,
-      { cache: 'no-store' } // Don't cache shared content
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return await response.json();
+    const analysis = await getAnalysisByShareSlug(slug);
+    if (!analysis) return null;
+    return {
+      id: analysis.id,
+      url: analysis.url,
+      overall_score: analysis.overall_score,
+      parameters: analysis.parameters,
+      analyzed_at: analysis.analyzed_at,
+      shared_at: analysis.shared_at,
+      share_expires_at: analysis.share_expires_at,
+    };
   } catch (error) {
     console.error('Error fetching shared analysis:', error);
     return null;
