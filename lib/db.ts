@@ -183,8 +183,8 @@ export async function getAnalyzedUrls(
       (
         SELECT COUNT(*)::int
         FROM analyses a2
-        WHERE a2.user_id = analyses.user_id
-          AND a2.normalized_url = analyses.normalized_url
+        WHERE a2.user_id = latest.user_id
+          AND a2.normalized_url = latest.normalized_url
       ) AS analysis_count
     FROM (
       SELECT DISTINCT ON (normalized_url)
