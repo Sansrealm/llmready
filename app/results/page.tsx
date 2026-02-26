@@ -113,7 +113,7 @@ export default function ResultsPage() {
             console.log('✅ Analysis fetched', data.cached ? '(from cache)' : '(fresh)');
             return data as AnalysisResult;
         },
-        enabled: !!url, // Only run query if URL exists
+        enabled: !!url && isLoaded, // Wait for Clerk to load before firing — prevents double-request
         staleTime: 5 * 60 * 1000, // 5 minutes
         gcTime: 30 * 60 * 1000, // 30 minutes
         retry: 1,
