@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
-import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry } from './types';
+import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry, AnalyzedUrlSummary } from './types';
 import type { VisibilityResult } from './ai-visibility-scan';
 
 /**
@@ -163,6 +163,47 @@ export async function getAnalysisByUrl(
   `;
 
   return (result.rows[0] as DbAnalysis) || null;
+}
+
+/**
+ * Retrieves distinct analyzed URLs for a user, one row per unique URL
+ * Returns the most recent analysis for each URL, ordered by recency
+ * Used by the "My Analysis" navbar dropdown
+ */
+export async function getAnalyzedUrls(
+  userId: string,
+  limit: number = 20
+): Promise<AnalyzedUrlSummary[]> {
+  const result = await sql`
+    SELECT
+      url,
+      normalized_url,
+      overall_score AS latest_score,
+      analyzed_at,
+      (
+        SELECT COUNT(*)::int
+        FROM analyses a2
+        WHERE a2.user_id = analyses.user_id
+          AND a2.normalized_url = analyses.normalized_url
+      ) AS analysis_count
+    FROM (
+      SELECT DISTINCT ON (normalized_url)
+        url, normalized_url, overall_score, analyzed_at, user_id
+      FROM analyses
+      WHERE user_id = ${userId}
+      ORDER BY normalized_url, analyzed_at DESC
+    ) latest
+    ORDER BY analyzed_at DESC
+    LIMIT ${limit}
+  `;
+
+  return result.rows.map((row) => ({
+    url: row.url as string,
+    normalizedUrl: row.normalized_url as string,
+    latestScore: row.latest_score as number,
+    analyzedAt: row.analyzed_at as string,
+    analysisCount: row.analysis_count as number,
+  }));
 }
 
 /**

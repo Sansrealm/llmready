@@ -291,6 +291,22 @@ export interface GuestEmailCaptureResult {
 }
 
 // ============================================================================
+// My Analyses Types
+// ============================================================================
+
+/**
+ * Summary of an analyzed URL shown in the "My Analysis" navbar dropdown
+ * Each entry represents the latest analysis for a distinct URL
+ */
+export interface AnalyzedUrlSummary {
+  url: string;
+  normalizedUrl: string;
+  latestScore: number;
+  analyzedAt: string; // ISO timestamp of most recent analysis
+  analysisCount: number; // total analyses for this URL by the user
+}
+
+// ============================================================================
 // Visibility Waitlist Types
 // ============================================================================
 
