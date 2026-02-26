@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { checkPremiumStatus } from '@/lib/auth-utils';
 import { getAnalysisHistory, calculateTrend } from '@/lib/db';
 
 /**
@@ -14,8 +14,8 @@ import { getAnalysisHistory, calculateTrend } from '@/lib/db';
  */
 export async function GET(request: Request) {
   try {
-    // Check authentication
-    const { userId, has } = await auth();
+    // Check authentication and premium status
+    const { isPremium, userId } = await checkPremiumStatus();
 
     if (!userId) {
       return NextResponse.json(
@@ -23,9 +23,6 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
-
-    // Check premium status using Clerk's billing feature
-    const isPremium = has({ plan: 'llm_check_premium' });
 
     if (!isPremium) {
       return NextResponse.json(
