@@ -179,14 +179,9 @@ export default function AiVisibilityPage() {
         {/* ── Sample Report ────────────────────────────────────────────────── */}
         <section className="w-full py-16 bg-gray-50 dark:bg-gray-900">
           <div className="container px-4 md:px-6 mx-auto max-w-4xl space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Sample report — for illustration purposes
-              </p>
-              <span className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-full">
-                Demo only
-              </span>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              Sample report — for illustration purposes
+            </p>
 
             <div className="bg-white dark:bg-gray-950 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl overflow-hidden">
 
