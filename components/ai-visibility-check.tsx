@@ -45,6 +45,7 @@ interface AiVisibilityCheckProps {
   isPremium: boolean;
   userEmail: string | null;
   userId: string | null;
+  visibilityQueries?: string[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ export default function AiVisibilityCheck({
   industry,
   isSignedIn,
   isPremium,
+  visibilityQueries,
 }: AiVisibilityCheckProps) {
   const [data, setData] = useState<ScanResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -181,7 +183,7 @@ export default function AiVisibilityCheck({
       const res = await fetch("/api/ai-visibility-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, industry: industry ?? "other" }),
+        body: JSON.stringify({ url, industry: industry ?? "other", visibilityQueries }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Scan failed");

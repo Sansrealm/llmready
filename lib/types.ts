@@ -76,6 +76,8 @@ export interface AnalysisResult {
   parameters: SiteMetric[];
   recommendations: Recommendation[];
   remainingAnalyses?: number; // Only present for free users
+  industry?: string; // GPT-detected: ecommerce|saas|media|education|healthcare|other
+  visibilityQueries?: string[]; // 5 custom AI search queries generated from site content
 }
 
 /**

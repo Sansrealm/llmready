@@ -32,7 +32,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { url, industry } = body as { url: string; industry?: string };
+    const { url, industry, visibilityQueries } = body as {
+      url: string;
+      industry?: string;
+      visibilityQueries?: string[];
+    };
 
     if (!url?.trim()) {
       return NextResponse.json({ error: 'url is required' }, { status: 400 });
@@ -54,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fresh scan ──────────────────────────────────────────────────────────
-    const scan = await runVisibilityScan(url, industry ?? null);
+    const scan = await runVisibilityScan(url, industry ?? null, visibilityQueries);
 
     // Save to DB (only non-error results to keep data clean)
     await saveVisibilityScan(

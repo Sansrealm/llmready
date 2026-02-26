@@ -111,6 +111,10 @@ export async function POST(request: NextRequest) {
       Images: ${images}, With Alt Text: ${imagesWithAlt}
 
       Provide an analysis of how well this website is optimized for Large Language Models (LLMs).
+      Also classify the site's industry as one of: ecommerce, saas, media, education, healthcare, other.
+      And generate 5 search queries a potential customer might type into ChatGPT or Perplexity
+      when looking for this product/service. Base them on the meta description and content.
+
       Return a JSON object with this shape:
 
       {
@@ -120,7 +124,9 @@ export async function POST(request: NextRequest) {
         ],
         "recommendations": [
           { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} }
-        ]
+        ],
+        "industry": "ecommerce|saas|media|education|healthcare|other",
+        "visibility_queries": ["query 1", "query 2", "query 3", "query 4", "query 5"]
       }
     `;
 
@@ -150,6 +156,14 @@ export async function POST(request: NextRequest) {
         throw new Error("Invalid analysis structure");
       }
       analysisResult = parsed as AnalysisResult;
+
+      // Extract GPT-detected industry and visibility queries (additive fields)
+      if (typeof parsed.industry === 'string' && parsed.industry) {
+        analysisResult.industry = parsed.industry;
+      }
+      if (Array.isArray(parsed.visibility_queries) && parsed.visibility_queries.length > 0) {
+        analysisResult.visibilityQueries = parsed.visibility_queries.slice(0, 5);
+      }
     } catch (err) {
       console.error("❌ JSON parse or structure error:", err);
       return NextResponse.json(

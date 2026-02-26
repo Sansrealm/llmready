@@ -504,11 +504,12 @@ export default function ResultsPage() {
                             {url && (
                                 <AiVisibilityCheck
                                     url={url}
-                                    industry={industry}
+                                    industry={industry ?? analysisResult?.industry ?? null}
                                     isSignedIn={!!isSignedIn}
                                     isPremium={isPremium}
                                     userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
                                     userId={user?.id ?? null}
+                                    visibilityQueries={analysisResult?.visibilityQueries}
                                 />
                             )}
 

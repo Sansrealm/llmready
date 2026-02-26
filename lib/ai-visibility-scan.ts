@@ -145,14 +145,21 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * Runs a full AI visibility scan for a given URL and industry.
  * Fires all 15 queries (5 prompts × 3 models) in parallel.
  * Failed individual queries are marked error:true but don't abort the scan.
+ *
+ * If visibilityQueries (5 custom queries from GPT analysis) are provided,
+ * they are used instead of the static industry prompts.
  */
 export async function runVisibilityScan(
   url: string,
-  industry: string | null
+  industry: string | null,
+  visibilityQueries?: string[]
 ): Promise<ScanOutput> {
   const normalizedUrl = normalizeUrl(url);
   const { rootDomain, brandName } = extractDomainTokens(url);
-  const prompts = getPromptsForIndustry(industry);
+  const prompts =
+    visibilityQueries && visibilityQueries.length === 5
+      ? visibilityQueries
+      : getPromptsForIndustry(industry);
 
   // Build task list: 5 prompts × 3 models = 15 tasks
   const tasks = prompts.flatMap((prompt) =>
