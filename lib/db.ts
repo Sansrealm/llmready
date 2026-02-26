@@ -597,6 +597,10 @@ export interface VisibilityResultRow {
   prompt: string;
   found: boolean;
   snippet: string | null;
+  prominence: 'high' | 'medium' | 'low' | null;
+  sentiment: number | null; // -1 to 1
+  cited: boolean;
+  score: number | null; // null = legacy row pre-rubric scoring
 }
 
 /**
@@ -626,7 +630,7 @@ export async function getLatestVisibilityScan(
 
   // Fetch the 15 detail rows for this scan
   const resultsResult = await sql`
-    SELECT model, prompt, found, snippet
+    SELECT model, prompt, found, snippet, prominence, sentiment, cited, score
     FROM ai_visibility_results
     WHERE scan_id = ${scan.id}
     ORDER BY model, prompt
@@ -660,8 +664,12 @@ export async function saveVisibilityScan(
   // Insert all result rows (sequential to avoid connection pool pressure)
   for (const r of results) {
     await sql`
-      INSERT INTO ai_visibility_results (scan_id, model, prompt, found, snippet)
-      VALUES (${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null})
+      INSERT INTO ai_visibility_results
+        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, score)
+      VALUES (
+        ${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null},
+        ${r.prominence ?? null}, ${r.sentiment ?? null}, ${r.cited}, ${r.score ?? null}
+      )
     `;
   }
 
