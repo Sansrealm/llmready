@@ -1,6 +1,7 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
 import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry } from './types';
+import type { VisibilityResult } from './ai-visibility-scan';
 
 /**
  * Normalizes a URL for consistent storage and querying
@@ -535,4 +536,112 @@ export async function saveVisibilityWaitlistSignup({
     email: record.email,
     is_new: record.is_new,
   };
+}
+
+// ============================================================================
+// AI Visibility Scan Functions
+// ============================================================================
+
+export interface VisibilityScanRow {
+  id: string;
+  normalized_url: string;
+  industry: string | null;
+  total_found: number;
+  total_queries: number;
+  scanned_at: string;
+}
+
+export interface VisibilityResultRow {
+  model: string;
+  prompt: string;
+  found: boolean;
+  snippet: string | null;
+}
+
+/**
+ * Returns the latest scan for a URL if it falls within the cache window.
+ * Returns null if no scan exists or the most recent is older than maxAgeHours.
+ */
+export async function getLatestVisibilityScan(
+  url: string,
+  maxAgeHours: number = 72
+): Promise<{ scan: VisibilityScanRow; results: VisibilityResultRow[] } | null> {
+  const normalizedUrl = normalizeUrl(url);
+  const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
+
+  // Find the most recent scan within the cache window
+  const scanResult = await sql`
+    SELECT id, normalized_url, industry, total_found, total_queries, scanned_at
+    FROM ai_visibility_scans
+    WHERE normalized_url = ${normalizedUrl}
+      AND scanned_at > ${cutoff}::timestamptz
+    ORDER BY scanned_at DESC
+    LIMIT 1
+  `;
+
+  if (scanResult.rows.length === 0) return null;
+
+  const scan = scanResult.rows[0] as VisibilityScanRow;
+
+  // Fetch the 15 detail rows for this scan
+  const resultsResult = await sql`
+    SELECT model, prompt, found, snippet
+    FROM ai_visibility_results
+    WHERE scan_id = ${scan.id}
+    ORDER BY model, prompt
+  `;
+
+  return { scan, results: resultsResult.rows as VisibilityResultRow[] };
+}
+
+/**
+ * Saves a completed scan and its 15 result rows.
+ * Returns the created scan ID.
+ */
+export async function saveVisibilityScan(
+  url: string,
+  industry: string | null,
+  totalFound: number,
+  totalQueries: number,
+  results: VisibilityResult[]
+): Promise<string> {
+  const normalizedUrl = normalizeUrl(url);
+
+  // Insert scan header
+  const scanInsert = await sql`
+    INSERT INTO ai_visibility_scans (normalized_url, industry, total_found, total_queries)
+    VALUES (${normalizedUrl}, ${industry}, ${totalFound}, ${totalQueries})
+    RETURNING id
+  `;
+
+  const scanId = scanInsert.rows[0].id as string;
+
+  // Insert all result rows (sequential to avoid connection pool pressure)
+  for (const r of results) {
+    await sql`
+      INSERT INTO ai_visibility_results (scan_id, model, prompt, found, snippet)
+      VALUES (${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null})
+    `;
+  }
+
+  return scanId;
+}
+
+/**
+ * Returns all historical scan headers for a URL, oldest first.
+ * Used to render the visibility trend line.
+ */
+export async function getVisibilityScanHistory(
+  url: string
+): Promise<VisibilityScanRow[]> {
+  const normalizedUrl = normalizeUrl(url);
+
+  const result = await sql`
+    SELECT id, normalized_url, industry, total_found, total_queries, scanned_at
+    FROM ai_visibility_scans
+    WHERE normalized_url = ${normalizedUrl}
+    ORDER BY scanned_at ASC
+  `;
+
+  return result.rows as VisibilityScanRow[];
 }
