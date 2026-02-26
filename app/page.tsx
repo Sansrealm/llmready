@@ -448,7 +448,6 @@ export default function Home() {
                     <div>
                       <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200 flex items-center gap-2">
                         AI Visibility Check
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300">Coming Soon</span>
                       </p>
                       <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">See if your website is recommended by ChatGPT, Gemini, and Perplexity when users search for your products or services.</p>
                     </div>
