@@ -157,9 +157,6 @@ export default function AiVisibilityPage() {
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="w-full py-16 md:py-24 bg-gray-950">
           <div className="container px-4 md:px-6 mx-auto text-center space-y-6 max-w-3xl">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-green-500 bg-green-500/10 border border-green-500/20 px-3 py-1 rounded-full">
-              Coming Soon
-            </span>
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl text-white leading-tight">
               Is your brand showing up{" "}
               <span className="text-green-400">when AI answers your customers?</span>
@@ -363,15 +360,12 @@ export default function AiVisibilityPage() {
         {/* ── CTA ──────────────────────────────────────────────────────────── */}
         <section className="w-full py-16 bg-gray-950">
           <div className="container px-4 md:px-6 mx-auto max-w-2xl text-center space-y-5">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-green-500 bg-green-500/10 border border-green-500/20 px-3 py-1 rounded-full">
-              Launching Soon
-            </span>
             <h2 className="text-2xl font-bold sm:text-3xl text-white">
-              Be the first to know when AI Visibility Check goes live
+              Find out if AI is recommending your brand
             </h2>
             <p className="text-gray-400">
-              Run a free LLM readiness analysis today to get early access and be notified the moment
-              AI Visibility Check launches.
+              Run a free LLM readiness analysis today, then check your AI visibility across
+              ChatGPT, Gemini, and Perplexity.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <Link
