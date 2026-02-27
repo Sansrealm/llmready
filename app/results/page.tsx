@@ -635,7 +635,7 @@ export default function ResultsPage() {
                 </div>
             </main>
             <Footer />
-            <ExitSurveyModal isPremium={isPremium} page="results" />
+            <ExitSurveyModal isPremium={isPremium} isSignedIn={!!isSignedIn} page="results" />
         </div>
     );
 }

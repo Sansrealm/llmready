@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X } from "lucide-react";
+import { X, MessageSquare } from "lucide-react";
 
 const REASONS = [
   { value: "price",    label: "Price is too high" },
@@ -13,9 +13,23 @@ const REASONS = [
 
 type Reason = (typeof REASONS)[number]["value"];
 
-const STORAGE_SUBMITTED = "llmcheck_exit_survey_submitted";
-const STORAGE_SESSION   = "llmcheck_exit_survey_shown";
+/**
+ * Storage keys
+ *
+ * STORAGE_SUBMITTED  — localStorage. Set once on submit. Prevents ever showing again.
+ * STORAGE_MINIMIZED  — localStorage. Set when a signed-in user dismisses the popup
+ *                      without submitting. Causes the floating icon to reappear on
+ *                      every subsequent visit until they submit.
+ * STORAGE_SESSION    — sessionStorage. Guests only: prevents re-triggering in the
+ *                      same browser session after exit-intent fires once.
+ * STORAGE_SESSION_ID — localStorage UUID for anonymous session tracking.
+ */
+const STORAGE_SUBMITTED  = "llmcheck_exit_survey_submitted";
+const STORAGE_MINIMIZED  = "llmcheck_exit_survey_minimized";
+const STORAGE_SESSION    = "llmcheck_exit_survey_shown";
 const STORAGE_SESSION_ID = "llmcheck_session_id";
+
+type View = "hidden" | "modal" | "minimized" | "submitted";
 
 function getOrCreateSessionId(): string {
   try {
@@ -32,14 +46,18 @@ function getOrCreateSessionId(): string {
 
 interface ExitSurveyModalProps {
   isPremium: boolean;
+  isSignedIn: boolean;
   page?: string;
 }
 
-export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSurveyModalProps) {
-  const [visible, setVisible]     = useState(false);
+export default function ExitSurveyModal({
+  isPremium,
+  isSignedIn,
+  page = "results",
+}: ExitSurveyModalProps) {
+  const [view, setView]           = useState<View>("hidden");
   const [selected, setSelected]   = useState<Reason | null>(null);
   const [otherText, setOtherText] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const entryTime = useRef(Date.now());
 
@@ -47,11 +65,22 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
     // Never show to premium users
     if (isPremium) return;
 
-    // Never show if already submitted (persists across sessions)
     try {
+      // Permanently suppressed after submission
       if (localStorage.getItem(STORAGE_SUBMITTED)) return;
-      // Never show twice in the same session
-      if (sessionStorage.getItem(STORAGE_SESSION)) return;
+
+      if (isSignedIn) {
+        // Signed-in: if they previously dismissed without submitting,
+        // restore the floating icon immediately (no exit-intent needed).
+        if (localStorage.getItem(STORAGE_MINIMIZED)) {
+          setView("minimized");
+          return;
+        }
+        // First time ever — wait for exit intent (handled below).
+      } else {
+        // Guest: only show once per browser session.
+        if (sessionStorage.getItem(STORAGE_SESSION)) return;
+      }
     } catch {
       return;
     }
@@ -62,10 +91,16 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
       if (Date.now() - entryTime.current < MIN_TIME_ON_PAGE) return;
       try {
         if (localStorage.getItem(STORAGE_SUBMITTED)) return;
-        if (sessionStorage.getItem(STORAGE_SESSION)) return;
-        sessionStorage.setItem(STORAGE_SESSION, "true");
+        if (isSignedIn) {
+          if (localStorage.getItem(STORAGE_MINIMIZED)) return;
+          // Mark as "seen" so subsequent visits show the floating icon
+          localStorage.setItem(STORAGE_MINIMIZED, "true");
+        } else {
+          if (sessionStorage.getItem(STORAGE_SESSION)) return;
+          sessionStorage.setItem(STORAGE_SESSION, "true");
+        }
       } catch { /* ignore */ }
-      setVisible(true);
+      setView("modal");
     };
 
     // Desktop: mouse leaving toward browser chrome
@@ -85,7 +120,17 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
       document.removeEventListener("mouseleave", onMouseLeave);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [isPremium]);
+  }, [isPremium, isSignedIn]);
+
+  const handleClose = () => {
+    if (isSignedIn) {
+      // Signed-in users: collapse to floating icon (already marked in localStorage)
+      setView("minimized");
+    } else {
+      // Guests: just hide for this session (sessionStorage already set)
+      setView("hidden");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!selected || submitting) return;
@@ -104,17 +149,35 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
       });
     } catch { /* fail silently — don't block the UX */ }
 
-    try { localStorage.setItem(STORAGE_SUBMITTED, "true"); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(STORAGE_MINIMIZED);
+      localStorage.setItem(STORAGE_SUBMITTED, "true");
+    } catch { /* ignore */ }
 
     setSubmitting(false);
-    setSubmitted(true);
+    setView("submitted");
 
     // Auto-close after 2.5 seconds
-    setTimeout(() => setVisible(false), 2500);
+    setTimeout(() => setView("hidden"), 2500);
   };
 
-  if (!visible) return null;
+  if (view === "hidden") return null;
 
+  // ── Minimized floating icon ──────────────────────────────────────────────
+  if (view === "minimized") {
+    return (
+      <button
+        onClick={() => setView("modal")}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium pl-3 pr-4 py-2.5 rounded-full shadow-lg transition-colors"
+        aria-label="Open feedback survey"
+      >
+        <MessageSquare className="h-4 w-4 shrink-0" />
+        <span>Quick feedback</span>
+      </button>
+    );
+  }
+
+  // ── Full modal (modal + submitted states) ────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -130,7 +193,7 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
             </h2>
           </div>
           <button
-            onClick={() => setVisible(false)}
+            onClick={handleClose}
             className="ml-3 mt-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0"
             aria-label="Dismiss"
           >
@@ -138,7 +201,7 @@ export default function ExitSurveyModal({ isPremium, page = "results" }: ExitSur
           </button>
         </div>
 
-        {submitted ? (
+        {view === "submitted" ? (
           /* Thank you state */
           <div className="px-5 pb-6 pt-2 text-center">
             <p className="text-2xl mb-2">🙏</p>
