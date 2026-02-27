@@ -165,6 +165,12 @@ export default function ResultsPage() {
         return meetsMinimumThreshold;
     }, [analysisResult]);
 
+    // Randomly rotate AI model name in upgrade headline
+    const aiModelName = useMemo(() => {
+        const models = ['ChatGPT', 'Gemini', 'Perplexity'];
+        return models[Math.floor(Math.random() * models.length)];
+    }, []);
+
     // 🔹 NEW: Comprehensive ad display validation
     const shouldShowAds = useMemo(() => {
         return !isPremium && // Not premium user
@@ -316,7 +322,7 @@ export default function ResultsPage() {
                                 <span className="text-green-600 font-bold text-sm mt-0.5">✓ Your LLM score: {analysisResult.overall_score}/100</span>
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                                ❓ But is ChatGPT actually recommending you?
+                                ❓ But is {aiModelName} actually recommending you?
                             </h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                                 Check your visibility across ChatGPT, Gemini &amp; Perplexity
