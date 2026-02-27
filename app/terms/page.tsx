@@ -1,9 +1,24 @@
 // app/terms/page.tsx
-// Terms of Service 
+// Terms of Service
 
+import type { Metadata } from "next";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import Script from "next/script";
+
+export const metadata: Metadata = {
+  title: "Terms of Service — LLM Check",
+  description:
+    "Read LLM Check's Terms of Service. Understand your rights and responsibilities when using our AI website analysis and visibility tools.",
+  openGraph: {
+    title: "Terms of Service — LLM Check",
+    description:
+      "Read LLM Check's Terms of Service. Understand your rights and responsibilities when using our AI website analysis and visibility tools.",
+    url: "https://llmcheck.app/terms",
+    type: "website",
+    images: [{ url: "https://llmcheck.app/og-image.png", width: 1200, height: 630 }],
+  },
+};
 
 export default function TermsOfService() {
     return (

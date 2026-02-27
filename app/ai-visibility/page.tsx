@@ -7,7 +7,32 @@ import { CheckCircle2, XCircle, Eye, TrendingUp, AlertTriangle } from "lucide-re
 export const metadata: Metadata = {
   title: "AI Visibility Check — See How Your Brand Appears in ChatGPT, Gemini & Perplexity | LLM Check",
   description:
-    "Find out if your business shows up when customers ask ChatGPT, Gemini, or Perplexity about your products and services. AI Visibility Check — coming soon to LLM Check.",
+    "Find out if your business shows up when customers ask ChatGPT, Gemini, or Perplexity about your products and services. Stay visible to AI with LLM Check.",
+  keywords: [
+    "AI visibility check",
+    "ChatGPT brand visibility",
+    "Gemini brand mentions",
+    "Perplexity SEO",
+    "AI search visibility",
+    "LLM brand awareness",
+    "generative engine optimization",
+    "GEO",
+  ],
+  openGraph: {
+    title: "AI Visibility Check — See How Your Brand Appears in ChatGPT, Gemini & Perplexity",
+    description:
+      "Find out if your business shows up when customers ask AI assistants about your products and services. Scan across ChatGPT, Gemini, and Perplexity.",
+    url: "https://llmcheck.app/ai-visibility",
+    type: "website",
+    images: [{ url: "https://llmcheck.app/og-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Visibility Check — Is Your Brand Showing Up in AI Search?",
+    description:
+      "Scan ChatGPT, Gemini, and Perplexity to see if your business gets recommended when customers ask AI assistants about your niche.",
+    images: ["https://llmcheck.app/og-image.png"],
+  },
 }
 
 // ─── Simulated report data ────────────────────────────────────────────────────

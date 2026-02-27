@@ -1,8 +1,23 @@
 // app/privacy/page.tsx
-// Privacy Policy page 
+// Privacy Policy page
 
+import type { Metadata } from "next";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — LLM Check",
+  description:
+    "Read LLM Check's Privacy Policy. Learn how we collect, use, and protect your data when you use our AI website analysis and visibility tools.",
+  openGraph: {
+    title: "Privacy Policy — LLM Check",
+    description:
+      "Read LLM Check's Privacy Policy. Learn how we collect, use, and protect your data when you use our AI website analysis and visibility tools.",
+    url: "https://llmcheck.app/privacy",
+    type: "website",
+    images: [{ url: "https://llmcheck.app/og-image.png", width: 1200, height: 630 }],
+  },
+};
 
 export default function PrivacyPolicy() {
     return (
