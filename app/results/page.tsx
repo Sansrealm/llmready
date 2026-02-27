@@ -1,7 +1,7 @@
 // app/results/page.tsx - Complete file with content validation for ads
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
@@ -80,6 +80,9 @@ export default function ResultsPage() {
 
     const [refreshing, setRefreshing] = useState(false);
 
+    // When true, the next queryFn call will bypass the server-side cache
+    const bypassCacheRef = useRef(false);
+
     // Use React Query for analysis data fetching with caching
     const {
         data: analysisResult,
@@ -91,9 +94,12 @@ export default function ResultsPage() {
         queryFn: async () => {
             if (!url) throw new Error('URL is required');
 
-            console.log('🔄 Fetching analysis (with cache check)...');
+            const useCached = !bypassCacheRef.current;
+            bypassCacheRef.current = false; // reset after consuming
 
-            const response = await fetch("/api/analyze?cached=true", {
+            console.log(useCached ? '🔄 Fetching analysis (with cache check)...' : '🔄 Re-analyzing (bypassing cache)...');
+
+            const response = await fetch(useCached ? "/api/analyze?cached=true" : "/api/analyze", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -366,10 +372,10 @@ export default function ResultsPage() {
                                     )}
 
                                     <Button
-                                        onClick={() => refetch()}
+                                        onClick={() => { bypassCacheRef.current = true; refetch(); }}
                                         disabled={loading}
                                         variant="outline"
-                                        title="Bypass cache and get fresh analysis"
+                                        title="Run a fresh analysis, bypassing cache"
                                     >
                                         <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                                         Re-analyze
