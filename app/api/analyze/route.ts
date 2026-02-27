@@ -226,7 +226,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(analysisResult);
+    return NextResponse.json({
+      ...analysisResult,
+      analyzed_at: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("🔥 Analysis error:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

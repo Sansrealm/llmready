@@ -83,6 +83,11 @@ export default function ResultsPage() {
     // When true, the next queryFn call will bypass the server-side cache
     const bypassCacheRef = useRef(false);
 
+    // ── Re-analyze cooldown state (populated after analysisResult is available) ──
+    const REANALYZE_COOLDOWN_MS = 72 * 60 * 60 * 1000;
+    const [cooldownRemaining, setCooldownRemaining] = useState(0);
+    const [showReanalyzeWarning, setShowReanalyzeWarning] = useState(false);
+
     // Use React Query for analysis data fetching with caching
     const {
         data: analysisResult,
@@ -128,6 +133,45 @@ export default function ResultsPage() {
 
     // Convert React Query error to string for compatibility with existing code
     const error = queryError ? (queryError as Error).message : null;
+
+    // ── Re-analyze cooldown (72 h) ──────────────────────────────────────────
+    useEffect(() => {
+        if (!analysisResult?.analyzed_at) return;
+        const lastAnalyzed = new Date(analysisResult.analyzed_at).getTime();
+        const update = () => {
+            setCooldownRemaining(Math.max(0, lastAnalyzed + REANALYZE_COOLDOWN_MS - Date.now()));
+        };
+        update();
+        const timer = setInterval(update, 60_000);
+        return () => clearInterval(timer);
+    }, [analysisResult?.analyzed_at]);
+
+    const inCooldown = cooldownRemaining > 0;
+
+    function formatCooldown(ms: number): string {
+        const totalHours = Math.floor(ms / (1000 * 60 * 60));
+        const days = Math.floor(totalHours / 24);
+        const hours = totalHours % 24;
+        if (days > 0) return `${days}d ${hours}h`;
+        const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+    }
+
+    const handleReanalyzeClick = () => {
+        if (inCooldown || loading) return;
+        if (isSignedIn && !isPremium) {
+            setShowReanalyzeWarning(true);
+        } else {
+            bypassCacheRef.current = true;
+            refetch();
+        }
+    };
+
+    const handleConfirmReanalyze = () => {
+        setShowReanalyzeWarning(false);
+        bypassCacheRef.current = true;
+        refetch();
+    };
 
     // PDF generation states
     const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -372,14 +416,41 @@ export default function ResultsPage() {
                                     )}
 
                                     <Button
-                                        onClick={() => { bypassCacheRef.current = true; refetch(); }}
-                                        disabled={loading}
+                                        onClick={handleReanalyzeClick}
+                                        disabled={inCooldown || loading}
                                         variant="outline"
-                                        title="Run a fresh analysis, bypassing cache"
+                                        title={inCooldown ? `Available in ${formatCooldown(cooldownRemaining)}` : "Run a fresh analysis"}
                                     >
                                         <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                                        Re-analyze
+                                        {loading
+                                            ? 'Analyzing...'
+                                            : inCooldown
+                                            ? `Re-analyze in ${formatCooldown(cooldownRemaining)}`
+                                            : 'Re-analyze'}
                                     </Button>
+
+                                    {/* Free user re-analyze warning */}
+                                    {showReanalyzeWarning && (
+                                        <div className="w-full mt-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                            <p className="text-sm text-amber-800 dark:text-amber-300 mb-2">
+                                                ⚠️ This will use <strong>1 of your {analysisResult?.remainingAnalyses ?? 0} remaining analyses</strong>. Continue?
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleConfirmReanalyze}
+                                                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-md transition-colors"
+                                                >
+                                                    Confirm &amp; Re-analyze
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowReanalyzeWarning(false)}
+                                                    className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline px-2"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {!isSignedIn && (
                                         <Link href="/login">

@@ -78,6 +78,8 @@ export interface AnalysisResult {
   remainingAnalyses?: number; // Only present for free users
   industry?: string; // GPT-detected: ecommerce|saas|media|education|healthcare|other
   visibilityQueries?: string[]; // 5 custom AI search queries generated from site content
+  analyzed_at?: string; // ISO timestamp of when this analysis was run
+  cached?: boolean; // true when result was served from DB cache
 }
 
 /**
