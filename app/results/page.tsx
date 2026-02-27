@@ -17,6 +17,7 @@ import ScoreHistoryWidget from '@/components/score-history-widget';
 import { ShareButton } from '@/components/share-button';
 import { AnalysisResult, DebugInfo } from '@/lib/types';
 import AiVisibilityCheck from '@/components/ai-visibility-check';
+import ExitSurveyModal from '@/components/exit-survey-modal';
 
 // Premium check that uses server-side API
 function useIsPremium() {
@@ -634,6 +635,7 @@ export default function ResultsPage() {
                 </div>
             </main>
             <Footer />
+            <ExitSurveyModal isPremium={isPremium} page="results" />
         </div>
     );
 }
