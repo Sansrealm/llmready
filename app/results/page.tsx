@@ -309,15 +309,41 @@ export default function ResultsPage() {
                         </Alert>
                     )}
 
-                    {/* Remaining analyses for free users */}
-                    {isSignedIn && !isPremium && analysisResult?.remainingAnalyses !== undefined && (
-                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <p className="text-blue-700 dark:text-blue-300 text-sm">
-                                You have <strong>{analysisResult.remainingAnalyses}</strong> free analyses remaining this month.
-                                <Link href="/pricing" className="ml-2 text-blue-600 hover:text-blue-800 font-medium">
-                                    Upgrade to Premium
-                                </Link> for unlimited analyses.
+                    {/* Upgrade block for free users */}
+                    {!isPremium && analysisResult && (
+                        <div className="mb-6 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 p-6">
+                            <div className="flex items-start gap-3 mb-3">
+                                <span className="text-green-600 font-bold text-sm mt-0.5">✓ Your LLM score: {analysisResult.overall_score}/100</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                                ❓ But is ChatGPT actually recommending you?
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                Check your visibility across ChatGPT, Gemini &amp; Perplexity
                             </p>
+                            <ul className="space-y-1.5 mb-5">
+                                {[
+                                    "See which queries you appear in",
+                                    "Track improvements over time",
+                                    "Download a full PDF report",
+                                ].map((item) => (
+                                    <li key={item} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <span className="text-indigo-500">→</span> {item}
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="flex flex-wrap gap-3">
+                                <Link href="/pricing">
+                                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+                                        Check My AI Visibility — $9/mo
+                                    </button>
+                                </Link>
+                                <Link href="/ai-visibility">
+                                    <button className="border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+                                        See Example Report →
+                                    </button>
+                                </Link>
+                            </div>
                         </div>
                     )}
 
@@ -384,14 +410,6 @@ export default function ResultsPage() {
                                         <Link href="/login">
                                             <Button variant="outline">
                                                 Sign In for Premium Features
-                                            </Button>
-                                        </Link>
-                                    )}
-
-                                    {isSignedIn && !isPremium && (
-                                        <Link href="/pricing">
-                                            <Button variant="outline">
-                                                Upgrade to Premium
                                             </Button>
                                         </Link>
                                     )}
