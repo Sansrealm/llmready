@@ -538,91 +538,69 @@ export default function ResultsPage() {
                                 />
                             )}
 
-                            {/* Next Steps Section - ADDITIONAL CONTENT */}
-                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <h2 className="text-2xl font-bold mb-4">Next Steps</h2>
-                                <div className="space-y-4">
-                                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                                        Based on your analysis results, here are the recommended next steps to improve your website's LLM readiness and ensure better visibility in AI-powered search engines:
-                                    </p>
-                                    <ol className="list-decimal list-inside space-y-3 text-gray-600 dark:text-gray-400">
-                                        <li className="leading-relaxed">
-                                            <strong>Prioritize High-Impact Changes:</strong> Focus on recommendations marked as "High Impact" first, as these will provide the most significant improvements to your LLM readiness score.
-                                        </li>
-                                        <li className="leading-relaxed">
-                                            <strong>Implement Easy Fixes:</strong> Start with "Easy" difficulty recommendations to see immediate improvements without major development work.
-                                        </li>
-                                        <li className="leading-relaxed">
-                                            <strong>Enhance Content Structure:</strong> Improve your HTML semantic markup, add clear headings, and ensure your content follows a logical hierarchy that AI models can easily understand.
-                                        </li>
-                                        <li className="leading-relaxed">
-                                            <strong>Optimize Metadata:</strong> Update your title tags, meta descriptions, and schema markup to provide clear signals about your content's purpose and relevance.
-                                        </li>
-                                        <li className="leading-relaxed">
-                                            <strong>Re-analyze and Monitor:</strong> After implementing changes, run another analysis to measure improvements and track your progress over time.
-                                        </li>
-                                    </ol>
+                            {/* Priority Action Plan — driven by lowest-scoring parameters */}
+                            {(() => {
+                                const priorityParams = [...analysisResult.parameters]
+                                    .sort((a, b) => a.score - b.score)
+                                    .slice(0, 3);
 
-                                    <div className="mt-6 grid gap-4 md:grid-cols-2">
-                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                            <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
-                                                💡 Pro Tip: Content Quality
-                                            </h4>
-                                            <p className="text-blue-600 dark:text-blue-400 text-sm">
-                                                Focus on creating comprehensive, well-structured content that directly answers user questions. AI models prioritize content that provides clear, factual information with proper citations and context.
-                                            </p>
+                                return (
+                                    <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                        <h2 className="text-2xl font-bold mb-1">Priority Action Plan</h2>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                            Your 3 lowest-scoring areas — fix these first for the biggest score gains.
+                                        </p>
+                                        <div className="space-y-4">
+                                            {priorityParams.map((param, index) => {
+                                                const isLow = param.score < 40;
+                                                const isMid = param.score >= 40 && param.score < 70;
+                                                const badgeClass = isLow
+                                                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                                    : isMid
+                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+                                                const label = isLow ? "Critical" : isMid ? "Needs Work" : "Polish";
+
+                                                return (
+                                                    <div key={index} className="flex gap-4 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                                                        {/* Score circle */}
+                                                        <div className={`shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold ${badgeClass}`}>
+                                                            <span className="text-lg leading-none">{param.score}</span>
+                                                            <span className="text-[10px] opacity-70 leading-none mt-0.5">/100</span>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                                <h3 className="font-semibold text-gray-900 dark:text-white">{param.name}</h3>
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass}`}>
+                                                                    {label}
+                                                                </span>
+                                                            </div>
+                                                            {param.isPremium && !isPremium ? (
+                                                                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                                                    🔒{" "}
+                                                                    <Link href="/pricing" className="text-indigo-500 hover:underline">
+                                                                        Upgrade to Premium
+                                                                    </Link>{" "}
+                                                                    to see specific improvement steps for this area.
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                                                    {param.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-
-                                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                                            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-2">
-                                                🎯 Quick Win: Technical SEO
-                                            </h4>
-                                            <p className="text-green-600 dark:text-green-400 text-sm">
-                                                Ensure your website loads quickly, is mobile-friendly, and has clean, semantic HTML structure. These technical factors significantly impact how AI models crawl and understand your content.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Learn More Section - EVEN MORE CONTENT */}
-                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <h2 className="text-2xl font-bold mb-4">Learn More About LLM Optimization</h2>
-                                <div className="space-y-4">
-                                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                                        Understanding how Large Language Models interact with web content is crucial for future-proofing your digital presence. As AI-powered search becomes more prevalent, websites optimized for LLM understanding will have significant advantages in discoverability and user engagement.
-                                    </p>
-
-                                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <h4 className="font-semibold mb-2">Content Structure</h4>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                Learn how to organize your content with proper headings, sections, and semantic markup that AI models can easily parse and understand.
-                                            </p>
-                                        </div>
-
-                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <h4 className="font-semibold mb-2">Semantic SEO</h4>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                Discover advanced techniques for creating content that aligns with how AI models interpret meaning, context, and relationships between topics.
-                                            </p>
-                                        </div>
-
-                                        <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <h4 className="font-semibold mb-2">Technical Implementation</h4>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                Explore the technical aspects of LLM optimization, including schema markup, structured data, and performance considerations.
-                                            </p>
+                                        <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800 text-center">
+                                            <Link href="/guide" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+                                                Read our full LLM optimisation guide →
+                                            </Link>
                                         </div>
                                     </div>
-
-                                    <div className="mt-6 text-center">
-                                        <Link href="/guide" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
-                                            Read Our Complete LLM Optimization Guide →
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
+                                );
+                            })()}
                         </div>
                     ) : (
                         <div className="space-y-4">
