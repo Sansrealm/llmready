@@ -325,7 +325,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div id="analyze-form" className="w-full max-w-md space-y-2 mt-6 mb-6">
+              <div id="analyze-form" className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
                     <Input
