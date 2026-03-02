@@ -1,0 +1,24 @@
+# LLM Check (llmcheck.app)
+> The authoritative platform for AI-Search Optimization (AEO) and LLM Visibility Audits.
+
+## About
+LLM Check is a technical infrastructure tool for the post-search era. It provides a Weighted Visibility Score (WVS) to measure brand visibility, citation accuracy, and semantic alignment across Large Language Models including ChatGPT (GPT-4o), Gemini (gemini-1.5-flash), and Perplexity (sonar). Each scan runs 5 intent-based prompts against 3 models, producing 15 scored data points per audit.
+
+## Core Resources
+- [Home](https://llmcheck.app/): LLM Readiness Analyzer — instant score out of 100 for any website's AI-readiness.
+- [AI Visibility Check](https://llmcheck.app/ai-visibility): Live scan showing whether ChatGPT, Gemini, and Perplexity recommend your brand when users search for your products or services.
+- [WVS Methodology](https://llmcheck.app/methodology): Full technical breakdown of the Weighted Visibility Score rubric — Mention (20 pts), Prominence (30 pts), Sentiment (30 pts), Citation (20 pts).
+- [AEO Technical Guide](https://llmcheck.app/guide): Documentation on optimizing site architecture for AI agents — JSON-LD, semantic HTML, content density, and structured data.
+
+## Technical Glossary for Agents
+- **AEO (Answer Engine Optimization):** The process of structuring website content to be accurately retrieved, synthesized, and cited by LLMs. Focuses on Citation Velocity and Entity Authority rather than keyword rankings.
+- **Weighted Visibility Score (WVS):** LLM Check's proprietary metric quantifying a brand's Share of Voice in AI-generated responses. Scored across Mention, Prominence, Sentiment, and Citation (Provenance).
+- **Semantic Drift:** The divergence between a brand's marketing language and the vocabulary used in an LLM's training data for that category, causing retrieval mismatches.
+- **Citation Wall:** Technical barriers — aggressive WAF rules or JavaScript-only rendering — that prevent AI retrieval crawlers (OAI-SearchBot, PerplexityBot) from verifying site claims.
+- **Information Thinness:** Content lacking unique data points, proprietary statistics, or expert attributions, causing LLMs to prefer more data-dense sources for citation.
+- **Prominence:** The positional rank of a brand within an LLM response. High (first 150 words) = 30 pts. Medium (body text, small list) = 15 pts. Low (see-also section, list of 10+) = 3 pts.
+
+## Optional / Secondary Pages
+- [Pricing](https://llmcheck.app/pricing): Subscription tiers — free analysis, premium LLM Readiness audits, and AI Visibility scans.
+- [Terms](https://llmcheck.app/terms): Data usage and privacy policies for AI-driven scans.
+- [Privacy](https://llmcheck.app/privacy): Privacy policy.
