@@ -27,33 +27,20 @@ export interface OgCard {
   warning?: string;
 }
 
-/** One selectable variant — overrides title and optionally card */
-export interface OgVariant {
-  title: string[];
-  card?: OgCard;
-}
-
 export interface OgConfig {
   /** Small branded pill in the top-left */
   badge?: string;
   /**
    * Headline split into lines. The LAST line is rendered in the accent colour.
    * Use 2–3 lines for best results.
-   * Can be omitted when `variants` is provided.
    */
-  title?: string[];
+  title: string[];
   /** One or two sentences below the headline */
   subtitle: string;
   /** Button label. Omit to hide the CTA button entirely. */
   cta?: string;
   /** Optional right-side mock panel. Omit for a text-only layout. */
   card?: OgCard;
-  /**
-   * When present, the route picks one entry randomly per request.
-   * The selected variant's title/card override the top-level values.
-   * `title` at the top level can be omitted when variants are provided.
-   */
-  variants?: OgVariant[];
   /** Override default colours */
   theme?: {
     /** Page background — CSS gradient or solid colour */
@@ -89,7 +76,7 @@ const DEFAULTS = {
 export function generateOgImage(config: OgConfig): ImageResponse {
   const {
     badge,
-    title = [],
+    title,
     subtitle,
     cta,
     card,
