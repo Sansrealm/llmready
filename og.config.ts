@@ -24,21 +24,67 @@ const ogConfig: Record<string, OgConfig> = {
   // ── Homepage ────────────────────────────────────────────────────────────────
   home: {
     badge: "llmcheck.app",
-    title: ["Does ChatGPT", "recommend", "your brand?"],
     subtitle:
       "Scan ChatGPT, Gemini, and Perplexity to see if they cite you — or your competitors.",
     cta: "Free scan — instant results",
-    card: {
-      header: "AI Visibility Check",
-      domain: "yoursite.com",
-      rows: [
-        { label: "ChatGPT",    found: true  },
-        { label: "Gemini",     found: false },
-        { label: "Perplexity", found: false },
-      ],
-      score: 33,
-      warning: "2 of 3 AI assistants don't know you exist",
-    },
+    variants: [
+      {
+        title: ["Does ChatGPT", "recommend", "your brand?"],
+        card: {
+          header: "AI Visibility Check",
+          domain: "yoursite.com",
+          rows: [
+            { label: "ChatGPT",    found: true  },
+            { label: "Gemini",     found: false },
+            { label: "Perplexity", found: false },
+          ],
+          score: 33,
+          warning: "2 of 3 AI assistants don't know you exist",
+        },
+      },
+      {
+        title: ["Does Gemini", "recommend", "your brand?"],
+        card: {
+          header: "AI Visibility Check",
+          domain: "yoursite.com",
+          rows: [
+            { label: "ChatGPT",    found: false },
+            { label: "Gemini",     found: true  },
+            { label: "Perplexity", found: false },
+          ],
+          score: 40,
+          warning: "2 of 3 AI assistants don't know you exist",
+        },
+      },
+      {
+        title: ["Does Perplexity", "recommend", "your brand?"],
+        card: {
+          header: "AI Visibility Check",
+          domain: "yoursite.com",
+          rows: [
+            { label: "ChatGPT",    found: false },
+            { label: "Gemini",     found: false },
+            { label: "Perplexity", found: true  },
+          ],
+          score: 20,
+          warning: "2 of 3 AI assistants don't know you exist",
+        },
+      },
+      {
+        title: ["Does AI", "recommend", "your brand?"],
+        card: {
+          header: "AI Visibility Check",
+          domain: "yoursite.com",
+          rows: [
+            { label: "ChatGPT",    found: false },
+            { label: "Gemini",     found: false },
+            { label: "Perplexity", found: false },
+          ],
+          score: 0,
+          warning: "No AI assistants are recommending you yet",
+        },
+      },
+    ],
   },
 
   // ── AI Visibility page ───────────────────────────────────────────────────
