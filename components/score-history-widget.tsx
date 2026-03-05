@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Lock, BarChart2 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -151,16 +151,11 @@ export default function ScoreHistoryWidget({
       <Card>
         <CardHeader>
           <CardTitle>Score History for this URL</CardTitle>
-          <CardDescription>
-            Track your progress over time as you optimize for LLM readiness
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p className="text-lg font-medium">This is your first analysis of this URL</p>
-            <p className="text-sm mt-2">
-              Analyze this URL again in the future to see how your score changes over time
-            </p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-600">
+            <BarChart2 className="w-6 h-6" />
+            <p className="text-sm">Your analysis trend will show up here once you have more runs.</p>
           </div>
         </CardContent>
       </Card>

@@ -374,7 +374,7 @@ export default function AiVisibilityCheck({
         </div>
 
         {/* Snippets */}
-        {snippets.length > 0 && (
+        {snippets.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-emerald-500" />
@@ -394,6 +394,11 @@ export default function AiVisibilityCheck({
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+            No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
+            Your LLM Readiness score and Priority Action Plan below show where to start.
           </div>
         )}
 

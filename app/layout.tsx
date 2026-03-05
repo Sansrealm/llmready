@@ -13,20 +13,21 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://llmcheck.app'),
-  title: "LLM Ready Analyzer - Optimize Your Website for AI Search | Free Website Analysis",
-  description: "Analyze your website's readiness for Large Language Models and AI-powered search engines. Get instant insights, recommendations, and improve your AI SEO ranking. Free analysis available.",
+  title: "LLM Check — AI Visibility & LLM Readiness Audit",
+  description: "Find out if ChatGPT, Gemini, and Perplexity recommend your brand. Free AI visibility scan — instant results, no signup required.",
 
   openGraph: {
-    title: "LLM Ready Analyzer - Optimize Your Website for AI Search",
-    description: "Free AI website analysis tool. Check if your website is optimized for Large Language Models and AI search engines like ChatGPT, Claude, and Perplexity.",
+    title: "Does ChatGPT recommend your brand?",
+    description: "Scan ChatGPT, Gemini, and Perplexity to see if they cite you — or your competitors. Free AI visibility audit at llmcheck.app.",
     type: "website",
     url: "https://llmcheck.app",
-    siteName: "LLM Ready Analyzer",
+    siteName: "LLM Check",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og",
         width: 1200,
         height: 630,
+        alt: "LLM Check — AI Visibility Scan for ChatGPT, Gemini, and Perplexity",
       },
     ],
     locale: "en_US",
@@ -34,9 +35,9 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "LLM Ready Analyzer - Optimize Your Website for AI Search",
-    description: "Free AI website analysis tool. Check if your website is ready for Large Language Models and AI search engines.",
-    images: ["/og-image.png"],
+    title: "Does ChatGPT recommend your brand?",
+    description: "Scan ChatGPT, Gemini, and Perplexity to see if they cite you — or your competitors. Free at llmcheck.app.",
+    images: ["/og"],
   },
 
   keywords: [
