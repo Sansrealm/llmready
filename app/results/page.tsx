@@ -308,11 +308,16 @@ export default function ResultsPage() {
             <div className="flex min-h-screen flex-col">
                 <Navbar />
                 <main className="flex-1">
-                    <div className="container py-8 px-4 md:px-6">
+                    <div className="container py-8 px-4 md:px-6 max-w-2xl">
+                        <div className="flex items-center gap-3 mb-8">
+                            <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin shrink-0" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Analysing your site — this usually takes a few seconds…</p>
+                        </div>
                         <div className="space-y-4">
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-32 w-full" />
-                            <Skeleton className="h-32 w-full" />
+                            <Skeleton className="h-9 w-56 rounded-lg" />
+                            <Skeleton className="h-4 w-72 rounded" />
+                            <Skeleton className="h-36 w-full rounded-xl" />
+                            <Skeleton className="h-36 w-full rounded-xl" />
                         </div>
                     </div>
                 </main>
@@ -326,26 +331,27 @@ export default function ResultsPage() {
             <Navbar />
             <main className="flex-1">
                 <div className="container py-8 px-4 md:px-6">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-2">
                         <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
-                    </div>
-                    <p className="mb-6 text-gray-600">Analysis for: {url}</p>
-
-                    {/* Premium status indicator */}
-                    {isSignedIn && (
-                        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                            <p className="text-sm">
-                                Account Status: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
+                        {isSignedIn && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                                    isPremium
+                                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
+                                        : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isPremium ? 'bg-green-500' : 'bg-gray-400'}`} />
                                     {isPremium ? 'Premium' : 'Free'}
                                 </span>
                                 {!isPremium && (
-                                    <span className="ml-2">
-                                        - <Link href="/pricing" className="text-blue-600 hover:underline">Upgrade for full features</Link>
-                                    </span>
+                                    <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
+                                        Upgrade →
+                                    </Link>
                                 )}
-                            </p>
-                        </div>
-                    )}
+                            </div>
+                        )}
+                    </div>
+                    <p className="mb-6 text-gray-500 dark:text-gray-400 text-sm">Analysis for: {url}</p>
 
                     {/* Success/Error messages for PDF generation */}
                     {pdfSuccess && (

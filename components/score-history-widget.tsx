@@ -70,15 +70,15 @@ export default function ScoreHistoryWidget({
   // Show upgrade prompt for non-premium users
   if (!isPremium && !premiumLoading) {
     return (
-      <Card className="border-orange-200 dark:border-orange-800">
+      <Card className="border-indigo-200 dark:border-indigo-800">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              <Lock className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
               <CardTitle>Track Your Progress Over Time</CardTitle>
             </div>
-            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
-              Premium Only
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
+              Premium
             </span>
           </div>
           <CardDescription>
@@ -88,20 +88,20 @@ export default function ScoreHistoryWidget({
         <CardContent>
           <div className="space-y-4">
             <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-              <li className="flex items-start">
-                <span className="mr-2">📈</span>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">→</span>
                 <span>Score history chart showing trends over time</span>
               </li>
-              <li className="flex items-start">
-                <span className="mr-2">📊</span>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">→</span>
                 <span>Detailed analysis of improvements and declines</span>
               </li>
-              <li className="flex items-start">
-                <span className="mr-2">🎯</span>
-                <span>Track the impact of your optimization efforts</span>
+              <li className="flex items-center gap-2">
+                <span className="text-indigo-400">→</span>
+                <span>Track the impact of your optimisation efforts</span>
               </li>
             </ul>
-            <Button className="w-full bg-orange-600 hover:bg-orange-700" asChild>
+            <Button className="w-full bg-indigo-600 hover:bg-indigo-700" asChild>
               <Link href="/pricing">Upgrade to Premium</Link>
             </Button>
           </div>
@@ -115,11 +115,15 @@ export default function ScoreHistoryWidget({
     return (
       <Card>
         <CardHeader>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-6 w-48 rounded-lg" />
+          <Skeleton className="h-4 w-64 mt-1 rounded" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-64 w-full" />
+          <div className="flex items-center gap-2 mb-4 text-sm text-gray-400 dark:text-gray-500">
+            <div className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" />
+            Loading your score history…
+          </div>
+          <Skeleton className="h-64 w-full rounded-lg" />
         </CardContent>
       </Card>
     );
