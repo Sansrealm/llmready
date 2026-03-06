@@ -684,6 +684,26 @@ export default function ResultsPage() {
                                     </div>
                                 );
                             })()}
+
+                            {/* Guest "create account" hook — shown after full results */}
+                            {!isSignedIn && (
+                                <div className="rounded-xl border border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 p-6 text-center">
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-green-600 dark:text-green-400 mb-2">
+                                        You&apos;ve used your free scan
+                                    </p>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                                        Want to check more sites?
+                                    </h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                        Create a free account and get <strong>3 analyses per month</strong> — no credit card required.
+                                    </p>
+                                    <Link href="/login">
+                                        <button className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors">
+                                            Create Free Account →
+                                        </button>
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-4">

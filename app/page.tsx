@@ -287,10 +287,10 @@ export default function Home() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Is Your Website <span className="text-green-600 dark:text-green-500">LLM Ready</span>?
+                  Is AI sending your customers to a competitor?
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  Analyze your website's readiness for Large Language Models and improve your visibility in AI-powered search.
+                  Don&apos;t be invisible in the new search era. Find out if ChatGPT, Gemini, and Perplexity are recommending your brand—and get the exact roadmap to fix it.
                 </p>
               </div>
 
@@ -371,7 +371,7 @@ export default function Home() {
                   {/* Updated usage info based on subscription status */}
                   {!isSignedIn && analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free users can analyze 1 website. Create an account for more.
+                      Free scan. See your AI Visibility Score in under 60 seconds.
                     </p>
                   )}
 
@@ -404,7 +404,7 @@ export default function Home() {
                         ? "Loading..." // Step 2: Show loading until server confirms
                         : isLimitReached
                           ? "Analysis Limit Reached"
-                          : "Analyze"}
+                          : "Analyze My AI Visibility"}
                   </Button>
 
                   {isLimitReached && (
