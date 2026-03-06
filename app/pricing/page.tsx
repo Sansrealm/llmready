@@ -222,7 +222,7 @@ export default function PricingPage() {
                   <tr className="border-b">
                     <td className="py-4">Number of Analyses</td>
                     <td className="py-4 text-center">Limited</td>
-                    <td className="py-4 text-center">Unlimited</td>
+                    <td className="py-4 text-center">25 per month</td>
                   </tr>
                 </tbody>
               </table>
