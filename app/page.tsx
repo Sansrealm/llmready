@@ -290,7 +290,7 @@ export default function Home() {
                   Is AI sending your customers to a competitor?
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  Don&apos;t be invisible in the new search era. Find out if ChatGPT, Gemini, and Perplexity are recommending your brand—and get the exact roadmap to fix it.
+                  When customers ask ChatGPT, Gemini or Perplexity for a service or product like yours, do they see your name? Most businesses are invisible to AI without even knowing it. llmcheck shows you exactly where you stand and gives you actionable insights to get cited ahead of others.
                 </p>
               </div>
 
