@@ -120,7 +120,16 @@ export default function PricingPage() {
                 </div>
 
                 {/* Clerk's built-in PricingTable component - now public */}
-                <PricingTable />
+                {/* Hide plan description: it contains a signed-in-specific notice
+                    ("This indicates the premium plan options…") that is confusing
+                    for new visitors. Our feature comparison table covers this. */}
+                <PricingTable
+                  appearance={{
+                    elements: {
+                      planDescription: { display: "none" },
+                    },
+                  }}
+                />
 
                 {/* Sign-in prompt for non-authenticated users */}
                 {!isSignedIn && (
@@ -129,13 +138,13 @@ export default function PricingPage() {
                       Ready to get started?
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      Sign in to subscribe and start optimizing your website for AI
+                      Sign in and start optimizing your website for AI
                     </p>
                     <Link
                       href="/auth"
                       className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700 h-10 px-6 py-2"
                     >
-                      Sign In to Subscribe
+                      Sign In
                     </Link>
                   </div>
                 )}
