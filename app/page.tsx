@@ -282,7 +282,7 @@ export default function Home() {
         )}
 
         {/* Hero Section */}
-        <section id="analyze-form" className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900">
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
@@ -324,6 +324,9 @@ export default function Home() {
                   </div>
                 </div>
               )}
+
+              {/* Scroll anchor — gives CTA bookmarks a clean landing point above the form */}
+              <div id="analyze-form" className="scroll-mt-24" />
 
               <div className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -371,7 +374,7 @@ export default function Home() {
                   {/* Updated usage info based on subscription status */}
                   {!isSignedIn && analysisCount === 0 && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Free scan. See your AI Visibility Score in under 60 seconds.
+                      Used by the founders and marketers defining the new era of AI Search. Start for free.
                     </p>
                   )}
 
