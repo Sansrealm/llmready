@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History } from "lucide-react";
+import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History, Search, TrendingUp, ListChecks } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { ScreenshotCarousel } from "@/components/screenshot-carousel";
@@ -282,7 +282,7 @@ export default function Home() {
         )}
 
         {/* Hero Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900">
+        <section id="analyze-form" className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
@@ -325,7 +325,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div id="analyze-form" className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
+              <div className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
                     <Input
@@ -454,6 +454,49 @@ export default function Home() {
                     </div>
                   )}
                 </form>
+              </div>
+
+              {/* How it works */}
+              <div className="w-full max-w-3xl my-12">
+                <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 text-center mb-3">
+                  How it works
+                </p>
+                <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-8">
+                  From &ldquo;Invisible&rdquo; to &ldquo;Recommended&rdquo; in 3 steps.
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+
+                  <div className="flex flex-col gap-3 p-5 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                      <Search className="w-4 h-4 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">The AI Audit</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      We query <strong>ChatGPT, Gemini, and Perplexity</strong> to see how they describe your business — and your competitors. Real answers from real AI.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3 p-5 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">The Visibility Score</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      Get a clear grade on your <strong>Citation Share</strong>. See exactly how often you are recommended vs. the competition — in one number you can act on.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3 p-5 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                      <ListChecks className="w-4 h-4 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">The Action Plan</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      A <strong>plain-English checklist</strong> of 3–5 changes to your website that make AI recognise you as an authority — and recommend you over everyone else.
+                    </p>
+                  </div>
+
+                </div>
               </div>
 
               {/* Feature showcase */}
