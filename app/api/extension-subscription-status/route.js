@@ -1,7 +1,7 @@
 // Fixed app/api/extension-subscription-status/route.js with better error handling
 
-import { NextResponse } from 'next/server';
-import { verifyToken, clerkClient } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
+import { verifyToken } from '@clerk/backend';
 
 export async function GET(request) {
     // TEMPORARY DEBUG - Remove after fixing
@@ -36,9 +36,10 @@ export async function GET(request) {
         try {
             console.log('🔐 Attempting token verification...');
             verifiedToken = await verifyToken(token, {
-                // Add any specific options if needed
-                issuer: (iss) => iss.includes('clerk'),
+                secretKey: process.env.CLERK_SECRET_KEY,
+                authorizedParties: ['chrome-extension://ajcjkkbebpgofanpddihbkilmcnjddad'],
             });
+
             userId = verifiedToken.sub;
             console.log('✅ Token verified successfully for user:', userId);
         } catch (tokenError) {
