@@ -76,7 +76,8 @@ export async function GET(request) {
         // Get user with better error handling
         let user;
         try {
-            user = await clerkClient.users.getUser(userId);
+            const clerk = await clerkClient();
+            user = await clerk.users.getUser(userId);
             console.log('✅ User data retrieved:', {
                 id: user.id,
                 hasMetadata: !!user.publicMetadata,
