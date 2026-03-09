@@ -1,5 +1,6 @@
 // Fixed app/api/extension-subscription-status/route.js with better error handling
 
+import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
 import { verifyToken } from '@clerk/backend';
 
