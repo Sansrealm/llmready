@@ -27,7 +27,8 @@ const cspHeader = `
     https://*.clerk.dev
     https://analytics.google.com
     https://*.stripe.com
-    https://vercel.live;
+    https://vercel.live
+    https://api.web3forms.com;
   img-src 'self' 
     https://img.clerk.com 
     https://*.clerk.com 

@@ -198,7 +198,7 @@ export default function TermsOfService() {
                             </p>
                             <div className="mb-8">
                                 <p className=" text-gray-700 dark:text-gray-300 mb-2"><strong>Website:</strong> <a href="https://llmcheck.app" className="text-blue-600 hover:underline">llmcheck.app</a></p>
-                                <p className=" text-gray-700 dark:text-gray-300"><strong>Support:</strong> <a href="#tally-open=wo1QWX&tally-emoji-text=👋&tally-emoji-animation=wave">Contact Us</a></p>
+                                <p className=" text-gray-700 dark:text-gray-300"><strong>Support:</strong> <a href="/contact" className="text-blue-600 hover:underline">Contact Us</a></p>
                             </div>
                         </section>
 

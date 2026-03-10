@@ -27,6 +27,14 @@ export default function Footer() {
                   Pricing
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/contact"
+                  className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+                >
+                  Contact
+                </Link>
+              </li>
             </ul>
           </div>
           <div className="md:col-span-3 md:col-start-8">
