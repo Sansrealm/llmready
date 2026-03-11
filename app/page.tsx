@@ -287,10 +287,10 @@ export default function Home() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                  Is AI sending your customers to a competitor?
+                  Make AI recommend your business.
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  When customers ask ChatGPT, Gemini or Perplexity for a service or product like yours, do they see your name? Most businesses are invisible to AI without even knowing it. llmcheck shows you exactly where you stand and gives you actionable insights to get cited ahead of others.
+                  Turn LLMs into your #1 referral source. llmcheck identifies the technical gaps keeping you out of AI answers and gives you actionable insights to outrank your competitors in the new era of search.
                 </p>
               </div>
 
@@ -329,6 +329,9 @@ export default function Home() {
               <div id="analyze-form" className="scroll-mt-24" />
 
               <div className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
+                <p className="text-lg font-semibold text-gray-900 dark:text-white mb-5">
+                  Start your audit for free
+                </p>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
                     <Input
@@ -372,11 +375,6 @@ export default function Home() {
                   </div>
 
                   {/* Updated usage info based on subscription status */}
-                  {!isSignedIn && analysisCount === 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Used by the founders and marketers defining the new era of AI Search. Start for free.
-                    </p>
-                  )}
 
                   {isSignedIn && !premiumLoading && !isPremium && canAnalyze === true && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">

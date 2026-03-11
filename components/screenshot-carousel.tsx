@@ -73,10 +73,7 @@ export function ScreenshotCarousel() {
       </div>
 
       <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-5">
-        Join{" "}
-        <span className="font-semibold text-gray-700 dark:text-gray-300">2,000+ businesses</span>{" "}
-        that are managing their AI visibility with LLMCheck.{" "}
-        <span className="text-green-600 dark:text-green-500 font-medium">Try for free.</span>
+        Join founders and marketers defining the new era of AI Search.
       </p>
     </div>
   )
