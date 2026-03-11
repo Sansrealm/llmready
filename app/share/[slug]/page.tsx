@@ -78,13 +78,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: `View the LLM readiness analysis for ${analysis.url}. Overall score: ${analysis.overall_score}/100`,
     openGraph: {
       title: `LLM Readiness Score: ${analysis.overall_score}/100`,
-      description: `Analysis results for ${analysis.url}`,
+      description: `AI readiness analysis for ${analysis.url}. See parameter breakdown and improvement recommendations.`,
       type: 'website',
+      siteName: 'LLM Check',
+      url: `https://llmcheck.app/share/${slug}`,
     },
     twitter: {
       card: 'summary_large_image',
       title: `LLM Readiness Score: ${analysis.overall_score}/100`,
-      description: `Analysis results for ${analysis.url}`,
+      description: `AI readiness analysis for ${analysis.url}. See parameter breakdown and improvement recommendations.`,
     },
   };
 }
