@@ -294,15 +294,13 @@ export default function Home() {
                 </p>
               </div>
 
-              <ScreenshotCarousel />
+              {!(isPremium && !premiumLoading) && <ScreenshotCarousel />}
 
               {/* Premium status indicator for signed-in users */}
-              {isSignedIn && !premiumLoading && (
+              {isSignedIn && !premiumLoading && !isPremium && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg inline-block">
                   <p className="text-sm">
-                    Current Plan: <span className={`font-medium ${isPremium ? 'text-green-600' : 'text-blue-600'}`}>
-                      {isPremium ? 'Premium ✅' : 'Free'}
-                    </span>
+                    Current Plan: <span className="font-medium text-blue-600">Free</span>
                   </p>
                 </div>
               )}
@@ -329,9 +327,11 @@ export default function Home() {
               <div id="analyze-form" className="scroll-mt-24" />
 
               <div className="w-full max-w-md mt-6 mb-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm shadow-sm px-6 py-7">
-                <p className="text-lg font-semibold text-gray-900 dark:text-white mb-5">
-                  Start your audit for free
-                </p>
+                {!(isPremium && !premiumLoading) && (
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white mb-5">
+                    Start your audit for free
+                  </p>
+                )}
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-3">
                     <Input
@@ -342,37 +342,39 @@ export default function Home() {
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Input
-                        type="email"
-                        placeholder="Email (optional)"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                      {email && (
-                        <p className="text-xs text-muted-foreground">
-                          By using this service you agree to your email being used for product updates and offers.{' '}
-                          <Link href="/privacy" className="underline hover:text-foreground">
-                            Privacy Policy
-                          </Link>
-                        </p>
-                      )}
+                  {!(isPremium && !premiumLoading) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Input
+                          type="email"
+                          placeholder="Email (optional)"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                        {email && (
+                          <p className="text-xs text-muted-foreground">
+                            By using this service you agree to your email being used for product updates and offers.{' '}
+                            <Link href="/privacy" className="underline hover:text-foreground">
+                              Privacy Policy
+                            </Link>
+                          </p>
+                        )}
+                      </div>
+                      <Select value={industry} onValueChange={setIndustry}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ecommerce">E-commerce</SelectItem>
+                          <SelectItem value="saas">SaaS</SelectItem>
+                          <SelectItem value="media">Media & Publishing</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="healthcare">Healthcare</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={industry} onValueChange={setIndustry}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select industry" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ecommerce">E-commerce</SelectItem>
-                        <SelectItem value="saas">SaaS</SelectItem>
-                        <SelectItem value="media">Media & Publishing</SelectItem>
-                        <SelectItem value="education">Education</SelectItem>
-                        <SelectItem value="healthcare">Healthcare</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  )}
 
                   {/* Updated usage info based on subscription status */}
 
