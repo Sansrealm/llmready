@@ -17,8 +17,21 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History, Search, TrendingUp, ListChecks } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import { ScreenshotCarousel } from "@/components/screenshot-carousel";
 import { DebugInfo } from "@/lib/types";
+
+function LoopCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <p className="text-base font-semibold text-gray-900 dark:text-white leading-snug">{title}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{description}</p>
+      </div>
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm px-5 py-4 overflow-hidden">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 
 // Updated premium check that uses server-side API (same as pricing page)
@@ -294,7 +307,6 @@ export default function Home() {
                 </p>
               </div>
 
-              {!(isPremium && !premiumLoading) && <ScreenshotCarousel />}
 
               {/* Premium status indicator for signed-in users */}
               {isSignedIn && !premiumLoading && !isPremium && (
@@ -621,6 +633,169 @@ export default function Home() {
                   Start Today — It&apos;s Free
                 </a>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Micro-loop feature demos */}
+        <section className="w-full py-20 bg-gray-50 dark:bg-gray-950">
+          <div className="container px-4 md:px-6 mx-auto">
+            <div className="text-center mb-12">
+              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-3">See it in action</p>
+              <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                What your report reveals
+              </h2>
+              <p className="mt-3 text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
+                In seconds, you get a full picture of how AI models see your website — and exactly what to fix.
+              </p>
+            </div>
+
+            <style>{`
+              @keyframes mlBefore {
+                0%,30%  { opacity:1; transform:translateY(0) }
+                40%,70% { opacity:0; transform:translateY(-5px) }
+                80%,100%{ opacity:1; transform:translateY(0) }
+              }
+              @keyframes mlAfter {
+                0%,30%  { opacity:0; transform:translateY(5px) }
+                40%,70% { opacity:1; transform:translateY(0) }
+                80%,100%{ opacity:0; transform:translateY(5px) }
+              }
+              @keyframes mlItem1 {
+                0%,10%  { opacity:0; transform:translateX(-8px) }
+                22%,78% { opacity:1; transform:translateX(0) }
+                90%,100%{ opacity:0; transform:translateX(-8px) }
+              }
+              @keyframes mlItem2 {
+                0%,20%  { opacity:0; transform:translateX(-8px) }
+                32%,78% { opacity:1; transform:translateX(0) }
+                90%,100%{ opacity:0; transform:translateX(-8px) }
+              }
+              @keyframes mlItem3 {
+                0%,30%  { opacity:0; transform:translateX(-8px) }
+                42%,78% { opacity:1; transform:translateX(0) }
+                90%,100%{ opacity:0; transform:translateX(-8px) }
+              }
+              @keyframes mlBar1 { 0%,12%{width:0%} 26%,72%{width:48%} 88%,100%{width:0%} }
+              @keyframes mlBar2 { 0%,18%{width:0%} 32%,72%{width:64%} 88%,100%{width:0%} }
+              @keyframes mlBar3 { 0%,24%{width:0%} 38%,72%{width:82%} 88%,100%{width:0%} }
+              @keyframes mlBar4 { 0%,30%{width:0%} 44%,72%{width:100%} 88%,100%{width:0%} }
+              .ml-before { animation: mlBefore 4.5s ease-in-out infinite }
+              .ml-after  { animation: mlAfter  4.5s ease-in-out infinite }
+              .ml-item1  { animation: mlItem1  5.5s ease-out infinite }
+              .ml-item2  { animation: mlItem2  5.5s ease-out infinite }
+              .ml-item3  { animation: mlItem3  5.5s ease-out infinite }
+              .ml-bar1   { animation: mlBar1   5.5s ease-out infinite }
+              .ml-bar2   { animation: mlBar2   5.5s ease-out infinite }
+              .ml-bar3   { animation: mlBar3   5.5s ease-out infinite }
+              .ml-bar4   { animation: mlBar4   5.5s ease-out infinite }
+            `}</style>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-4xl mx-auto">
+
+              {/* 1 — Score */}
+              <LoopCard
+                title="See your AI visibility score"
+                description="A single number—0 to 100—showing exactly how visible you are to AI right now."
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">AI Visibility Score</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 font-medium">llmcheck.com</span>
+                </div>
+                <div className="relative h-12 mb-4">
+                  <div className="ml-before absolute inset-0 flex items-end gap-1">
+                    <span className="text-4xl font-bold text-red-500 dark:text-red-400 leading-none">42</span>
+                    <span className="text-base text-gray-300 dark:text-gray-600 mb-0.5">/100</span>
+                  </div>
+                  <div className="ml-after absolute inset-0 flex items-end gap-1">
+                    <span className="text-4xl font-bold text-green-500 dark:text-green-400 leading-none">78</span>
+                    <span className="text-base text-gray-400 dark:text-gray-500 mb-0.5">/100</span>
+                  </div>
+                </div>
+                <div className="relative h-9">
+                  <div className="ml-before absolute inset-0 flex items-center gap-2 px-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                    <span className="text-xs text-red-700 dark:text-red-300">Missing structured data markup</span>
+                  </div>
+                  <div className="ml-after absolute inset-0 flex items-center gap-2 px-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="text-xs text-green-700 dark:text-green-300 line-through opacity-60">Missing structured data markup</span>
+                    <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">Fixed ✓</span>
+                  </div>
+                </div>
+              </LoopCard>
+
+              {/* 2 — Recommendations */}
+              <LoopCard
+                title="Prioritized fixes, not a wall of text"
+                description="Every recommendation ranked by impact so you know exactly what to tackle first."
+              >
+                <div className="space-y-2">
+                  <div className="ml-item1 flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 flex-shrink-0">HIGH</span>
+                    <span className="text-xs text-gray-700 dark:text-gray-300">Add FAQ schema markup to top pages</span>
+                  </div>
+                  <div className="ml-item2 flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex-shrink-0">MED</span>
+                    <span className="text-xs text-gray-700 dark:text-gray-300">Rewrite meta descriptions for clarity</span>
+                  </div>
+                  <div className="ml-item3 flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex-shrink-0">LOW</span>
+                    <span className="text-xs text-gray-700 dark:text-gray-300">Add author bio and credentials page</span>
+                  </div>
+                </div>
+              </LoopCard>
+
+              {/* 3 — LLM visibility */}
+              <LoopCard
+                title="How each AI sees your brand"
+                description="Check your citation status across ChatGPT, Gemini, and Perplexity in one view."
+              >
+                <div className="space-y-3">
+                  {[
+                    { name: "ChatGPT", dot: "bg-green-500" },
+                    { name: "Gemini",  dot: "bg-blue-500"  },
+                    { name: "Perplexity", dot: "bg-purple-500" },
+                  ].map(({ name, dot }) => (
+                    <div key={name} className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{name}</span>
+                      <div className="relative h-5 w-28">
+                        <span className="ml-before absolute inset-0 flex items-center justify-end">
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Not cited</span>
+                        </span>
+                        <span className="ml-after absolute inset-0 flex items-center justify-end gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                          <span className="text-xs font-semibold text-green-600 dark:text-green-400">Cited ✓</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </LoopCard>
+
+              {/* 4 — Trends */}
+              <LoopCard
+                title="Track your progress over time"
+                description="Watch your AI visibility score climb week by week as you implement fixes."
+              >
+                <div className="space-y-3">
+                  {[
+                    { label: "Week 1", cls: "ml-bar1", score: "38" },
+                    { label: "Week 2", cls: "ml-bar2", score: "52" },
+                    { label: "Week 3", cls: "ml-bar3", score: "65" },
+                    { label: "Week 4", cls: "ml-bar4", score: "78" },
+                  ].map(({ label, cls, score }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 w-14 flex-shrink-0">{label}</span>
+                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div className={`${cls} h-full rounded-full bg-indigo-500`} />
+                      </div>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-6 text-right">{score}</span>
+                    </div>
+                  ))}
+                </div>
+              </LoopCard>
+
             </div>
           </div>
         </section>
