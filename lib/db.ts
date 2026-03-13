@@ -273,7 +273,8 @@ export async function createPublicShare(
 ): Promise<ShareResponse> {
   // Verify ownership
   const ownershipCheck = await sql`
-    SELECT id FROM analyses
+    SELECT id, share_slug, is_public, share_expires_at
+    FROM analyses
     WHERE id = ${analysisId} AND user_id = ${userId}
   `;
 
@@ -281,7 +282,21 @@ export async function createPublicShare(
     throw new Error('Unauthorized: You don\'t own this analysis');
   }
 
-  // Generate unique slug with retry logic for collisions
+  // Return existing valid share link instead of generating a new one
+  const existing = ownershipCheck.rows[0];
+  if (
+    existing.is_public &&
+    existing.share_slug &&
+    existing.share_expires_at &&
+    new Date(existing.share_expires_at) > new Date()
+  ) {
+    return {
+      share_slug: existing.share_slug,
+      expires_at: new Date(existing.share_expires_at),
+    };
+  }
+
+  // No valid share exists — generate a new unique slug
   let slug: string;
   let attempts = 0;
   const maxAttempts = 5;
