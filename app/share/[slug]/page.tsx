@@ -15,6 +15,7 @@ import Footer from '@/components/footer';
 import { SiteMetric } from '@/lib/types';
 import { getAnalysisByShareSlug } from '@/lib/db';
 import { Lock } from 'lucide-react';
+import { auth, currentUser } from '@clerk/nextjs/server';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -22,6 +23,7 @@ interface PageProps {
 
 interface SharedAnalysis {
   id: string;
+  user_id: string;
   url: string;
   overall_score: number;
   parameters: SiteMetric[];
@@ -36,6 +38,7 @@ async function getSharedAnalysis(slug: string): Promise<SharedAnalysis | null> {
     if (!analysis) return null;
     return {
       id: analysis.id,
+      user_id: analysis.user_id,
       url: analysis.url,
       overall_score: analysis.overall_score,
       parameters: analysis.parameters,
@@ -111,6 +114,18 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
 
   if (!analysis) notFound();
 
+  // Check if the viewer should see the full report:
+  // — they own the analysis, OR
+  // — they are a premium subscriber
+  const { userId } = await auth();
+  const isOwner = !!userId && userId === analysis.user_id;
+  let isPremium = false;
+  if (userId && !isOwner) {
+    const user = await currentUser();
+    isPremium = user?.publicMetadata?.premiumUser === true;
+  }
+  const showFull = isOwner || isPremium;
+
   let domain = analysis.url;
   try {
     const u = analysis.url.startsWith('http') ? analysis.url : `https://${analysis.url}`;
@@ -166,42 +181,40 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Parameter teaser — first 2 visible */}
-        <div className="mb-2">
+        {/* Parameters */}
+        <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
             Analysis Parameters
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {visibleParams.map((param, i) => (
-              <div
-                key={i}
-                className="p-4 bg-card rounded-xl border border-border"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-semibold text-sm">{param.name}</h3>
-                  <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
-                    {param.score}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
-                  <div
-                    className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
-                    style={{ width: `${param.score}%` }}
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                  {param.description}
-                </p>
-              </div>
-            ))}
-          </div>
 
-          {/* Locked remaining parameters */}
-          {lockedParams.length > 0 && (
-            <div className="relative">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm pointer-events-none select-none"
-                   aria-hidden="true">
-                {lockedParams.map((param, i) => (
+          {showFull ? (
+            /* Owner / premium — all parameters visible */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {analysis.parameters.map((param, i) => (
+                <div key={i} className="p-4 bg-card rounded-xl border border-border">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-sm">{param.name}</h3>
+                    <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
+                      {param.score}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
+                    <div
+                      className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
+                      style={{ width: `${param.score}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {param.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Guest / free — first 2 visible, rest blurred */
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {visibleParams.map((param, i) => (
                   <div key={i} className="p-4 bg-card rounded-xl border border-border">
                     <div className="flex justify-between items-start mb-3">
                       <h3 className="font-semibold text-sm">{param.name}</h3>
@@ -215,115 +228,133 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
                         style={{ width: `${param.score}%` }}
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
                       {param.description}
                     </p>
                   </div>
                 ))}
               </div>
-              {/* Gradient fade + lock */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background flex flex-col items-center justify-end pb-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Lock className="w-4 h-4" />
-                  <span>{lockedParams.length} more parameters in the full report</span>
+
+              {lockedParams.length > 0 && (
+                <div className="relative">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm pointer-events-none select-none" aria-hidden="true">
+                    {lockedParams.map((param, i) => (
+                      <div key={i} className="p-4 bg-card rounded-xl border border-border">
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="font-semibold text-sm">{param.name}</h3>
+                          <span className={`text-xl font-bold ${scoreColor(param.score)}`}>{param.score}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
+                          <div className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`} style={{ width: `${param.score}%` }} />
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{param.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background flex flex-col items-center justify-end pb-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lock className="w-4 h-4" />
+                      <span>{lockedParams.length} more parameters in the full report</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* ── GATE: Unlock the Full Report ─────────────────────────── */}
-        <div className="my-10 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-gray-900 p-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 mb-4">
-            <Lock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Full Report Available with Premium
-          </h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-1 max-w-md mx-auto">
-            This report includes AI visibility results across ChatGPT, Gemini & Perplexity,
-            plus a prioritized fix list.
-          </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 max-w-md mx-auto">
-            Sign up for Premium to unlock the full report — and audit your own site.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/pricing">
-              <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8">
-                Unlock Full Report
-              </Button>
-            </Link>
-            <Link href="/">
-              <Button size="lg" variant="outline">
-                Audit My Site Free
-              </Button>
+        {/* ── Gate / dashboard CTA ─────────────────────────────────── */}
+        {showFull ? (
+          <div className="my-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-6 text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              This is a shared snapshot. For AI visibility details and live recommendations,
+              view the full report in your dashboard.
+            </p>
+            <Link href="/results">
+              <Button variant="outline">View Full Report →</Button>
             </Link>
           </div>
-        </div>
-
-        {/* ── AI Visibility — locked preview ───────────────────────── */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            AI Visibility Analysis
-          </h2>
-          <div className="relative rounded-2xl overflow-hidden border border-border">
-            {/* Mock rows — blurred */}
-            <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
-              {['ChatGPT', 'Gemini', 'Perplexity'].map((llm) => (
-                <div key={llm} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <span className="font-medium text-sm">{llm}</span>
-                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">
-                    Checking...
-                  </span>
-                </div>
-              ))}
+        ) : (
+          <div className="my-10 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-gray-900 p-8 text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 mb-4">
+              <Lock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
-            {/* Lock overlay */}
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
-              <Lock className="w-6 h-6 text-indigo-500" />
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                AI visibility data is locked
-              </p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Full Report Available with Premium
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-1 max-w-md mx-auto">
+              This report includes AI visibility results across ChatGPT, Gemini & Perplexity,
+              plus a prioritized fix list.
+            </p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 max-w-md mx-auto">
+              Sign up for Premium to unlock the full report — and audit your own site.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/pricing">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Unlock with Premium
+                <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8">
+                  Unlock Full Report
                 </Button>
+              </Link>
+              <Link href="/">
+                <Button size="lg" variant="outline">Audit My Site Free</Button>
               </Link>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ── Recommendations — locked preview ─────────────────────── */}
-        <div className="mb-10">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Recommendations
-          </h2>
-          <div className="relative rounded-2xl overflow-hidden border border-border">
-            {/* Mock rows — blurred */}
-            <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
-              {['Add FAQ schema markup to top pages', 'Rewrite meta descriptions for AI clarity', 'Add author credentials and bio page'].map((rec, i) => (
-                <div key={i} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5">
-                    {i === 0 ? 'HIGH' : i === 1 ? 'MED' : 'LOW'}
-                  </span>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
-                </div>
-              ))}
-            </div>
-            {/* Lock overlay */}
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
-              <Lock className="w-6 h-6 text-indigo-500" />
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Recommendations are locked
-              </p>
-              <Link href="/pricing">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Unlock with Premium
-                </Button>
-              </Link>
+        {/* ── AI Visibility ────────────────────────────────────────── */}
+        {!showFull && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              AI Visibility Analysis
+            </h2>
+            <div className="relative rounded-2xl overflow-hidden border border-border">
+              <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
+                {['ChatGPT', 'Gemini', 'Perplexity'].map((llm) => (
+                  <div key={llm} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <span className="font-medium text-sm">{llm}</span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">Checking...</span>
+                  </div>
+                ))}
+              </div>
+              <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
+                <Lock className="w-6 h-6 text-indigo-500" />
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">AI visibility data is locked</p>
+                <Link href="/pricing">
+                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Unlock with Premium</Button>
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ── Recommendations ──────────────────────────────────────── */}
+        {!showFull && (
+          <div className="mb-10">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Recommendations
+            </h2>
+            <div className="relative rounded-2xl overflow-hidden border border-border">
+              <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
+                {['Add FAQ schema markup to top pages', 'Rewrite meta descriptions for AI clarity', 'Add author credentials and bio page'].map((rec, i) => (
+                  <div key={i} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5">
+                      {i === 0 ? 'HIGH' : i === 1 ? 'MED' : 'LOW'}
+                    </span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
+                <Lock className="w-6 h-6 text-indigo-500" />
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Recommendations are locked</p>
+                <Link href="/pricing">
+                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Unlock with Premium</Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Analyzed date */}
         <p className="text-xs text-muted-foreground text-center">
