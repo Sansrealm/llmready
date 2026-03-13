@@ -269,7 +269,7 @@ export function generateShareSlug(): string {
 export async function createPublicShare(
   analysisId: string,
   userId: string,
-  expiresInDays: number = 30
+  expiresInDays: number = 365
 ): Promise<ShareResponse> {
   // Verify ownership
   const ownershipCheck = await sql`

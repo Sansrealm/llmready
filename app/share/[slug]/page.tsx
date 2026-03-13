@@ -1,19 +1,9 @@
 /**
- * Public Share Page - app/share/[slug]/page.tsx
+ * Public Share Page — app/share/[slug]/page.tsx
  *
- * Displays publicly shared LLM readiness analysis reports.
- * This is a Server Component that fetches data at request time.
- *
- * Features:
- * - Server-side rendering (no client-side state)
- * - Dynamic routing with [slug] parameter
- * - SEO-optimized metadata generation
- * - Public access (no authentication required)
- * - 404 handling for invalid/expired shares
- * - CTA section to drive conversions
- *
- * Route: /share/[slug]
- * API Endpoint: GET /api/share/[slug]
+ * Visitors see the overall score + a 2-parameter teaser.
+ * AI visibility details, remaining parameters, and recommendations
+ * are locked behind a premium upgrade gate.
  */
 
 import { Metadata } from 'next';
@@ -24,11 +14,10 @@ import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
 import { SiteMetric } from '@/lib/types';
 import { getAnalysisByShareSlug } from '@/lib/db';
+import { Lock } from 'lucide-react';
 
 interface PageProps {
-  params: Promise<{
-    slug: string;
-  }>;
+  params: Promise<{ slug: string }>;
 }
 
 interface SharedAnalysis {
@@ -41,7 +30,6 @@ interface SharedAnalysis {
   share_expires_at?: string | null;
 }
 
-// Fetch shared analysis directly from DB — avoids unreliable self-HTTP calls on Vercel
 async function getSharedAnalysis(slug: string): Promise<SharedAnalysis | null> {
   try {
     const analysis = await getAnalysisByShareSlug(slug);
@@ -61,7 +49,6 @@ async function getSharedAnalysis(slug: string): Promise<SharedAnalysis | null> {
   }
 }
 
-// Generate metadata for SEO and social sharing
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const analysis = await getSharedAnalysis(slug);
@@ -73,162 +60,284 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  let domain = analysis.url;
+  try {
+    const u = analysis.url.startsWith('http') ? analysis.url : `https://${analysis.url}`;
+    domain = new URL(u).hostname.replace(/^www\./, '');
+  } catch { /* use raw url */ }
+
   return {
-    title: `LLM Analysis: ${analysis.overall_score}/100 - ${analysis.url}`,
-    description: `View the LLM readiness analysis for ${analysis.url}. Overall score: ${analysis.overall_score}/100`,
+    title: `${domain} — AI Citation Audit | LLM Check`,
+    description: `${domain} scored ${analysis.overall_score}/100 on AI visibility. See what's holding it back from being recommended by ChatGPT, Gemini, and Perplexity.`,
     openGraph: {
-      title: `LLM Readiness Score: ${analysis.overall_score}/100`,
-      description: `AI readiness analysis for ${analysis.url}. See parameter breakdown and improvement recommendations.`,
+      title: `${domain} scored ${analysis.overall_score}/100 on AI visibility`,
+      description: `AI Citation Audit by LLM Check. See what's blocking ${domain} from AI recommendations.`,
       type: 'website',
       siteName: 'LLM Check',
       url: `https://llmcheck.app/share/${slug}`,
     },
     twitter: {
       card: 'summary_large_image',
-      title: `LLM Readiness Score: ${analysis.overall_score}/100`,
-      description: `AI readiness analysis for ${analysis.url}. See parameter breakdown and improvement recommendations.`,
+      title: `${domain} scored ${analysis.overall_score}/100 on AI visibility`,
+      description: `AI Citation Audit by LLM Check. See what's blocking ${domain} from AI recommendations.`,
     },
   };
+}
+
+function scoreColor(score: number) {
+  if (score >= 80) return 'text-green-600 dark:text-green-400';
+  if (score >= 60) return 'text-amber-500 dark:text-amber-400';
+  if (score >= 40) return 'text-orange-600 dark:text-orange-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
+function scoreBarColor(score: number) {
+  if (score >= 80) return 'bg-green-600';
+  if (score >= 60) return 'bg-amber-500';
+  if (score >= 40) return 'bg-orange-500';
+  return 'bg-red-600';
+}
+
+function verdict(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: 'Strong AI Readiness',    color: 'text-green-600 dark:text-green-400' };
+  if (score >= 60) return { label: 'At Risk: Citation Gap',  color: 'text-amber-500 dark:text-amber-400' };
+  if (score >= 40) return { label: 'Critical: Citation Gap', color: 'text-orange-600 dark:text-orange-400' };
+  return            { label: 'Critical: Not Cited',          color: 'text-red-600 dark:text-red-400' };
 }
 
 export default async function SharedAnalysisPage({ params }: PageProps) {
   const { slug } = await params;
   const analysis = await getSharedAnalysis(slug);
 
-  if (!analysis) {
-    notFound();
-  }
+  if (!analysis) notFound();
 
-  // Determine score color based on value
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 dark:text-green-400';
-    if (score >= 60) return 'text-blue-600 dark:text-blue-400';
-    if (score >= 40) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
-  };
+  let domain = analysis.url;
+  try {
+    const u = analysis.url.startsWith('http') ? analysis.url : `https://${analysis.url}`;
+    domain = new URL(u).hostname.replace(/^www\./, '');
+  } catch { /* use raw url */ }
+
+  const v = verdict(analysis.overall_score);
+  const visibleParams = analysis.parameters.slice(0, 2);
+  const lockedParams  = analysis.parameters.slice(2);
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Shared Report Banner */}
+      {/* Shared report banner */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 py-3">
         <div className="container px-4 mx-auto">
           <p className="text-sm text-blue-800 dark:text-blue-300 flex items-center gap-2">
             <span>📊</span>
-            <span>This is a publicly shared analysis report</span>
+            <span>Shared AI Citation Audit — generated by <strong>llmcheck.app</strong></span>
           </p>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="container px-4 py-8 mx-auto max-w-6xl">
-        {/* URL Header */}
+      <main className="container px-4 py-10 mx-auto max-w-4xl">
+
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            LLM Readiness Analysis
-          </h1>
-          <p className="text-lg text-muted-foreground break-all">
-            {analysis.url}
+          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">
+            AI Citation Audit
           </p>
+          <h1 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+            {domain}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 break-all">{analysis.url}</p>
         </div>
 
-        {/* Overall Score */}
-        <div className="mb-8 p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="text-center">
-            <div className={`text-6xl font-bold mb-2 ${getScoreColor(analysis.overall_score)}`}>
-              {analysis.overall_score}
-              <span className="text-3xl text-muted-foreground">/100</span>
-            </div>
-            <p className="text-lg text-muted-foreground">
-              Overall LLM Readiness Score
-            </p>
-            <div className="mt-4 w-full max-w-md mx-auto bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all ${
-                  analysis.overall_score >= 80 ? 'bg-green-600' :
-                  analysis.overall_score >= 60 ? 'bg-blue-600' :
-                  analysis.overall_score >= 40 ? 'bg-yellow-600' :
-                  'bg-red-600'
-                }`}
-                style={{ width: `${analysis.overall_score}%` }}
-              ></div>
-            </div>
+        {/* Overall Score — always visible */}
+        <div className="mb-10 p-8 bg-gradient-to-br from-gray-950 to-gray-900 rounded-2xl border border-gray-800 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">
+            Overall AI Visibility Score
+          </p>
+          <div className={`text-7xl font-black leading-none mb-2 ${scoreColor(analysis.overall_score)}`}>
+            {analysis.overall_score}
+            <span className="text-3xl text-gray-600 font-bold">/100</span>
+          </div>
+          <p className={`text-lg font-bold mt-3 ${v.color}`}>{v.label}</p>
+          <div className="mt-5 w-full max-w-sm mx-auto bg-gray-800 rounded-full h-2.5">
+            <div
+              className={`h-2.5 rounded-full ${scoreBarColor(analysis.overall_score)}`}
+              style={{ width: `${analysis.overall_score}%` }}
+            />
           </div>
         </div>
 
-        {/* Parameters Grid */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-6">Analysis Parameters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {analysis.parameters.map((param, index) => (
+        {/* Parameter teaser — first 2 visible */}
+        <div className="mb-2">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            Analysis Parameters
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {visibleParams.map((param, i) => (
               <div
-                key={index}
-                className="p-4 bg-card rounded-lg border border-border hover:shadow-md transition-shadow"
+                key={i}
+                className="p-4 bg-card rounded-xl border border-border"
               >
                 <div className="flex justify-between items-start mb-3">
                   <h3 className="font-semibold text-sm">{param.name}</h3>
-                  <span className={`text-xl font-bold ${getScoreColor(param.score)}`}>
+                  <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
                     {param.score}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
                   <div
-                    className={`h-2 rounded-full transition-all ${
-                      param.score >= 80 ? 'bg-green-600' :
-                      param.score >= 60 ? 'bg-blue-600' :
-                      param.score >= 40 ? 'bg-yellow-600' :
-                      'bg-red-600'
-                    }`}
+                    className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
                     style={{ width: `${param.score}%` }}
-                  ></div>
+                  />
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
                   {param.description}
                 </p>
               </div>
             ))}
           </div>
+
+          {/* Locked remaining parameters */}
+          {lockedParams.length > 0 && (
+            <div className="relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 blur-sm pointer-events-none select-none"
+                   aria-hidden="true">
+                {lockedParams.map((param, i) => (
+                  <div key={i} className="p-4 bg-card rounded-xl border border-border">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-semibold text-sm">{param.name}</h3>
+                      <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
+                        {param.score}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
+                      <div
+                        className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
+                        style={{ width: `${param.score}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {param.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {/* Gradient fade + lock */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background flex flex-col items-center justify-end pb-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Lock className="w-4 h-4" />
+                  <span>{lockedParams.length} more parameters in the full report</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Share Info */}
-        <div className="mt-8 p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-          <p>
-            Analyzed on: {new Date(analysis.analyzed_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-            {analysis.share_expires_at && (
-              <>
-                {' • '}
-                Expires: {new Date(analysis.share_expires_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </>
-            )}
-          </p>
-        </div>
-      </main>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-b from-white to-blue-50 dark:from-gray-950 dark:to-gray-900 py-16 border-t">
-        <div className="container px-4 mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Analyze Your Own Website
+        {/* ── GATE: Unlock the Full Report ─────────────────────────── */}
+        <div className="my-10 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-gray-900 p-8 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 mb-4">
+            <Lock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Full Report Available with Premium
           </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Get your LLM readiness score, detailed parameter analysis, and actionable recommendations to improve your website's AI visibility.
+          <p className="text-gray-500 dark:text-gray-400 mb-1 max-w-md mx-auto">
+            This report includes AI visibility results across ChatGPT, Gemini & Perplexity,
+            plus a prioritized fix list.
           </p>
-          <Link href="/">
-            <Button size="lg" className="text-lg px-8 py-6">
-              Start Free Analysis
-            </Button>
-          </Link>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 max-w-md mx-auto">
+            Sign up for Premium to unlock the full report — and audit your own site.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/pricing">
+              <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8">
+                Unlock Full Report
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button size="lg" variant="outline">
+                Audit My Site Free
+              </Button>
+            </Link>
+          </div>
         </div>
-      </section>
+
+        {/* ── AI Visibility — locked preview ───────────────────────── */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            AI Visibility Analysis
+          </h2>
+          <div className="relative rounded-2xl overflow-hidden border border-border">
+            {/* Mock rows — blurred */}
+            <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
+              {['ChatGPT', 'Gemini', 'Perplexity'].map((llm) => (
+                <div key={llm} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                  <span className="font-medium text-sm">{llm}</span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">
+                    Checking...
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Lock overlay */}
+            <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
+              <Lock className="w-6 h-6 text-indigo-500" />
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                AI visibility data is locked
+              </p>
+              <Link href="/pricing">
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  Unlock with Premium
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Recommendations — locked preview ─────────────────────── */}
+        <div className="mb-10">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            Recommendations
+          </h2>
+          <div className="relative rounded-2xl overflow-hidden border border-border">
+            {/* Mock rows — blurred */}
+            <div className="blur-sm pointer-events-none select-none p-5 space-y-3" aria-hidden="true">
+              {['Add FAQ schema markup to top pages', 'Rewrite meta descriptions for AI clarity', 'Add author credentials and bio page'].map((rec, i) => (
+                <div key={i} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5">
+                    {i === 0 ? 'HIGH' : i === 1 ? 'MED' : 'LOW'}
+                  </span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
+                </div>
+              ))}
+            </div>
+            {/* Lock overlay */}
+            <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
+              <Lock className="w-6 h-6 text-indigo-500" />
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Recommendations are locked
+              </p>
+              <Link href="/pricing">
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  Unlock with Premium
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Analyzed date */}
+        <p className="text-xs text-muted-foreground text-center">
+          Analyzed on{' '}
+          {new Date(analysis.analyzed_at).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          })}
+          {analysis.share_expires_at && (
+            <> · Expires {new Date(analysis.share_expires_at).toLocaleDateString('en-US', {
+              year: 'numeric', month: 'long', day: 'numeric',
+            })}</>
+          )}
+        </p>
+      </main>
 
       <Footer />
     </div>

@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Create public share (30 day expiry)
+    // 4. Create public share (365 day expiry)
     // This function verifies ownership and throws if unauthorized
-    const shareData = await createPublicShare(analysisId, userId, 30);
+    const shareData = await createPublicShare(analysisId, userId, 365);
 
     // 5. Build full share URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://llmcheck.app';
