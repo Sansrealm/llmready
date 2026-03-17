@@ -392,7 +392,7 @@ export default function Home() {
 
                   {isSignedIn && !premiumLoading && !isPremium && canAnalyze === true && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      You have <strong>{remainingAnalyses}</strong> free analyses remaining. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade to Premium</Link> for 25 analyses per month.
+                      You have <strong>{remainingAnalyses}</strong> free analyses remaining. <Link href="/pricing" className="text-blue-500 hover:underline">Upgrade</Link> for more analyses per month.
                     </p>
                   )}
 
@@ -434,7 +434,7 @@ export default function Home() {
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {isSignedIn && !isPremium
-                          ? "Upgrade to Premium for 25 analyses per month"
+                          ? "Upgrade for more analyses per month"
                           : !isSignedIn && analysisCount >= 1
                             ? "Get 3 free analyses when you create an account"
                             : "Unlock full access to LLM readiness audits with premium"

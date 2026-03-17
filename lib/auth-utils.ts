@@ -11,6 +11,7 @@ import { UserSubscription } from './types';
 // Analysis limits by user tier
 const FREE_USER_LIMIT = 3;
 const PREMIUM_USER_LIMIT = 25;
+const AGENCY_USER_LIMIT = 100;
 
 /**
  * Complete user subscription information
@@ -19,6 +20,7 @@ export interface UserSubscriptionInfo {
   userId: string | null;
   isAuthenticated: boolean;
   isPremium: boolean;
+  isAgency: boolean;
   analysisCount: number;
   limit: number;
   canAnalyze: boolean;
@@ -37,7 +39,7 @@ export interface UserSubscriptionInfo {
 export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
   try {
     // Get authentication status
-    const { userId } = await auth();
+    const { userId, has } = await auth();
 
     // Guest users (not authenticated)
     if (!userId) {
@@ -45,6 +47,7 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
         userId: null,
         isAuthenticated: false,
         isPremium: false,
+        isAgency: false,
         analysisCount: 0,
         limit: 0, // Guests are handled separately with localStorage
         canAnalyze: false,
@@ -58,15 +61,18 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
     const user = await client.users.getUser(userId);
     const metadata = (user.publicMetadata as Partial<UserSubscription>) || {};
 
-    // Determine premium status
-    const isPremium = metadata.premiumUser === true;
+    // Determine plan using Clerk's has() (session-level) with metadata fallback
+    const isAgency = (has?.({ plan: 'llm_check_agency' }) ?? false) as boolean;
+    const isPremiumPlan = !isAgency && ((has?.({ plan: 'llm_check_premium' }) ?? false) as boolean || metadata.premiumUser === true);
+    // Agency users get all premium features; isPremium = true for both paid tiers
+    const isPremium = isPremiumPlan || isAgency;
 
     // Get analysis count (defaults to 0)
     let analysisCount = metadata.analysisCount || 0;
 
-    // Monthly reset logic for free users
-    // Premium users don't need resets as they have higher monthly limits
-    if (!isPremium) {
+    // Monthly reset logic for free users and agency users (both have monthly caps)
+    // Premium-only users don't reset (preserves existing behaviour)
+    if (!isPremiumPlan) {
       try {
         // Initialize lastAnalysisReset if it doesn't exist (first-time user)
         const lastResetDate = metadata.lastAnalysisReset
@@ -122,7 +128,7 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
     }
 
     // Determine limit based on user tier
-    const limit = isPremium ? PREMIUM_USER_LIMIT : FREE_USER_LIMIT;
+    const limit = isAgency ? AGENCY_USER_LIMIT : isPremiumPlan ? PREMIUM_USER_LIMIT : FREE_USER_LIMIT;
 
     // Calculate remaining analyses
     const remainingAnalyses = Math.max(0, limit - analysisCount);
@@ -134,6 +140,7 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
       userId,
       isAuthenticated: true,
       isPremium,
+      isAgency,
       analysisCount,
       limit,
       canAnalyze,
@@ -147,6 +154,7 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo> {
       userId: null,
       isAuthenticated: false,
       isPremium: false,
+      isAgency: false,
       analysisCount: 0,
       limit: 0,
       canAnalyze: false,
@@ -205,7 +213,7 @@ export async function checkPremiumStatus(): Promise<{
   userId: string | null;
 }> {
   try {
-    const { userId } = await auth();
+    const { userId, has } = await auth();
 
     if (!userId) {
       return { isPremium: false, userId: null };
@@ -215,10 +223,10 @@ export async function checkPremiumStatus(): Promise<{
     const user = await client.users.getUser(userId);
     const metadata = (user.publicMetadata as Partial<UserSubscription>) || {};
 
-    return {
-      isPremium: metadata.premiumUser === true,
-      userId,
-    };
+    const isAgency = (has?.({ plan: 'llm_check_agency' }) ?? false) as boolean;
+    const isPremium = isAgency || (has?.({ plan: 'llm_check_premium' }) ?? false) as boolean || metadata.premiumUser === true;
+
+    return { isPremium, userId };
   } catch (error) {
     console.error('Error checking premium status:', error);
     return { isPremium: false, userId: null };
@@ -263,4 +271,5 @@ export async function validatePremiumAccess(): Promise<{
 export const ANALYSIS_LIMITS = {
   FREE: FREE_USER_LIMIT,
   PREMIUM: PREMIUM_USER_LIMIT,
+  AGENCY: AGENCY_USER_LIMIT,
 } as const;

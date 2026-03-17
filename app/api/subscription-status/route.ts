@@ -31,6 +31,7 @@ export async function GET() {
       limits: {
         free: ANALYSIS_LIMITS.FREE,
         premium: ANALYSIS_LIMITS.PREMIUM,
+        agency: ANALYSIS_LIMITS.AGENCY,
       },
     });
   } catch (error) {
