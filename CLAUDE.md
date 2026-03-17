@@ -73,25 +73,45 @@ npm start
 ### 🔴 CRITICAL - Revenue/Security/Core Business Logic
 **Never modify without thorough understanding and testing:**
 
-- `/app/api/analyze/route.js` - Core analysis engine (OpenAI integration, costs money per request)
-- `/app/api/webhooks/Stripe/route.js` - Payment processing (activates/revokes premium)
+- `/app/api/analyze/route.ts` - Core analysis engine (OpenAI integration, costs money per request)
+- `/app/api/webhooks/Stripe/route.ts` - Payment processing (activates/revokes premium)
+- `/app/api/webhooks/clerk/route.js` - Clerk user lifecycle webhooks
 - `/middleware.ts` - Route protection (Clerk authentication)
 - `/next.config.mjs` - CSP security headers (Clerk, Stripe, AdSense integration)
 
 ### 🟡 IMPORTANT - Understand Before Changing
 
+- `/app/page.tsx` - Homepage with analysis form (premium/free/guest conditional rendering)
 - `/app/results/page.tsx` - Results display with tier-based features
-- `/app/api/subscription-status/route.js` - Server-side premium verification
+- `/app/share/[slug]/page.tsx` - Public share page (owner/premium see full report; guests see gated teaser)
+- `/app/share/[slug]/opengraph-image.tsx` - Dynamic OG image for share links (narrative-flow card)
+- `/app/ai-visibility/page.tsx` - AI visibility analysis page
+- `/app/api/subscription-status/route.ts` - Server-side premium verification
 - `/app/api/subscription/route.js` - Stripe billing portal integration
+- `/app/api/share/create/route.ts` - Share link creation (idempotent — reuses existing valid links)
 - `/components/navbar.tsx` - Auth state and navigation
 - `/app/pricing/page.tsx` - Clerk PricingTable integration
-- `/lib/db.ts` - Database utilities (URL normalization, analysis saving)
+- `/lib/db.ts` - Database utilities (URL normalization, analysis saving, share links)
+- `/lib/auth-utils.ts` - Auth and subscription check utilities
+- `/og.config.ts` - OG image configuration per page
 
 ### 🟢 SAFE - Standard Development
 
 - `/components/ui/*` - shadcn/ui components
+- `/components/score-gauge.tsx` - Score gauge display
+- `/components/parameter-score-card.tsx` - Parameter score card
+- `/components/recommendation-card.tsx` - Recommendation display
+- `/components/share-button.tsx` - Share link copy button
+- `/components/ai-visibility-check.tsx` - AI visibility check UI
+- `/components/score-history-widget.tsx` - Score history chart (premium)
+- `/components/screenshot-carousel.tsx` - Homepage screenshot carousel
 - `/app/guide/page.tsx` - Educational content
+- `/app/contact/page.tsx`, `/app/methodology/page.tsx` - Marketing pages
 - `/app/terms/*`, `/app/privacy/*` - Legal pages
+- `/app/og/route.tsx` - Static OG image route
+- `/app/og-preview/route.tsx` - Local OG design preview (dev only, not linked in UI)
+- `/lib/og-image.tsx` - Reusable OG image renderer
+- `/emails/*` - Email templates (React Email)
 - `/components/footer.tsx` - Site footer
 - Styling/CSS changes
 

@@ -173,6 +173,25 @@ export default function ResultsPage() {
         refetch();
     };
 
+    // Cycling status messages during analysis
+    const STATUS_MESSAGES = [
+        "Fetching your website content…",
+        "Parsing page structure and metadata…",
+        "Checking structured data and schema…",
+        "Running AI readiness analysis…",
+        "Scoring your parameters…",
+        "Generating your recommendations…",
+        "Almost there…",
+    ];
+    const [statusIdx, setStatusIdx] = useState(0);
+    useEffect(() => {
+        if (!loading) { setStatusIdx(0); return; }
+        const interval = setInterval(() => {
+            setStatusIdx(i => Math.min(i + 1, STATUS_MESSAGES.length - 1));
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [loading]);
+
     // PDF generation states
     const [pdfGenerating, setPdfGenerating] = useState(false);
     const [pdfSuccess, setPdfSuccess] = useState<string | null>(null);
@@ -302,17 +321,41 @@ export default function ResultsPage() {
     };
 
 
-    // Show loading screen while checking premium status
+    // Show loading screen while analysis is running
     if (premiumLoading || loading) {
+        const progressPct = Math.round(((statusIdx + 1) / STATUS_MESSAGES.length) * 100);
         return (
             <div className="flex min-h-screen flex-col">
                 <Navbar />
                 <main className="flex-1">
-                    <div className="container py-8 px-4 md:px-6 max-w-2xl">
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin shrink-0" />
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Analysing your site — this usually takes a few seconds…</p>
+                    <div className="container py-12 px-4 md:px-6 max-w-2xl">
+                        {/* Header */}
+                        <div className="mb-8">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-2">
+                                AI Citation Audit
+                            </p>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">
+                                {url}
+                            </h1>
                         </div>
+
+                        {/* Status message */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-4 h-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin shrink-0" />
+                            <p key={statusIdx} className="text-sm font-medium text-gray-700 dark:text-gray-300 transition-all">
+                                {STATUS_MESSAGES[statusIdx]}
+                            </p>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mb-10">
+                            <div
+                                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-700"
+                                style={{ width: `${progressPct}%` }}
+                            />
+                        </div>
+
+                        {/* Skeleton placeholders */}
                         <div className="space-y-4">
                             <Skeleton className="h-9 w-56 rounded-lg" />
                             <Skeleton className="h-4 w-72 rounded" />
