@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History, Search, TrendingUp, ListChecks } from "lucide-react";
+import { AlertCircle, BarChart2, Code2, FileText, Zap, Eye, History, Search, TrendingUp, ListChecks, Puzzle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { DebugInfo } from "@/lib/types";
@@ -305,6 +305,15 @@ export default function Home() {
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
                   Turn LLMs into your #1 referral source. llmcheck identifies the technical gaps keeping you out of AI answers and gives you actionable insights to outrank your competitors in the new era of search.
                 </p>
+                <a
+                  href="https://chromewebstore.google.com/detail/oalgfkbijifcmkbibinfoppkmhckjjcj?utm_source=item-share-cb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm"
+                >
+                  <Puzzle className="h-4 w-4" />
+                  Add to Chrome — 1-click analysis on any site
+                </a>
               </div>
 
 
