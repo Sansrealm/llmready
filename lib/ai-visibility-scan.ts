@@ -233,7 +233,15 @@ async function analyzeVisibility(
 
 const PROMPT_SUFFIX = ' Please list specific websites, tools, or companies by name in your answer.';
 
-async function queryChatGPT(prompt: string): Promise<string> {
+interface ModelResponse {
+  text: string;
+  /** Ranked source URLs returned by the model. Only populated for Perplexity
+   *  (from the top-level `citations` field on the API response). Empty for
+   *  ChatGPT and Gemini, which don't expose a separate citations list. */
+  citations: string[];
+}
+
+async function queryChatGPT(prompt: string): Promise<ModelResponse> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -241,10 +249,10 @@ async function queryChatGPT(prompt: string): Promise<string> {
     max_tokens: 500,
     temperature: 0.3,
   });
-  return response.choices[0]?.message?.content ?? '';
+  return { text: response.choices[0]?.message?.content ?? '', citations: [] };
 }
 
-async function queryPerplexity(prompt: string): Promise<string> {
+async function queryPerplexity(prompt: string): Promise<ModelResponse> {
   const perplexity = new OpenAI({
     apiKey: process.env.PERPLEXITY_API_KEY,
     baseURL: 'https://api.perplexity.ai',
@@ -254,17 +262,21 @@ async function queryPerplexity(prompt: string): Promise<string> {
     messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
     max_tokens: 500,
   });
-  return response.choices[0]?.message?.content ?? '';
+  // Perplexity returns the ranked source URLs it retrieved in a top-level
+  // `citations` field alongside `choices`. Using this directly is more
+  // reliable than regex-parsing URLs from the generated text.
+  const citations = (response as unknown as { citations?: string[] }).citations ?? [];
+  return { text: response.choices[0]?.message?.content ?? '', citations };
 }
 
-async function queryGemini(prompt: string): Promise<string> {
+async function queryGemini(prompt: string): Promise<ModelResponse> {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   const result = await model.generateContent(prompt + PROMPT_SUFFIX);
-  return result.response.text();
+  return { text: result.response.text(), citations: [] };
 }
 
-const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<string>> = {
+const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<ModelResponse>> = {
   chatgpt: queryChatGPT,
   gemini: queryGemini,
   perplexity: queryPerplexity,
@@ -324,7 +336,24 @@ export async function runVisibilityScan(
       }
 
       try {
-        const analysis = await analyzeVisibility(outcome.value, rootDomain, brandName, brandAlias);
+        const { text, citations } = outcome.value;
+        const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias);
+
+        // For Perplexity, override `cited` using the structured citations array
+        // (ranked sources Perplexity retrieved from its index) rather than
+        // relying on URL regex over the generated text.
+        if (model === 'perplexity' && citations.length > 0) {
+          const citedViaIndex = citations.some((u) => u.includes(rootDomain));
+          if (citedViaIndex !== analysis.cited) {
+            console.log(`[ai-visibility] Perplexity citation override for ${rootDomain}: text=${analysis.cited} → index=${citedViaIndex}`);
+            analysis.cited = citedViaIndex;
+            // Recompute score with corrected citation value
+            if (analysis.found && analysis.prominence && analysis.sentiment !== null) {
+              analysis.score = computeScore(analysis.prominence, analysis.sentiment, citedViaIndex);
+            }
+          }
+        }
+
         return { model, prompt, ...analysis, error: false } satisfies VisibilityResult;
       } catch (err) {
         console.error(`[ai-visibility] analysis failed for ${model}/"${prompt}":`, err);
