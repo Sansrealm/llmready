@@ -524,6 +524,163 @@ export function GuideContent() {
         </section>
       </section>
 
+      <section id="citation-recovery" className="mb-20">
+        <div className="flex items-center gap-3 mb-8">
+          <svg
+            className="w-8 h-8 text-green-600 dark:text-green-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <h2 className="text-3xl font-bold">The Citation Recovery Loop</h2>
+        </div>
+
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-8">
+          Monitoring reveals a frustrating pattern: an LLM paraphrases your content accurately but never names you. Your ideas are in the answer — your brand is not. This is a <strong>citation gap</strong>, and it&apos;s recoverable. The Citation Recovery Loop is a repeatable four-stage process for diagnosing why you&apos;re being used but not credited, then fixing it.
+        </p>
+
+        <section id="diagnostic-hierarchy" className="mb-16">
+          <h3 className="text-2xl font-semibold mb-6">Stage 1 — Diagnose the Gap</h3>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+            Not all citation gaps have the same root cause. Run through this diagnostic hierarchy before deciding on a fix. Treating the wrong cause wastes effort.
+          </p>
+
+          <div className="overflow-x-auto my-8">
+            <table className="w-full text-sm border-collapse rounded-lg overflow-hidden shadow-sm">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-gray-800 text-left">
+                  <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">Symptom</th>
+                  <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">Likely Cause</th>
+                  <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">Recovery Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">LLM paraphrases your content but names a competitor</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Competitor has stronger authority signals on the topic</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Build more external citations and expert bylines on that topic</td>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">LLM answers correctly but cites no one</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Content is too generic — matches many sources equally</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Add proprietary data, original research, or a named framework</td>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">LLM cites you in long-form but not in brief answers</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Content is not extractable — no standalone quotable unit</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Add summary boxes, definitions, or a short &quot;key takeaway&quot; block</td>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">LLM never reaches your content at all</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Crawl or indexing problem; content not in training or retrieval scope</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Fix technical access: robots.txt, llms.txt, canonical tags, page speed</td>
+                </tr>
+                <tr className="bg-green-50 dark:bg-green-950/40">
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium">LLM cites you by name with correct context</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium text-green-700 dark:text-green-400">Success — citation gap closed</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium">Replicate this pattern across other topics</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="extractable-content" className="mb-16">
+          <h3 className="text-2xl font-semibold mb-6">Stage 2 — Make Content Extractable</h3>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+            LLMs favour content they can lift cleanly into a short answer. If your insight is buried in a 2,000-word essay with no summary, the model may absorb the idea but attribute it to a source that wraps the same idea in a clean, standalone sentence. Extractability is a design choice.
+          </p>
+
+          <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-lg my-8 shadow-sm">
+            <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Extractability tactics:</h4>
+            <ul className="list-disc pl-6 space-y-3">
+              <li className="text-gray-700 dark:text-gray-300"><strong>Open with the answer.</strong> Put your core claim in the first two sentences — don&apos;t save it for a conclusion.</li>
+              <li className="text-gray-700 dark:text-gray-300"><strong>Name your framework.</strong> A named concept (&quot;the Citation Recovery Loop&quot;, &quot;the MECE principle&quot;) is far more citable than an unnamed process. The name becomes a retrieval anchor.</li>
+              <li className="text-gray-700 dark:text-gray-300"><strong>Add a &quot;Key takeaway&quot; box.</strong> A visually distinct summary block gives the model a pre-packaged quote it can reproduce verbatim with attribution.</li>
+              <li className="text-gray-700 dark:text-gray-300"><strong>Use definition-style headings.</strong> &quot;What is X?&quot; or &quot;X defined&quot; headings match the question format LLMs are optimised to answer.</li>
+              <li className="text-gray-700 dark:text-gray-300"><strong>Include a stat or number.</strong> Specific data points (&quot;83% of B2B buyers...&quot;) are attributed because they can&apos;t be paraphrased away — the number requires a source.</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950/50 p-6 rounded-lg my-6 border-l-4 border-blue-400">
+            <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+              <strong>Example — before:</strong> &quot;There are several factors that influence how search engines and AI systems index and retrieve content, including technical configuration, content quality, and external signals.&quot;<br /><br />
+              <strong>Example — after:</strong> &quot;LLM citation depends on three factors: technical access (can the model reach your page?), authority signals (do external sources corroborate you?), and extractability (can the model lift your key claim in one sentence?).&quot;<br /><br />
+              The second version is self-contained, names a structure, and is quotable at any answer length.
+            </p>
+          </div>
+        </section>
+
+        <section id="fan-out-queries" className="mb-16">
+          <h3 className="text-2xl font-semibold mb-6">Stage 3 — Optimise for Fan-Out Queries</h3>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+            A single user question triggers multiple internal sub-queries inside an LLM (especially in retrieval-augmented systems like Perplexity). This &quot;fan-out&quot; means your content needs to answer not just the surface question, but the supporting questions the model asks to build a complete answer.
+          </p>
+
+          <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-lg my-8 shadow-sm">
+            <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">How to optimise for fan-out:</h4>
+            <ol className="list-decimal pl-6 space-y-3">
+              <li className="text-gray-700 dark:text-gray-300">
+                <strong>Map the question tree.</strong> For your target topic, list the five to eight sub-questions a thorough answer requires. Each sub-question is a citation opportunity.
+              </li>
+              <li className="text-gray-700 dark:text-gray-300">
+                <strong>Create a &quot;hub and spoke&quot; content structure.</strong> A comprehensive pillar page handles the main query; shorter supporting pages answer individual sub-questions with their own extractable summaries.
+              </li>
+              <li className="text-gray-700 dark:text-gray-300">
+                <strong>Cross-link explicitly.</strong> Internal links between pillar and spokes help crawlers and retrieval systems understand that your site covers the full topic — not just one angle.
+              </li>
+              <li className="text-gray-700 dark:text-gray-300">
+                <strong>Answer follow-up intents.</strong> After the main answer, include an FAQ or &quot;Related questions&quot; section. These mirror the follow-up queries a user types after reading an LLM response.
+              </li>
+              <li className="text-gray-700 dark:text-gray-300">
+                <strong>Monitor which sub-queries cite you.</strong> If your pillar is cited but the supporting pages are not, individual spoke pages need extractability work (Stage 2).
+              </li>
+            </ol>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950/50 p-6 rounded-lg my-6 border-l-4 border-blue-400">
+            <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+              <strong>Worked example:</strong> User query — &quot;How do I improve my AI search ranking?&quot;<br /><br />
+              Fan-out sub-queries the model might issue: <em>What signals do LLMs use to rank sources? · How do I make content crawlable by AI? · What is llms.txt? · How do I measure AI citation? · What is E-E-A-T and does it apply to LLMs?</em><br /><br />
+              Each sub-query is a standalone citation slot. A site that answers all five will appear more frequently in composite answers than a site that answers only the top-level question.
+            </p>
+          </div>
+        </section>
+
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-lg my-8 shadow-sm">
+          <h4 className="font-semibold mb-6 text-gray-900 dark:text-gray-100 text-lg">Stage 4 — Source-Worthiness Checklist</h4>
+          <p className="text-gray-700 dark:text-gray-300 mb-6 text-sm">Before publishing (or auditing existing content), confirm each item. A page that passes all checks is structurally ready to be cited.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              "Core claim stated in the first two sentences",
+              "Page has a named concept, framework, or original term",
+              "At least one specific statistic or data point with a source",
+              "A summary box or key-takeaway block is present",
+              "Page is reachable by crawlers (not blocked in robots.txt)",
+              "llms.txt lists this page (or the domain root) as allowed",
+              "Page loads in under 3 seconds on mobile",
+              "Author name and credentials are visible on the page",
+              "At least two external sites link to this page",
+              "Content has been updated within the last 12 months",
+              "FAQ or related-questions section covers fan-out sub-queries",
+              "Structured data (Article, FAQPage, or HowTo schema) is present",
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-3">
+                <span className="text-gray-400 dark:text-gray-500 mt-0.5 text-base leading-none flex-shrink-0">☐</span>
+                <span className="text-gray-700 dark:text-gray-300 text-sm">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="advanced-strategies" className="mb-20">
         <div className="flex items-center gap-3 mb-8">
           <svg
