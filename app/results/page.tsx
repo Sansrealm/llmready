@@ -250,6 +250,49 @@ export default function ResultsPage() {
             hasEnoughContent; // Has substantial content
     }, [isPremium, loading, error, analysisResult, hasEnoughContent]);
 
+    // Citation intelligence computed values
+    const topQueriesForDisplay = useMemo(() => {
+        if (!analysisResult?.citationGaps) return [];
+        const types = ['problem', 'category', 'comparison'] as const;
+        return types.flatMap(type => {
+            const match = analysisResult.citationGaps!.find(g => g.query_type === type);
+            return match ? [match] : [];
+        });
+    }, [analysisResult?.citationGaps]);
+
+    const bucketSummary = useMemo(() => {
+        if (!analysisResult?.citationGaps) return [];
+        const types = ['brand', 'problem', 'category', 'comparison'] as const;
+        const labels: Record<string, string> = {
+            brand: 'Brand', problem: 'Problem', category: 'Category', comparison: 'Comparison',
+        };
+        const implications: Record<string, string> = {
+            brand: 'LLMs recognise your brand',
+            problem: 'LLMs surface you for problems you solve',
+            category: 'LLMs include you in category searches',
+            comparison: 'LLMs mention you in comparisons',
+        };
+        return types.map(type => {
+            const gaps = analysisResult.citationGaps!.filter(g => g.query_type === type);
+            const cited = gaps.filter(g => g.status === 'cited').length;
+            const total = gaps.length;
+            return { type, label: labels[type], cited, total, implication: implications[type] };
+        }).filter(b => b.total > 0);
+    }, [analysisResult?.citationGaps]);
+
+    const displacingDomains = useMemo(() => {
+        if (!analysisResult?.citationGaps) return [];
+        const freq: Record<string, number> = {};
+        for (const gap of analysisResult.citationGaps) {
+            if (gap.status === 'not_cited') {
+                for (const domain of gap.displaced_by) {
+                    freq[domain] = (freq[domain] || 0) + 1;
+                }
+            }
+        }
+        return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    }, [analysisResult?.citationGaps]);
+
     // Enhanced refresh function
     const refreshSession = async () => {
         setRefreshing(true);
@@ -651,6 +694,46 @@ export default function ResultsPage() {
                                 </div>
                             </div>
 
+                            {/* Section 1: Top Queries — authenticated users only */}
+                            {isSignedIn && topQueriesForDisplay.length > 0 && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-xl font-bold mb-1">How you appear when customers search</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                        These are the queries most likely driving traffic to your competitors
+                                    </p>
+                                    <div className="space-y-3">
+                                        {topQueriesForDisplay.map((gap, i) => (
+                                            <div key={i} className="flex items-start justify-between gap-4 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">{gap.query}</p>
+                                                    <span className="text-xs text-gray-400 dark:text-gray-500 capitalize mt-0.5 inline-block">{gap.query_type}</span>
+                                                </div>
+                                                <div className="shrink-0 text-right">
+                                                    {gap.status === 'cited' ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                                            Cited
+                                                        </span>
+                                                    ) : (
+                                                        <div className="text-right">
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-full">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                                                                Not cited
+                                                            </span>
+                                                            {gap.displaced_by[0] && (
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                                    {gap.displaced_by[0]} appeared instead
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* AI Visibility Check Section */}
                             {url && (
                                 <AiVisibilityCheck
@@ -662,6 +745,172 @@ export default function ResultsPage() {
                                     userId={user?.id ?? null}
                                     visibilityQueries={analysisResult?.visibilityQueries}
                                 />
+                            )}
+
+                            {/* Section 2: Visibility by Query Type — premium only */}
+                            {bucketSummary.length > 0 && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-xl font-bold mb-1">Visibility by query type</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                        How often Perplexity cites you across different search intents
+                                    </p>
+                                    {isPremium ? (
+                                        <div className="space-y-5">
+                                            {bucketSummary.map(bucket => {
+                                                const pct = bucket.total > 0 ? (bucket.cited / bucket.total) * 100 : 0;
+                                                const barColor = bucket.cited >= 3 ? 'bg-green-500' : bucket.cited === 2 ? 'bg-amber-500' : 'bg-red-500';
+                                                const textColor = bucket.cited >= 3 ? 'text-green-700 dark:text-green-400' : bucket.cited === 2 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400';
+                                                return (
+                                                    <div key={bucket.type}>
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <div className="min-w-0">
+                                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{bucket.label}</span>
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">— {bucket.implication}</span>
+                                                            </div>
+                                                            <span className={`text-sm font-bold shrink-0 ml-4 ${textColor}`}>{bucket.cited}/{bucket.total}</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                                            <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <div className="space-y-5 blur-sm pointer-events-none select-none" aria-hidden>
+                                                {bucketSummary.map(bucket => (
+                                                    <div key={bucket.type}>
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{bucket.label}</span>
+                                                            <span className="text-sm font-bold text-gray-400">?/5</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                                            <div className="h-2 rounded-full bg-gray-300 dark:bg-gray-600" style={{ width: '55%' }} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="text-center bg-white dark:bg-gray-950 px-6 py-4 rounded-xl border shadow-sm">
+                                                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">🔒 Premium feature</p>
+                                                    <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
+                                                        Upgrade to see citation breakdown →
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Section 3: Who is displacing you — premium only */}
+                            {displacingDomains.length > 0 && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-xl font-bold mb-1">Who appears instead of you</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                        Sites Perplexity cites when your domain doesn&apos;t appear
+                                    </p>
+                                    {isPremium ? (
+                                        <div className="space-y-3">
+                                            {displacingDomains.map(([domain, count], i) => {
+                                                const maxCount = displacingDomains[0][1];
+                                                const pct = Math.round((count / maxCount) * 100);
+                                                return (
+                                                    <div key={domain} className="flex items-center gap-3">
+                                                        <span className="text-xs text-gray-400 dark:text-gray-500 w-4 shrink-0">{i + 1}</span>
+                                                        <span className="text-sm font-medium text-gray-900 dark:text-white w-44 shrink-0 truncate">{domain}</span>
+                                                        <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                                            <div className="h-2 rounded-full bg-red-400 dark:bg-red-500 transition-all" style={{ width: `${pct}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 w-16 text-right">
+                                                            {count} {count === 1 ? 'query' : 'queries'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <div className="space-y-3 blur-sm pointer-events-none select-none" aria-hidden>
+                                                {displacingDomains.map(([, count], i) => (
+                                                    <div key={i} className="flex items-center gap-3">
+                                                        <span className="text-xs text-gray-400 w-4 shrink-0">{i + 1}</span>
+                                                        <span className="text-sm font-medium text-gray-400 w-44 shrink-0">competitor.com</span>
+                                                        <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                                            <div className="h-2 rounded-full bg-gray-300 dark:bg-gray-600" style={{ width: `${Math.round((1 / (i + 1)) * 80 + 20)}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 shrink-0 w-16 text-right">{count} queries</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="text-center bg-white dark:bg-gray-950 px-6 py-4 rounded-xl border shadow-sm">
+                                                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">🔒 Premium feature</p>
+                                                    <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
+                                                        Upgrade to see who&apos;s outranking you →
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Section 4: Perplexity Citation Rate — premium only */}
+                            {(analysisResult.citationRate != null || analysisResult.citationDataQuality === 'insufficient') && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-xl font-bold mb-4">Perplexity citation rate</h2>
+                                    {isPremium ? (
+                                        analysisResult.citationDataQuality === 'insufficient' ? (
+                                            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Insufficient data</p>
+                                                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                                                        More than half the Perplexity queries returned errors. Run a fresh analysis to get an accurate citation rate.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-center shrink-0">
+                                                    <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-400">
+                                                        {Math.round((analysisResult.citationRate ?? 0) * 100)}%
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">citation rate</div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 mb-2">
+                                                        <div
+                                                            className="h-3 rounded-full bg-indigo-500 transition-all"
+                                                            style={{ width: `${Math.round((analysisResult.citationRate ?? 0) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                        Your site appeared in <strong>{Math.round((analysisResult.citationRate ?? 0) * 20)} of 20</strong> live Perplexity queries
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-center shrink-0 blur-sm select-none" aria-hidden>
+                                                <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-400">??%</div>
+                                                <div className="text-xs text-gray-500 mt-1">citation rate</div>
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 mb-3">
+                                                    <div className="h-3 rounded-full bg-gray-300 dark:bg-gray-600" style={{ width: '40%' }} />
+                                                </div>
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">🔒 Premium feature</p>
+                                                <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
+                                                    Upgrade to see your live citation rate →
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {/* Priority Action Plan — driven by lowest-scoring parameters */}
