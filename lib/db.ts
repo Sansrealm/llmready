@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
-import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry, AnalyzedUrlSummary, CitationResult, CitationGap, QueryBucket } from './types';
+import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry, AnalyzedUrlSummary, CitationResult, CitationGap, QueryBucket, Recommendation } from './types';
 import type { VisibilityResult } from './ai-visibility-scan';
 
 /**
@@ -46,6 +46,7 @@ export async function saveAnalysis({
   url,
   overallScore,
   parameters,
+  recommendations,
   citationResults,
   citationRate,
   citationGaps,
@@ -56,6 +57,7 @@ export async function saveAnalysis({
   url: string;
   overallScore: number;
   parameters: SiteMetric[];
+  recommendations?: Recommendation[] | null;
   citationResults?: CitationResult[] | null;
   citationRate?: number | null;
   citationGaps?: CitationGap[] | null;
@@ -66,7 +68,7 @@ export async function saveAnalysis({
 
   const result = await sql`
     INSERT INTO analyses (
-      user_id, url, normalized_url, overall_score, parameters,
+      user_id, url, normalized_url, overall_score, parameters, recommendations,
       citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
     )
     VALUES (
@@ -75,13 +77,14 @@ export async function saveAnalysis({
       ${normalizedUrl},
       ${overallScore},
       ${JSON.stringify(parameters)},
+      ${recommendations != null ? JSON.stringify(recommendations) : null},
       ${citationResults != null ? JSON.stringify(citationResults) : null},
       ${citationRate ?? null},
       ${citationGaps != null ? JSON.stringify(citationGaps) : null},
       ${queryBuckets != null ? JSON.stringify(queryBuckets) : null},
       ${citationDataQuality ?? null}
     )
-    RETURNING id, user_id, url, normalized_url, overall_score, parameters, analyzed_at, created_at,
+    RETURNING id, user_id, url, normalized_url, overall_score, parameters, recommendations, analyzed_at, created_at,
               citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
   `;
 
@@ -172,6 +175,7 @@ export async function getAnalysisByUrl(
       normalized_url,
       overall_score,
       parameters,
+      recommendations,
       analyzed_at,
       created_at,
       citation_results,

@@ -135,6 +135,7 @@ export interface DbAnalysis {
   normalized_url: string;
   overall_score: number;
   parameters: SiteMetric[];
+  recommendations?: Recommendation[] | null;
   analyzed_at: string; // ISO timestamp
   created_at: string; // ISO timestamp
   // Sharing fields

@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
             const analysisResult: AnalysisResult = {
               overall_score: cachedAnalysis.overall_score,
               parameters: cachedAnalysis.parameters,
-              recommendations: [],
+              recommendations: cachedAnalysis.recommendations ?? [],
             };
 
             if (!subscription.isPremium) {
@@ -400,6 +400,7 @@ export async function POST(request: NextRequest) {
           url: url,
           overallScore: analysisResult.overall_score,
           parameters: analysisResult.parameters,
+          recommendations: analysisResult.recommendations ?? null,
           citationResults: citationResults ?? null,
           citationRate: citationRate ?? null,
           citationGaps: citationGaps ?? null,
