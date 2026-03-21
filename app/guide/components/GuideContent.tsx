@@ -139,6 +139,102 @@ export function GuideContent() {
         <p className="text-gray-700 dark:text-gray-300 leading-relaxed mt-8">This shift means you need to think beyond "How do I rank #1?" and start asking "How do I become the definitive source AI models turn to when discussing my expertise?"</p>
       </section>
 
+      <section id="eeat-vs-geo" className="mb-20">
+        <div className="flex items-center gap-3 mb-8">
+          <svg
+            className="w-8 h-8 text-green-600 dark:text-green-500"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 20V10" />
+            <path d="M12 20V4" />
+            <path d="M6 20v-6" />
+          </svg>
+          <h2 className="text-3xl font-bold">E-E-A-T, GEO, and Why the Difference Matters</h2>
+        </div>
+
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+          Google&apos;s <strong>E-E-A-T</strong> framework — Experience, Expertise, Authoritativeness, Trustworthiness — became the definitive quality benchmark for search-era content. It still matters. But applying it unchanged to AI-generated answers will leave you optimising for the wrong outcome.
+        </p>
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-8">
+          <strong>Generative Engine Optimization (GEO)</strong> is the discipline of making content discoverable, credible, and citable by large language models. It shares DNA with E-E-A-T but targets a fundamentally different mechanism: not page ranking, but <em>citation selection inside a synthesised answer</em>.
+        </p>
+
+        <div className="overflow-x-auto my-8">
+          <table className="w-full text-sm border-collapse rounded-lg overflow-hidden shadow-sm">
+            <thead>
+              <tr className="bg-gray-100 dark:bg-gray-800 text-left">
+                <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">Signal</th>
+                <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">What it meant for Google (E-E-A-T)</th>
+                <th className="px-4 py-3 font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">What it means for LLMs (GEO)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">Experience</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">First-hand product/service use demonstrated in reviews and how-tos</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Original perspective that can&apos;t be paraphrased away — the primary differentiator between citable and generic content</td>
+              </tr>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">Expertise</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Author credentials and topical depth signalled to Google&apos;s quality raters</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">On-page author bylines with verifiable credentials — the model can only read what&apos;s in the text; credentials not on the page don&apos;t exist to it</td>
+              </tr>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">Authoritativeness</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Backlink profile and domain reputation in PageRank</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Third-party mentions in sources that were in training data (Wikipedia, major publications, industry forums) — backlink count is irrelevant if the linking pages aren&apos;t in the model&apos;s corpus</td>
+              </tr>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">Trustworthiness</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">HTTPS, accurate facts, transparent ownership, low ad density</td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">Same technical signals, but now also factual consistency across sources — LLMs cross-reference claims; a single contradicted fact reduces citation likelihood across your whole domain</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-2xl font-semibold mb-6 mt-12">What GEO Adds That E-E-A-T Doesn&apos;t Cover</h3>
+        <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+          E-E-A-T was designed around a human quality rater reviewing a single page. GEO deals with an AI system synthesising hundreds of sources into one answer. Three requirements emerge that have no E-E-A-T equivalent:
+        </p>
+
+        <div className="space-y-6 mb-8">
+          <div className="border-l-4 border-green-500 pl-6">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Extractability</h4>
+            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+              A high-E-E-A-T page buried in prose still won&apos;t be cited if the model can&apos;t cleanly lift the key claim into a short answer. GEO requires content to be structurally quotable — summary boxes, definition-style headings, named frameworks. E-E-A-T has no equivalent requirement.
+            </p>
+          </div>
+          <div className="border-l-4 border-green-500 pl-6">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Technical access for AI crawlers</h4>
+            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+              Google&apos;s crawler and LLM training/retrieval crawlers are separate systems with separate rules. A well-optimised Google page may be blocked from AI indexing by a robots.txt rule or absent from an <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">llms.txt</code> allowlist. E-E-A-T assumes crawlability; GEO cannot.
+            </p>
+          </div>
+          <div className="border-l-4 border-green-500 pl-6">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Fan-out coverage</h4>
+            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+              A single authoritative page ranks well in Google. In GEO, one page answering the top-level query is insufficient — the model issues multiple sub-queries to build a complete answer, and each sub-query is a separate citation slot. Authority must be distributed across a topic cluster, not concentrated in a single URL.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-green-50 dark:bg-green-950/40 p-6 rounded-lg border-l-4 border-green-500 my-8">
+          <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">The GEO definition</h4>
+          <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+            <strong>Generative Engine Optimization (GEO)</strong> is the practice of structuring content, authority signals, and technical access so that large language models consistently find, understand, and cite your expertise when synthesising answers — regardless of whether a human ever clicks through to your page.
+          </p>
+          <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed mt-3">
+            GEO is not a replacement for SEO or E-E-A-T. It is the layer above them — the set of additional requirements that determine whether a credible, well-ranked page gets included in the AI answer or silently ignored.
+          </p>
+        </div>
+      </section>
+
       <section id="core-principles" className="mb-20">
         <div className="flex items-center gap-3 mb-8">
           <svg
