@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
-import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry, AnalyzedUrlSummary } from './types';
+import { SiteMetric, DbAnalysis, TrendData, ShareResponse, VisibilityWaitlistEntry, AnalyzedUrlSummary, CitationResult, CitationGap, QueryBucket } from './types';
 import type { VisibilityResult } from './ai-visibility-scan';
 
 /**
@@ -46,24 +46,43 @@ export async function saveAnalysis({
   url,
   overallScore,
   parameters,
+  citationResults,
+  citationRate,
+  citationGaps,
+  queryBuckets,
+  citationDataQuality,
 }: {
   userId: string;
   url: string;
   overallScore: number;
   parameters: SiteMetric[];
+  citationResults?: CitationResult[] | null;
+  citationRate?: number | null;
+  citationGaps?: CitationGap[] | null;
+  queryBuckets?: QueryBucket[] | null;
+  citationDataQuality?: 'sufficient' | 'insufficient' | null;
 }): Promise<DbAnalysis> {
   const normalizedUrl = normalizeUrl(url);
 
   const result = await sql`
-    INSERT INTO analyses (user_id, url, normalized_url, overall_score, parameters)
+    INSERT INTO analyses (
+      user_id, url, normalized_url, overall_score, parameters,
+      citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
+    )
     VALUES (
       ${userId},
       ${url},
       ${normalizedUrl},
       ${overallScore},
-      ${JSON.stringify(parameters)}
+      ${JSON.stringify(parameters)},
+      ${citationResults != null ? JSON.stringify(citationResults) : null},
+      ${citationRate ?? null},
+      ${citationGaps != null ? JSON.stringify(citationGaps) : null},
+      ${queryBuckets != null ? JSON.stringify(queryBuckets) : null},
+      ${citationDataQuality ?? null}
     )
-    RETURNING id, user_id, url, normalized_url, overall_score, parameters, analyzed_at, created_at
+    RETURNING id, user_id, url, normalized_url, overall_score, parameters, analyzed_at, created_at,
+              citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
   `;
 
   return result.rows[0] as DbAnalysis;
@@ -154,7 +173,12 @@ export async function getAnalysisByUrl(
       overall_score,
       parameters,
       analyzed_at,
-      created_at
+      created_at,
+      citation_results,
+      citation_rate,
+      citation_gaps,
+      query_buckets,
+      citation_data_quality
     FROM analyses
     WHERE user_id = ${userId}
       AND normalized_url = ${normalizedUrl}

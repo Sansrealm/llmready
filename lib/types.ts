@@ -31,6 +31,32 @@ export interface UserSubscription {
 }
 
 // ============================================================================
+// Citation Intelligence Types
+// ============================================================================
+
+export interface QueryBucket {
+  query: string;
+  type: 'brand' | 'problem' | 'category' | 'comparison';
+}
+
+export interface CitationResult {
+  query: string;
+  query_type: string;
+  cited: boolean;
+  citation_position: number | null; // 1-based index in Perplexity citations[]
+  competing_domains: string[];       // up to 3 non-target cited domains
+  perplexity_status: 'success' | 'api_error' | 'parse_error';
+}
+
+export interface CitationGap {
+  query: string;
+  query_type: string;
+  status: 'cited' | 'not_cited';
+  citation_position: number | null;
+  displaced_by: string[];
+}
+
+// ============================================================================
 // Analysis Types
 // ============================================================================
 
@@ -77,7 +103,11 @@ export interface AnalysisResult {
   recommendations: Recommendation[];
   remainingAnalyses?: number; // Only present for free users
   industry?: string; // GPT-detected: ecommerce|saas|media|education|healthcare|other
-  visibilityQueries?: string[]; // 5 custom AI search queries generated from site content
+  visibilityQueries?: string[]; // flat query strings (backward compat for AI visibility scan)
+  queryBuckets?: QueryBucket[]; // typed query buckets (20 queries, 4 types × 5)
+  citationRate?: number | null; // null when data quality insufficient
+  citationGaps?: CitationGap[];
+  citationDataQuality?: 'sufficient' | 'insufficient';
   analyzed_at?: string; // ISO timestamp of when this analysis was run
   cached?: boolean; // true when result was served from DB cache
 }
@@ -112,6 +142,12 @@ export interface DbAnalysis {
   is_public?: boolean;
   shared_at?: string | null;
   share_expires_at?: string | null;
+  // Citation intelligence fields
+  citation_results?: CitationResult[] | null;
+  citation_rate?: number | null;
+  citation_gaps?: CitationGap[] | null;
+  query_buckets?: QueryBucket[] | null;
+  citation_data_quality?: 'sufficient' | 'insufficient' | null;
 }
 
 /**

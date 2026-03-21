@@ -310,7 +310,7 @@ export async function runVisibilityScan(
   const normalizedUrl = normalizeUrl(url);
   const { rootDomain, brandName, brandAlias } = extractDomainTokens(url);
   const prompts =
-    visibilityQueries && visibilityQueries.length === 5
+    visibilityQueries && visibilityQueries.length >= 10
       ? visibilityQueries
       : getPromptsForIndustry(industry);
 
