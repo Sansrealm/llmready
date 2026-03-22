@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
 import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket, CitationResult, CitationGap } from '@/lib/types';
 
-// Initialize OpenAI client
+// Anthropic client — used for website scoring (independent of measured models)
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// OpenAI-compatible client — used for Perplexity citation checks only
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -301,21 +307,18 @@ export async function POST(request: NextRequest) {
       }
     `;
 
-    // 7. Call OpenAI (this is the expensive operation)
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert in SEO, GEO (Generative Engine Optimization), and LLM citation analysis.',
-        },
-        { role: 'user', content: analysisPrompt },
-      ],
-      response_format: { type: 'json_object' },
+    // 7. Call Claude for scoring (independent of the three models being measured)
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: 'You are an expert in SEO, GEO (Generative Engine Optimization), and LLM citation analysis. Return only valid JSON — no markdown, no explanation, no code fences.',
+      messages: [{ role: 'user', content: analysisPrompt }],
     });
 
-    const raw = completion.choices[0].message.content;
-    console.log('🧠 GPT response received');
+    const rawContent = message.content[0].type === 'text' ? message.content[0].text : '';
+    // Strip markdown fences if present
+    const raw = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    console.log('🧠 Claude response received');
 
     // 8. Parse and validate response
     let analysisResult: AnalysisResult;
@@ -346,7 +349,7 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('❌ JSON parse or structure error:', err);
       return NextResponse.json(
-        { error: 'Invalid JSON from OpenAI', raw },
+        { error: 'Invalid JSON from Claude', raw },
         { status: 500 }
       );
     }

@@ -185,18 +185,15 @@ function detectCitation(text: string, rootDomain: string): boolean {
 
 // ── Score computation ─────────────────────────────────────────────────────────
 
-const WEIGHTS = { mention: 20, prominence: 30, sentiment: 30, citation: 20 } as const;
+const WEIGHTS = { mention: 25, prominence: 45, citation: 30 } as const;
 
-function computeScore(prominence: Prominence, sentiment: number, cited: boolean): number {
+function computeScore(prominence: Prominence, cited: boolean): number {
   let score = WEIGHTS.mention; // brand was found
 
   // Prominence: high=full, medium=half, low=10%
   if (prominence === 'high') score += WEIGHTS.prominence;
   else if (prominence === 'medium') score += WEIGHTS.prominence * 0.5;
   else score += WEIGHTS.prominence * 0.1;
-
-  // Sentiment: map [-1, 1] → [0, 30]
-  score += WEIGHTS.sentiment * ((sentiment + 1) / 2);
 
   // Citation
   if (cited) score += WEIGHTS.citation;
@@ -221,12 +218,9 @@ async function analyzeVisibility(
   const snippet = extractSnippet(text, mentionIndex);
   const prominence = assessProminence(text, mentionIndex);
   const cited = detectCitation(text, rootDomain);
+  const score = computeScore(prominence, cited);
 
-  // Sentiment only needed when brand is found
-  const sentiment = await assessSentiment(text, brandName);
-  const score = computeScore(prominence, sentiment, cited);
-
-  return { found: true, snippet, prominence, sentiment, cited, score };
+  return { found: true, snippet, prominence, sentiment: null, cited, score };
 }
 
 // ── Model query functions ─────────────────────────────────────────────────────
@@ -348,8 +342,8 @@ export async function runVisibilityScan(
             console.log(`[ai-visibility] Perplexity citation override for ${rootDomain}: text=${analysis.cited} → index=${citedViaIndex}`);
             analysis.cited = citedViaIndex;
             // Recompute score with corrected citation value
-            if (analysis.found && analysis.prominence && analysis.sentiment !== null) {
-              analysis.score = computeScore(analysis.prominence, analysis.sentiment, citedViaIndex);
+            if (analysis.found && analysis.prominence) {
+              analysis.score = computeScore(analysis.prominence, citedViaIndex);
             }
           }
         }
