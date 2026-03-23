@@ -295,7 +295,7 @@ export default function Home() {
                   Make AI recommend your business.
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-                  Turn LLMs into your #1 referral source. llmcheck identifies the technical gaps keeping you out of AI answers and gives you actionable insights to outrank your competitors in the new era of search.
+                  Find out why AI isn't recommending you — and exactly what to fix.
                 </p>
                 <a
                   href="https://chromewebstore.google.com/detail/oalgfkbijifcmkbibinfoppkmhckjjcj?utm_source=item-share-cb"
@@ -356,37 +356,19 @@ export default function Home() {
                     />
                   </div>
                   {!(isPremium && !premiumLoading) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Input
-                          type="email"
-                          placeholder="Email (optional)"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                        {email && (
-                          <p className="text-xs text-muted-foreground">
-                            By using this service you agree to your email being used for product updates and offers.{' '}
-                            <Link href="/privacy" className="underline hover:text-foreground">
-                              Privacy Policy
-                            </Link>
-                          </p>
-                        )}
-                      </div>
-                      <Select value={industry} onValueChange={setIndustry}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select industry" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ecommerce">E-commerce</SelectItem>
-                          <SelectItem value="saas">SaaS</SelectItem>
-                          <SelectItem value="media">Media & Publishing</SelectItem>
-                          <SelectItem value="education">Education</SelectItem>
-                          <SelectItem value="healthcare">Healthcare</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select value={industry} onValueChange={setIndustry}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ecommerce">E-commerce</SelectItem>
+                        <SelectItem value="saas">SaaS</SelectItem>
+                        <SelectItem value="media">Media & Publishing</SelectItem>
+                        <SelectItem value="education">Education</SelectItem>
+                        <SelectItem value="healthcare">Healthcare</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
 
                   {/* Updated usage info based on subscription status */}
