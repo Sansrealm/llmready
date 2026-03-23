@@ -16,7 +16,10 @@ const cspHeader = `
     https://*.clerk.accounts.dev
     https://js.stripe.com
     https://*.stripe.com
-    https://vercel.live;
+    https://vercel.live
+    https://pagead2.googlesyndication.com
+    https://tpc.googlesyndication.com
+    https://www.googleadservices.com;
   connect-src 'self'
     https://clerk.llmcheck.app
     https://www.llmcheck.app
@@ -28,13 +31,19 @@ const cspHeader = `
     https://analytics.google.com
     https://*.stripe.com
     https://vercel.live
-    https://api.web3forms.com;
+    https://api.web3forms.com
+    https://pagead2.googlesyndication.com
+    https://tpc.googlesyndication.com
+    https://www.googleadservices.com
+    https://adservice.google.com;
   img-src 'self' 
     https://img.clerk.com 
     https://*.clerk.com 
     https://analytics.google.com
     https://*.stripe.com
     https://vercel.com
+    https://pagead2.googlesyndication.com
+    https://tpc.googlesyndication.com
     data: blob:;
   worker-src 'self' blob:;
   style-src 'self' 'unsafe-inline';
@@ -45,7 +54,9 @@ const cspHeader = `
     https://*.clerk.accounts.dev
     https://checkout.stripe.com
     https://js.stripe.com
-    https://vercel.live;
+    https://vercel.live
+    https://tpc.googlesyndication.com
+    https://googleads.g.doubleclick.net;
   form-action 'self' https://checkout.stripe.com;
   font-src 'self' data:;
   media-src 'self';
