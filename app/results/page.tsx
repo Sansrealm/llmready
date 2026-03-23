@@ -744,6 +744,8 @@ export default function ResultsPage() {
                                     userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
                                     userId={user?.id ?? null}
                                     visibilityQueries={analysisResult?.visibilityQueries}
+                                    queryBuckets={analysisResult?.queryBuckets}
+                                    citationGaps={analysisResult?.citationGaps}
                                 />
                             )}
 

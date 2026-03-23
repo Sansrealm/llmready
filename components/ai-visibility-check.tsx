@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { CheckCircle2, XCircle, Eye, RefreshCw, TrendingUp, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, RefreshCw, TrendingUp, Lock, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/track-event";
 import Link from "next/link";
+import type { QueryBucket, CitationGap } from "@/lib/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ interface AiVisibilityCheckProps {
   userEmail: string | null;
   userId: string | null;
   visibilityQueries?: string[];
+  queryBuckets?: QueryBucket[];
+  citationGaps?: CitationGap[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -55,6 +58,14 @@ const MODELS: { id: keyof Omit<PromptResult, "prompt">; label: string; color: st
   { id: "gemini",     label: "Gemini",     color: "text-blue-600 dark:text-blue-400",       dot: "bg-blue-500"    },
   { id: "perplexity", label: "Perplexity", color: "text-violet-600 dark:text-violet-400",   dot: "bg-violet-500"  },
 ];
+
+const BUCKET_ORDER = ["brand", "problem", "category", "comparison"] as const;
+const BUCKET_LABELS: Record<string, string> = {
+  brand: "Brand",
+  problem: "Problem",
+  category: "Category",
+  comparison: "Comparison",
+};
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -133,6 +144,8 @@ export default function AiVisibilityCheck({
   isSignedIn,
   isPremium,
   visibilityQueries,
+  queryBuckets,
+  citationGaps,
 }: AiVisibilityCheckProps) {
   const [data, setData] = useState<ScanResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -264,6 +277,45 @@ export default function AiVisibilityCheck({
     total: data.results.length,
   }));
 
+  // Build bucket summary — requires queryBuckets prop to know each query's type
+  const queryTypeMap = new Map(
+    (queryBuckets ?? []).map((b) => [b.query, b.type])
+  );
+  const citationGapMap = new Map(
+    (citationGaps ?? []).map((g) => [g.query, g])
+  );
+
+  const bucketRows = BUCKET_ORDER.map((type) => {
+    const rows = data.results.filter(
+      (r) => queryTypeMap.get(r.prompt) === type
+    );
+    const perModel = MODELS.map((m) => {
+      const found = rows.filter((r) => r[m.id].found).length;
+      // For Perplexity cells only: find first not_cited gap with a competitor
+      let competitor: string | null = null;
+      if (m.id === "perplexity") {
+        for (const r of rows) {
+          const gap = citationGapMap.get(r.prompt);
+          if (gap && gap.status === "not_cited" && gap.displaced_by.length > 0) {
+            competitor = gap.displaced_by[0];
+            break;
+          }
+        }
+      }
+      return { modelId: m.id, found, total: rows.length, competitor };
+    });
+    return { type, label: BUCKET_LABELS[type] ?? type, perModel };
+  });
+
+  // Only show bucket table when we have typed query data
+  const hasBucketData =
+    queryBuckets &&
+    queryBuckets.length > 0 &&
+    bucketRows.some((b) => b.perModel[0].total > 0);
+
+  // void canRescan to satisfy linter (used only via disabled prop below)
+  void canRescan;
+
   return (
     <div ref={sectionRef} className="bg-white dark:bg-gray-950 rounded-lg border">
 
@@ -341,65 +393,204 @@ export default function AiVisibilityCheck({
           </p>
         )}
 
-        {/* Results grid */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">
-                  AI Query
-                </th>
-                {MODELS.map((m) => (
-                  <th key={m.id} className="py-2 px-3 text-center">
-                    <ModelBadge id={m.id} label={m.label} dot={m.dot} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
-              {data.results.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
-                  <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 text-sm leading-snug">
-                    &ldquo;{row.prompt}&rdquo;
-                  </td>
-                  {MODELS.map((m) => (
-                    <td key={m.id} className="py-3 px-3 text-center">
-                      <ResultCell cell={row[m.id]} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Snippets */}
-        {snippets.length > 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              Where {domain} was mentioned
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {snippets.map((s, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-4 space-y-1.5"
-                >
-                  <ModelBadge id={s.model.id} label={s.model.label} dot={s.model.dot} />
-                  <p className="text-xs text-gray-400 italic">&ldquo;{s.prompt}&rdquo;</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                    {s.snippet}
-                  </p>
-                </div>
-              ))}
+        {hasBucketData ? (
+          <>
+            {/* Bucket summary table */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                AI Visibility by Query Type
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-gray-800">
+                      <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/4">
+                        Query type
+                      </th>
+                      {MODELS.map((m) => (
+                        <th key={m.id} className="py-2 px-3 text-center">
+                          <ModelBadge id={m.id} label={m.label} dot={m.dot} />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
+                    {bucketRows.map((row) => (
+                      <tr key={row.type} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
+                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 font-medium text-sm">
+                          {row.label}
+                        </td>
+                        {row.perModel.map((cell) => {
+                          const scoreColor =
+                            cell.found >= 4
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : cell.found >= 2
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-red-500 dark:text-red-400";
+                          return (
+                            <td key={cell.modelId} className="py-3 px-3 text-center">
+                              {cell.total === 0 ? (
+                                <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                              ) : (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className={`text-sm font-semibold ${scoreColor}`}>
+                                    {cell.found}
+                                    <span className="text-xs font-normal text-gray-400">/{cell.total}</span>
+                                  </span>
+                                  {cell.modelId === "perplexity" &&
+                                    cell.found < cell.total &&
+                                    cell.competitor && (
+                                      <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[100px]">
+                                        {cell.competitor}
+                                      </span>
+                                    )}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* Collapsible full responses */}
+            <details className="group">
+              <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1 select-none list-none">
+                <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
+                See full responses ({data.totalQueries} queries)
+              </summary>
+              <div className="mt-4 space-y-4">
+                {/* 20-row query table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-gray-800">
+                        <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">
+                          AI Query
+                        </th>
+                        {MODELS.map((m) => (
+                          <th key={m.id} className="py-2 px-3 text-center">
+                            <ModelBadge id={m.id} label={m.label} dot={m.dot} />
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
+                      {data.results.map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
+                          <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 text-sm leading-snug">
+                            &ldquo;{row.prompt}&rdquo;
+                          </td>
+                          {MODELS.map((m) => (
+                            <td key={m.id} className="py-3 px-3 text-center">
+                              <ResultCell cell={row[m.id]} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Snippet cards */}
+                {snippets.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      Where {domain} was mentioned
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {snippets.map((s, i) => (
+                        <div
+                          key={i}
+                          className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-4 space-y-1.5"
+                        >
+                          <ModelBadge id={s.model.id} label={s.model.label} dot={s.model.dot} />
+                          <p className="text-xs text-gray-400 italic">&ldquo;{s.prompt}&rdquo;</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {s.snippet}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                    No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
+                    Your LLM Readiness score and Priority Action Plan below show where to start.
+                  </div>
+                )}
+              </div>
+            </details>
+          </>
         ) : (
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-            No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
-            Your LLM Readiness score and Priority Action Plan below show where to start.
-          </div>
+          /* Fallback: old layout for cached scans without queryBuckets */
+          <>
+            {/* Results grid */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">
+                      AI Query
+                    </th>
+                    {MODELS.map((m) => (
+                      <th key={m.id} className="py-2 px-3 text-center">
+                        <ModelBadge id={m.id} label={m.label} dot={m.dot} />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
+                  {data.results.map((row, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
+                      <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 text-sm leading-snug">
+                        &ldquo;{row.prompt}&rdquo;
+                      </td>
+                      {MODELS.map((m) => (
+                        <td key={m.id} className="py-3 px-3 text-center">
+                          <ResultCell cell={row[m.id]} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Snippets */}
+            {snippets.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-emerald-500" />
+                  Where {domain} was mentioned
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {snippets.map((s, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-4 space-y-1.5"
+                    >
+                      <ModelBadge id={s.model.id} label={s.model.label} dot={s.model.dot} />
+                      <p className="text-xs text-gray-400 italic">&ldquo;{s.prompt}&rdquo;</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                        {s.snippet}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
+                Your LLM Readiness score and Priority Action Plan below show where to start.
+              </div>
+            )}
+          </>
         )}
 
         {/* Trend */}
