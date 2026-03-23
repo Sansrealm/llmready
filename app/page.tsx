@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link"
 import { Input } from "@/components/ui/input";
@@ -115,6 +115,7 @@ export default function Home() {
   const [analysisCount, setAnalysisCount] = useState(0);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const { isLoaded, isSignedIn, user } = useUser();
+  const { openSignIn } = useClerk();
   const router = useRouter();
 
   // Use the same server-side subscription check as pricing page
@@ -161,19 +162,11 @@ export default function Home() {
 
     // Check limits for both guest and signed-in free users
     if (!isSignedIn) {
-      if (analysisCount >= 1) {
-        setShowLoginAlert(true);
-        setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
-        return;
-      }
-
       sessionStorage.setItem("pendingURL", processedUrl);
       sessionStorage.setItem("pendingIndustry", industry);
       sessionStorage.setItem("pendingEmail", email);
-
-      const newCount = analysisCount + 1;
-      setAnalysisCount(newCount);
-      localStorage.setItem("guestAnalysisCount", newCount.toString());
+      openSignIn();
+      return;
     } else if (!isPremium && canAnalyze === false) {
       // Step 3: Signed-in free user has reached limit (strict server check)
       setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), 100);
@@ -198,8 +191,7 @@ export default function Home() {
 
   // Step 3: Refine isLimitReached - strictly use server-returned values
   const isLimitReached = isLoaded && (
-    (!isSignedIn && analysisCount >= 1) || // Guest limit (localStorage)
-    (isSignedIn && !isPremium && !premiumLoading && canAnalyze === false) // Free user limit (server)
+    isSignedIn && !isPremium && !premiumLoading && canAnalyze === false
   );
 
   const jsonLd = {
