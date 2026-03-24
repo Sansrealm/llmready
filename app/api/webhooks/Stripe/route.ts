@@ -137,8 +137,10 @@ export async function POST(request: NextRequest) {
                 // Update user metadata in Clerk to mark as premium
                 try {
                     const client = await clerkClient();
+                    const user = await client.users.getUser(userId);
                     await client.users.updateUser(userId, {
                         publicMetadata: {
+                            ...user.publicMetadata,
                             premiumUser: true,
                             subscriptionId: session.subscription,
                             customerId: session.customer,
@@ -200,8 +202,10 @@ export async function POST(request: NextRequest) {
                     // Try to update Clerk metadata
                     try {
                         const client = await clerkClient();
+                        const user = await client.users.getUser(userId);
                         await client.users.updateUser(userId, {
                             publicMetadata: {
+                                ...user.publicMetadata,
                                 premiumUser: isActive,
                                 subscriptionStatus: subscription.status,
                                 subscriptionId: subscription.id,
@@ -266,8 +270,10 @@ export async function POST(request: NextRequest) {
                     // Update user metadata to remove premium status
                     try {
                         const client = await clerkClient();
+                        const user = await client.users.getUser(userId);
                         await client.users.updateUser(userId, {
                             publicMetadata: {
+                                ...user.publicMetadata,
                                 premiumUser: false,
                                 subscriptionStatus: 'canceled',
                                 updatedAt: new Date().toISOString(),
