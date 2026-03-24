@@ -474,11 +474,14 @@ export default function ResultsPage() {
                             {/* Overall Score Section */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
                                 <h2 className="text-2xl font-bold mb-4">Overall LLM Readiness Score</h2>
-                                <div className="flex items-center space-x-4">
-                                    <div className="text-4xl font-bold text-blue-600">
+                                <div className="flex flex-col">
+                                    <div className="text-7xl font-bold text-blue-600">
                                         {analysisResult.overall_score}
                                     </div>
-                                    <div className="text-lg text-gray-500">out of 100</div>
+                                    <div className="text-sm text-gray-500">out of 100</div>
+                                    <div className="text-xs text-gray-400 mt-1">
+                                        Scored across {analysisResult.parameters?.length ?? 12} LLM readiness parameters
+                                    </div>
                                 </div>
                                 <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
                                     <div
