@@ -12,6 +12,7 @@ import type { QueryBucket, CitationGap } from "@/lib/types";
 interface ModelCell {
   found: boolean;
   snippet: string | null;
+  cited?: boolean;
   error: boolean;
 }
 
@@ -49,7 +50,7 @@ interface AiVisibilityCheckProps {
   visibilityQueries?: string[];
   queryBuckets?: QueryBucket[];
   citationGaps?: CitationGap[];
-  onScanStatusKnown?: (hasRun: boolean) => void;
+  onScanStatusKnown?: (hasRun: boolean, hasCitationGaps: boolean) => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -203,10 +204,13 @@ export default function AiVisibilityCheck({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Scan failed");
       setData(json);
-      onScanStatusKnown?.(true);
+      const hasCitationGaps = (json.results as PromptResult[]).some(
+        (r) => !r.perplexity.error && r.perplexity.cited === false
+      );
+      onScanStatusKnown?.(true, hasCitationGaps);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
-      onScanStatusKnown?.(false);
+      onScanStatusKnown?.(false, false);
     } finally {
       setLoading(false);
       setRescanning(false);
@@ -422,8 +426,13 @@ export default function AiVisibilityCheck({
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
                     {bucketRows.map((row) => (
                       <tr key={row.type} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
-                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 font-medium text-sm">
-                          {row.label}
+                        <td className="py-3 pr-4">
+                          <span className="text-gray-700 dark:text-gray-300 font-medium text-sm">{row.label}</span>
+                          {row.perModel[0].total > 0 && (
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                              {row.perModel[0].total} queries
+                            </p>
+                          )}
                         </td>
                         {row.perModel.map((cell) => {
                           const scoreColor =

@@ -83,6 +83,7 @@ export default function ResultsPage() {
     // false = component responded: no prior scan
     // true  = component responded: scan exists
     const [visibilityScanHasRun, setVisibilityScanHasRun] = useState<boolean | null>(null);
+    const [scanHasCitationGaps, setScanHasCitationGaps] = useState<boolean | null>(null);
 
     // When true, the next queryFn call will bypass the server-side cache
     const bypassCacheRef = useRef(false);
@@ -751,7 +752,10 @@ export default function ResultsPage() {
                                         visibilityQueries={analysisResult?.visibilityQueries}
                                         queryBuckets={analysisResult?.queryBuckets}
                                         citationGaps={analysisResult?.citationGaps}
-                                        onScanStatusKnown={(hasRun) => setVisibilityScanHasRun(hasRun)}
+                                        onScanStatusKnown={(hasRun, hasCitationGaps) => {
+                                            setVisibilityScanHasRun(hasRun);
+                                            setScanHasCitationGaps(hasCitationGaps);
+                                        }}
                                     />
                                 </div>
                             )}
@@ -908,11 +912,20 @@ export default function ResultsPage() {
                                                     </p>
                                                 </div>
                                             </div>
-                                        // State 2 — AI scan ran, citation data from visibility scan
+                                        // State 2 — AI scan ran; branch on whether gaps were found
                                         ) : visibilityScanHasRun ? (
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                No citation gaps detected — your domain appeared in results across all query types.
-                                            </p>
+                                            scanHasCitationGaps ? (
+                                                <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                                                        Perplexity did not cite your domain in some queries — check the AI Visibility section above for the breakdown.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                    No citation gaps detected — your domain was cited across all Perplexity queries.
+                                                </p>
+                                            )
                                         // State 1 — no scan yet
                                         ) : (
                                             <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
