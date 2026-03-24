@@ -203,6 +203,13 @@ export async function POST(request: NextRequest) {
       }
       analysisResult = parsed as AnalysisResult;
 
+      // Clamp scores to valid 0–100 integer range
+      analysisResult.overall_score = Math.round(Math.max(0, Math.min(100, analysisResult.overall_score)));
+      analysisResult.parameters = analysisResult.parameters.map(p => ({
+        ...p,
+        score: Math.round(Math.max(0, Math.min(100, p.score))),
+      }));
+
       // Extract GPT-detected industry
       if (typeof parsed.industry === 'string' && parsed.industry) {
         analysisResult.industry = parsed.industry;
