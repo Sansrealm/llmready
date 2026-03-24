@@ -49,6 +49,7 @@ interface AiVisibilityCheckProps {
   visibilityQueries?: string[];
   queryBuckets?: QueryBucket[];
   citationGaps?: CitationGap[];
+  onScanStatusKnown?: (hasRun: boolean) => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -146,6 +147,7 @@ export default function AiVisibilityCheck({
   visibilityQueries,
   queryBuckets,
   citationGaps,
+  onScanStatusKnown,
 }: AiVisibilityCheckProps) {
   const [data, setData] = useState<ScanResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -201,8 +203,10 @@ export default function AiVisibilityCheck({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Scan failed");
       setData(json);
+      onScanStatusKnown?.(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
+      onScanStatusKnown?.(false);
     } finally {
       setLoading(false);
       setRescanning(false);

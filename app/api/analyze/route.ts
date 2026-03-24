@@ -1,135 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
 import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
-import { AnalysisResult, AnalysisRequest, QueryBucket, CitationResult, CitationGap } from '@/lib/types';
+import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 
 // Anthropic client — used for website scoring (independent of measured models)
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// OpenAI-compatible client — used for Perplexity citation checks only
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// ── Citation intelligence helper ───────────────────────────────────────────────
-
-async function runCitationChecks(
-  queryBuckets: QueryBucket[],
-  targetDomain: string
-): Promise<{
-  citationResults: CitationResult[];
-  citationGaps: CitationGap[];
-  citationRate: number | null;
-  citationDataQuality: 'sufficient' | 'insufficient';
-}> {
-  const perplexity = new OpenAI({
-    apiKey: process.env.PERPLEXITY_API_KEY,
-    baseURL: 'https://api.perplexity.ai',
-  });
-
-  // Fire all queries in parallel — never throw, always resolve
-  const settled = await Promise.allSettled(
-    queryBuckets.map(async (bucket) => {
-      const response = await perplexity.chat.completions.create({
-        model: 'sonar',
-        messages: [{ role: 'user', content: bucket.query }],
-        max_tokens: 400,
-      });
-      const citations =
-        (response as unknown as { citations?: string[] }).citations ?? [];
-      return { bucket, citations };
-    })
-  );
-
-  const citationResults: CitationResult[] = settled.map((outcome, i) => {
-    const bucket = queryBuckets[i];
-
-    if (outcome.status === 'rejected') {
-      return {
-        query: bucket.query,
-        query_type: bucket.type,
-        cited: false,
-        citation_position: null,
-        competing_domains: [],
-        perplexity_status: 'api_error' as const,
-      };
-    }
-
-    const { citations } = outcome.value;
-
-    // Find position of target domain in citations list
-    let citationPosition: number | null = null;
-    const competingDomains: string[] = [];
-
-    for (let idx = 0; idx < citations.length; idx++) {
-      const citUrl = citations[idx];
-      let hostname: string;
-      try {
-        hostname = new URL(citUrl).hostname.replace(/^www\./, '');
-      } catch {
-        continue;
-      }
-
-      if (hostname === targetDomain) {
-        if (citationPosition === null) {
-          citationPosition = idx + 1; // 1-based
-        }
-      } else {
-        if (competingDomains.length < 3 && !competingDomains.includes(hostname)) {
-          competingDomains.push(hostname);
-        }
-      }
-    }
-
-    return {
-      query: bucket.query,
-      query_type: bucket.type,
-      cited: citationPosition !== null,
-      citation_position: citationPosition,
-      competing_domains: competingDomains,
-      perplexity_status: 'success' as const,
-    };
-  });
-
-  // Data quality check
-  const nonSuccessCount = citationResults.filter(
-    (r) => r.perplexity_status !== 'success'
-  ).length;
-
-  let citationRate: number | null;
-  let citationDataQuality: 'sufficient' | 'insufficient';
-
-  if (nonSuccessCount > 10) {
-    citationRate = null;
-    citationDataQuality = 'insufficient';
-  } else {
-    const citedCount = citationResults.filter((r) => r.cited).length;
-    citationRate = citedCount / 20;
-    citationDataQuality = 'sufficient';
-  }
-
-  // Build citation gaps — not_cited entries first
-  const citationGaps: CitationGap[] = citationResults
-    .map((r) => ({
-      query: r.query,
-      query_type: r.query_type,
-      status: r.cited ? ('cited' as const) : ('not_cited' as const),
-      citation_position: r.citation_position,
-      displaced_by: r.competing_domains,
-    }))
-    .sort((a, b) => {
-      if (a.status === 'not_cited' && b.status === 'cited') return -1;
-      if (a.status === 'cited' && b.status === 'not_cited') return 1;
-      return 0;
-    });
-
-  return { citationResults, citationGaps, citationRate, citationDataQuality };
-}
 
 // ── Main route handler ─────────────────────────────────────────────────────────
 
@@ -150,10 +29,9 @@ export async function POST(request: NextRequest) {
     const requestData = await request.json() as AnalysisRequest;
     const { url, email, industry } = requestData;
 
-    // 1. Extract target domain — return 400 immediately if URL is malformed
-    let targetDomain: string;
+    // 1. Validate URL — return 400 immediately if malformed
     try {
-      targetDomain = new URL(url).hostname.replace(/^www\./, '');
+      new URL(url);
     } catch {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
@@ -183,19 +61,10 @@ export async function POST(request: NextRequest) {
               analysisResult.remainingAnalyses = subscription.remainingAnalyses;
             }
 
-            // Forward new citation fields from cache
-            if (cachedAnalysis.citation_rate != null) {
-              analysisResult.citationRate = cachedAnalysis.citation_rate;
-            }
-            if (cachedAnalysis.citation_gaps != null) {
-              analysisResult.citationGaps = cachedAnalysis.citation_gaps;
-            }
+            // Forward query buckets from cache
             if (cachedAnalysis.query_buckets != null) {
               analysisResult.queryBuckets = cachedAnalysis.query_buckets;
               analysisResult.visibilityQueries = cachedAnalysis.query_buckets.map((q) => q.query);
-            }
-            if (cachedAnalysis.citation_data_quality != null) {
-              analysisResult.citationDataQuality = cachedAnalysis.citation_data_quality;
             }
 
             return NextResponse.json({
@@ -354,32 +223,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Run Perplexity citation checks (authenticated users only)
-    let citationResults: CitationResult[] | undefined;
-    let citationGaps: CitationGap[] | undefined;
-    let citationRate: number | null | undefined;
-    let citationDataQuality: 'sufficient' | 'insufficient' | undefined;
-
-    if (subscription.isAuthenticated && analysisResult.queryBuckets && analysisResult.queryBuckets.length > 0) {
-      try {
-        console.log(`🔍 Running citation checks for ${targetDomain} (${analysisResult.queryBuckets.length} queries)`);
-        const citationData = await runCitationChecks(analysisResult.queryBuckets, targetDomain);
-        citationResults = citationData.citationResults;
-        citationGaps = citationData.citationGaps;
-        citationRate = citationData.citationRate;
-        citationDataQuality = citationData.citationDataQuality;
-
-        analysisResult.citationRate = citationRate;
-        analysisResult.citationGaps = citationGaps;
-        analysisResult.citationDataQuality = citationDataQuality;
-
-        console.log(`✅ Citation check complete: rate=${citationRate}, quality=${citationDataQuality}`);
-      } catch (citationError) {
-        console.error('⚠️ Citation check failed, continuing without citation data:', citationError);
-      }
-    }
-
-    // 10. Increment analysis count ONLY after successful analysis
+    // 9. Increment analysis count ONLY after successful analysis
     if (subscription.isAuthenticated && subscription.userId) {
       try {
         const newCount = await incrementAnalysisCount(subscription.userId);
@@ -404,11 +248,7 @@ export async function POST(request: NextRequest) {
           overallScore: analysisResult.overall_score,
           parameters: analysisResult.parameters,
           recommendations: analysisResult.recommendations ?? null,
-          citationResults: citationResults ?? null,
-          citationRate: citationRate ?? null,
-          citationGaps: citationGaps ?? null,
           queryBuckets: analysisResult.queryBuckets ?? null,
-          citationDataQuality: citationDataQuality ?? null,
         });
         console.log('✅ Analysis saved to database');
         analysisResult.id = savedAnalysis.id;

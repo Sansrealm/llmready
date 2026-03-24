@@ -6,13 +6,12 @@
  * appears in each model's response.
  *
  * Scoring rubric (per query × model result):
- *   Mention    20 pts  — brand/domain found in response (binary gate)
- *   Prominence 30 pts  — where in the response (high/medium/low)
- *   Sentiment  30 pts  — GPT-4o-mini judges recommendation strength (-1→1)
- *   Citation   20 pts  — direct URL to brand domain present
+ *   Mention    25 pts  — brand/domain found in response (binary gate)
+ *   Prominence 45 pts  — where in the response (high/medium/low)
+ *   Citation   30 pts  — direct URL to brand domain present
  *
- * Cost: ~$0.05–0.06 per full scan (15 queries + up to 15 sentiment calls)
- * Latency: 10–18 seconds (all queries + sentiment run in parallel)
+ * Cost: ~$0.02–0.03 per full scan (15 queries)
+ * Latency: 8–14 seconds (all queries run in parallel)
  */
 
 import OpenAI from 'openai';
@@ -31,7 +30,6 @@ export interface VisibilityResult {
   found: boolean;
   snippet: string | null;
   prominence: Prominence | null;  // null when not found
-  sentiment: number | null;       // -1 to 1, null when not found
   cited: boolean;                 // direct URL to brand domain in response
   score: number;                  // 0–100 weighted composite
   error: boolean;
@@ -135,43 +133,7 @@ function assessProminence(text: string, mentionIndex: number): Prominence {
   return 'medium'; // body text, not in lead paragraph
 }
 
-// ── Step C: Sentiment — LLM-as-judge ─────────────────────────────────────────
-
-/**
- * Uses GPT-4o-mini to score how strongly the response recommends the brand.
- * Returns a value in [-1, 1]:  -1 = avoid, 0 = neutral, 1 = highly recommended.
- * Falls back to 0 (neutral) on any error.
- */
-async function assessSentiment(text: string, brandName: string): Promise<number> {
-  try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Rate how strongly the following text recommends "${brandName}" on a scale from -1 to 1.\n` +
-            `-1 = explicitly warns against it or recommends avoiding it\n` +
-            ` 0 = neutral or purely factual mention (e.g. "Brand X is a tool for Y")\n` +
-            ` 1 = explicitly recommends it as a top choice (e.g. "Best choice for startups")\n\n` +
-            `Respond with only a decimal number between -1 and 1. No explanation.\n\n` +
-            `Text:\n${text.slice(0, 1200)}`,
-        },
-      ],
-      max_tokens: 10,
-      temperature: 0,
-    });
-
-    const raw = response.choices[0]?.message?.content?.trim() ?? '0';
-    const val = parseFloat(raw);
-    return isNaN(val) ? 0 : Math.max(-1, Math.min(1, val));
-  } catch {
-    return 0; // neutral fallback
-  }
-}
-
-// ── Step D: Citation detection ─────────────────────────────────────────────────
+// ── Step C: Citation detection ─────────────────────────────────────────────────
 
 /**
  * Returns true if the response contains a URL pointing to the brand's root domain.
@@ -208,11 +170,11 @@ async function analyzeVisibility(
   rootDomain: string,
   brandName: string,
   brandAlias: string
-): Promise<Pick<VisibilityResult, 'found' | 'snippet' | 'prominence' | 'sentiment' | 'cited' | 'score'>> {
+): Promise<Pick<VisibilityResult, 'found' | 'snippet' | 'prominence' | 'cited' | 'score'>> {
   const mentionIndex = findMentionIndex(text, rootDomain, brandName, brandAlias);
 
   if (mentionIndex === -1) {
-    return { found: false, snippet: null, prominence: null, sentiment: null, cited: false, score: 0 };
+    return { found: false, snippet: null, prominence: null, cited: false, score: 0 };
   }
 
   const snippet = extractSnippet(text, mentionIndex);
@@ -220,7 +182,7 @@ async function analyzeVisibility(
   const cited = detectCitation(text, rootDomain);
   const score = computeScore(prominence, cited);
 
-  return { found: true, snippet, prominence, sentiment: null, cited, score };
+  return { found: true, snippet, prominence, cited, score };
 }
 
 // ── Model query functions ─────────────────────────────────────────────────────
@@ -293,7 +255,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 /**
  * Runs a full AI visibility scan for a given URL and industry.
  * Fires all 15 queries (5 prompts × 3 models) in parallel, then runs
- * per-response rubric analysis (entity, prominence, sentiment, citation)
+ * per-response rubric analysis (entity, prominence, citation)
  * also in parallel.
  */
 export async function runVisibilityScan(
@@ -326,7 +288,7 @@ export async function runVisibilityScan(
 
       if (outcome.status === 'rejected') {
         console.error(`[ai-visibility] ${model} failed for "${prompt}":`, outcome.reason);
-        return { model, prompt, found: false, snippet: null, prominence: null, sentiment: null, cited: false, score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, score: 0, error: true } satisfies VisibilityResult;
       }
 
       try {
@@ -351,7 +313,7 @@ export async function runVisibilityScan(
         return { model, prompt, ...analysis, error: false } satisfies VisibilityResult;
       } catch (err) {
         console.error(`[ai-visibility] analysis failed for ${model}/"${prompt}":`, err);
-        return { model, prompt, found: false, snippet: null, prominence: null, sentiment: null, cited: false, score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, score: 0, error: true } satisfies VisibilityResult;
       }
     })
   );

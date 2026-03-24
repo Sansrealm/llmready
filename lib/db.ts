@@ -714,7 +714,7 @@ export async function saveVisibilityScan(
         (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, score)
       VALUES (
         ${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null},
-        ${r.prominence ?? null}, ${r.sentiment ?? null}, ${r.cited}, ${r.score ?? null}
+        ${r.prominence ?? null}, ${null}, ${r.cited}, ${r.score ?? null}
       )
     `;
   }

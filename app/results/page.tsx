@@ -79,6 +79,10 @@ export default function ResultsPage() {
     const industry = searchParams.get("industry");
 
     const [refreshing, setRefreshing] = useState(false);
+    // null = waiting for ai-visibility-check to report back
+    // false = component responded: no prior scan
+    // true  = component responded: scan exists
+    const [visibilityScanHasRun, setVisibilityScanHasRun] = useState<boolean | null>(null);
 
     // When true, the next queryFn call will bypass the server-side cache
     const bypassCacheRef = useRef(false);
@@ -736,17 +740,20 @@ export default function ResultsPage() {
 
                             {/* AI Visibility Check Section */}
                             {url && (
-                                <AiVisibilityCheck
-                                    url={url}
-                                    industry={industry ?? analysisResult?.industry ?? null}
-                                    isSignedIn={!!isSignedIn}
-                                    isPremium={isPremium}
-                                    userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
-                                    userId={user?.id ?? null}
-                                    visibilityQueries={analysisResult?.visibilityQueries}
-                                    queryBuckets={analysisResult?.queryBuckets}
-                                    citationGaps={analysisResult?.citationGaps}
-                                />
+                                <div id="ai-visibility-section">
+                                    <AiVisibilityCheck
+                                        url={url}
+                                        industry={industry ?? analysisResult?.industry ?? null}
+                                        isSignedIn={!!isSignedIn}
+                                        isPremium={isPremium}
+                                        userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
+                                        userId={user?.id ?? null}
+                                        visibilityQueries={analysisResult?.visibilityQueries}
+                                        queryBuckets={analysisResult?.queryBuckets}
+                                        citationGaps={analysisResult?.citationGaps}
+                                        onScanStatusKnown={(hasRun) => setVisibilityScanHasRun(hasRun)}
+                                    />
+                                </div>
                             )}
 
                             {/* Section 2: Visibility by Query Type — premium only */}
@@ -859,22 +866,19 @@ export default function ResultsPage() {
                                 </div>
                             )}
 
-                            {/* Section 4: Perplexity Citation Rate — premium only */}
-                            {(analysisResult.citationRate != null || analysisResult.citationDataQuality === 'insufficient') && (
-                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                    <h2 className="text-xl font-bold mb-4">Perplexity citation rate</h2>
-                                    {isPremium ? (
-                                        analysisResult.citationDataQuality === 'insufficient' ? (
-                                            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                                                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                                                <div>
-                                                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Insufficient data</p>
-                                                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
-                                                        More than half the Perplexity queries returned errors. Run a fresh analysis to get an accurate citation rate.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ) : (
+                            {/* Section 4: Perplexity Citation Rate */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <h2 className="text-xl font-bold mb-4">Perplexity citation rate</h2>
+                                {isPremium ? (
+                                    visibilityScanHasRun === null ? (
+                                        <div className="animate-pulse space-y-3">
+                                            <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded-full w-3/5" />
+                                            <div className="h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full w-2/5" />
+                                            <div className="h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full w-1/4" />
+                                        </div>
+                                    ) : (
+                                        // State 3 — legacy data from runCitationChecks
+                                        analysisResult.citationRate != null ? (
                                             <div className="flex items-center gap-6">
                                                 <div className="text-center shrink-0">
                                                     <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-400">
@@ -894,26 +898,54 @@ export default function ResultsPage() {
                                                     </p>
                                                 </div>
                                             </div>
-                                        )
-                                    ) : (
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-center shrink-0 blur-sm select-none" aria-hidden>
-                                                <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-400">??%</div>
-                                                <div className="text-xs text-gray-500 mt-1">citation rate</div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 mb-3">
-                                                    <div className="h-3 rounded-full bg-gray-300 dark:bg-gray-600" style={{ width: '40%' }} />
+                                        ) : analysisResult.citationDataQuality === 'insufficient' ? (
+                                            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Insufficient data</p>
+                                                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                                                        More than half the Perplexity queries returned errors. Run a fresh analysis to get an accurate citation rate.
+                                                    </p>
                                                 </div>
-                                                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">🔒 Premium feature</p>
-                                                <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
-                                                    Upgrade to see your live citation rate →
-                                                </Link>
                                             </div>
+                                        // State 2 — AI scan ran, citation data from visibility scan
+                                        ) : visibilityScanHasRun ? (
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                No citation gaps detected — your domain appeared in results across all query types.
+                                            </p>
+                                        // State 1 — no scan yet
+                                        ) : (
+                                            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 flex-1">
+                                                    Run your AI Visibility scan below to see citation data.
+                                                </p>
+                                                <button
+                                                    onClick={() => document.getElementById('ai-visibility-section')?.scrollIntoView({ behavior: 'smooth' })}
+                                                    className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium whitespace-nowrap"
+                                                >
+                                                    Run scan →
+                                                </button>
+                                            </div>
+                                        )
+                                    )
+                                ) : (
+                                    <div className="flex items-center gap-6">
+                                        <div className="text-center shrink-0 blur-sm select-none" aria-hidden>
+                                            <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-400">??%</div>
+                                            <div className="text-xs text-gray-500 mt-1">citation rate</div>
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                        <div className="flex-1">
+                                            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 mb-3">
+                                                <div className="h-3 rounded-full bg-gray-300 dark:bg-gray-600" style={{ width: '40%' }} />
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">🔒 Premium feature</p>
+                                            <Link href="/pricing" className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium">
+                                                Upgrade to see your live citation rate →
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Priority Action Plan — driven by lowest-scoring parameters */}
                             {(() => {
