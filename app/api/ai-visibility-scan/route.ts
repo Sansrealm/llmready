@@ -15,8 +15,11 @@ import {
   getLatestVisibilityScan,
   saveVisibilityScan,
   getVisibilityScanHistory,
+  updateAnalysisCitationData,
+  normalizeUrl,
   type VisibilityResultRow,
 } from '@/lib/db';
+import type { CitationGap, QueryBucket } from '@/lib/types';
 
 const CACHE_MAX_AGE_HOURS = 72;
 
@@ -32,10 +35,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { url, industry, visibilityQueries } = body as {
+    const { url, industry, visibilityQueries, queryBuckets } = body as {
       url: string;
       industry?: string;
       visibilityQueries?: string[];
+      queryBuckets?: QueryBucket[];
     };
 
     if (!url?.trim()) {
@@ -68,6 +72,62 @@ export async function POST(req: NextRequest) {
       scan.totalQueries,
       scan.results.filter((r) => !r.error)
     );
+
+    // ── Derive citation data from Perplexity results and write back to analyses ──
+    if (userId) {
+      try {
+        const perplexityResults = scan.results.filter(
+          (r) => r.model === 'perplexity' && !r.error
+        );
+
+        if (perplexityResults.length > 0) {
+          const citedCount = perplexityResults.filter((r) => r.cited === true).length;
+          const citationRate = citedCount / perplexityResults.length;
+
+          // Build a query → type map from queryBuckets if available
+          const queryTypeMap = new Map<string, string>();
+          if (queryBuckets) {
+            for (const b of queryBuckets) {
+              queryTypeMap.set(b.query, b.type);
+            }
+          }
+
+          const domainRe = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/gi;
+
+          const citationGaps: CitationGap[] = perplexityResults.map((r) => {
+            const displacedBy: string[] = [];
+            if (!r.cited && r.snippet) {
+              for (const m of r.snippet.matchAll(domainRe)) {
+                if (!displacedBy.includes(m[1])) displacedBy.push(m[1]);
+              }
+            }
+            return {
+              query: r.prompt,
+              query_type: queryTypeMap.get(r.prompt) ?? '',
+              status: r.cited ? 'cited' : 'not_cited',
+              citation_position: r.cited ? 1 : null,
+              displaced_by: displacedBy,
+            } as CitationGap;
+          });
+
+          const citationDataQuality: 'sufficient' | 'insufficient' =
+            perplexityResults.length < 10 ? 'insufficient' : 'sufficient';
+
+          await updateAnalysisCitationData(userId, normalizeUrl(url), {
+            citationRate,
+            citationGaps,
+            citationDataQuality,
+          });
+
+          console.log(
+            `[ai-visibility-scan] citation data written — rate: ${(citationRate * 100).toFixed(0)}%, gaps: ${citationGaps.length}`
+          );
+        }
+      } catch (citErr) {
+        // Non-fatal: scan result still returned to client
+        console.error('[ai-visibility-scan] citation backfill failed:', citErr);
+      }
+    }
 
     const history = await getVisibilityScanHistory(url);
 

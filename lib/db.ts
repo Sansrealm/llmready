@@ -740,3 +740,31 @@ export async function getVisibilityScanHistory(
 
   return result.rows as VisibilityScanRow[];
 }
+
+/**
+ * Writes citation data derived from an AI visibility scan back to the most
+ * recent analyses row for this user + URL.  No-ops silently if no row exists.
+ */
+export async function updateAnalysisCitationData(
+  userId: string,
+  normalizedUrl: string,
+  data: {
+    citationRate: number;
+    citationGaps: CitationGap[];
+    citationDataQuality: 'sufficient' | 'insufficient';
+  }
+): Promise<void> {
+  await sql`
+    UPDATE analyses
+    SET
+      citation_rate         = ${data.citationRate},
+      citation_gaps         = ${JSON.stringify(data.citationGaps)}::jsonb,
+      citation_data_quality = ${data.citationDataQuality}
+    WHERE id = (
+      SELECT id FROM analyses
+      WHERE user_id = ${userId} AND normalized_url = ${normalizedUrl}
+      ORDER BY analyzed_at DESC
+      LIMIT 1
+    )
+  `;
+}
