@@ -2,8 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { clerkClient } from '@clerk/nextjs/server';
+import { Resend } from 'resend';
+import { render } from '@react-email/render';
 import { findUserByStripeSubscription, findUserByStripeCustomer } from '@/lib/stripe-utils';
 import { addToRetryQueue, type WebhookMetadata } from '@/lib/queue/webhook-retry';
+import PremiumWelcomeEmail from '@/emails/premium-welcome';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -134,10 +137,13 @@ export async function POST(request: NextRequest) {
 
                 console.log('Updating user metadata for userId:', userId);
 
+                // Hoist user so it's accessible for the email guard below
+                const client = await clerkClient();
+                let user: Awaited<ReturnType<typeof client.users.getUser>> | null = null;
+
                 // Update user metadata in Clerk to mark as premium
                 try {
-                    const client = await clerkClient();
-                    const user = await client.users.getUser(userId);
+                    user = await client.users.getUser(userId);
                     await client.users.updateUser(userId, {
                         publicMetadata: {
                             ...user.publicMetadata,
@@ -164,6 +170,43 @@ export async function POST(request: NextRequest) {
                     console.log(`➕ Added to retry queue: ${userId}`);
                     // Continue processing - webhook will still return 200 to Stripe
                 }
+
+                // Fire-and-forget welcome email — does not block webhook response
+                // Guard: new subscriptions only (not renewals) and not already premium
+                // user === null means the metadata fetch threw; treat as not premium
+                // to avoid missing a genuine new subscriber
+                if (
+                    session.mode === 'subscription' &&
+                    user?.publicMetadata?.premiumUser !== true
+                ) {
+                    const welcomeToEmail =
+                        session.customer_details?.email ??
+                        session.customer_email ??
+                        userEmail;
+
+                    if (welcomeToEmail) {
+                        const firstName =
+                            session.customer_details?.name?.split(' ')[0] ?? 'there';
+                        const resend = new Resend(process.env.RESEND_API_KEY);
+                        (async () => {
+                            const emailHtml = await render(PremiumWelcomeEmail({ firstName }));
+                            await resend.emails.send({
+                                from: 'LLM Check <analysis@llmcheck.app>',
+                                to: welcomeToEmail,
+                                subject: 'Welcome to LLM Check — start here',
+                                html: emailHtml,
+                            });
+                        })().catch((err: unknown) =>
+                            console.error('Welcome email failed:', err)
+                        );
+                        console.log(`📧 Welcome email queued for ${welcomeToEmail}`);
+                    } else {
+                        console.warn('Welcome email skipped: no customer email available for this session');
+                    }
+                } else {
+                    console.log('Welcome email skipped: renewal or already premium user');
+                }
+
                 break;
             }
 
