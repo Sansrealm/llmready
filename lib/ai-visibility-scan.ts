@@ -227,9 +227,24 @@ async function queryPerplexity(prompt: string): Promise<ModelResponse> {
 
 async function queryGemini(prompt: string): Promise<ModelResponse> {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    tools: [{ googleSearchRetrieval: {} }],
+  });
   const result = await model.generateContent(prompt + PROMPT_SUFFIX);
-  return { text: result.response.text(), citations: [] };
+
+  // Extract grounded source URLs from grounding metadata.
+  // Falls back to [] if grounding is unavailable (e.g. Vertex AI key without grounding enabled).
+  const groundingChunks =
+    result.response.candidates?.[0]
+      ?.groundingMetadata?.groundingChunks ?? [];
+
+  const citations = groundingChunks
+    .map((chunk) => chunk.web?.uri)
+    .filter((uri): uri is string => !!uri)
+    .slice(0, 5);
+
+  return { text: result.response.text(), citations };
 }
 
 const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<ModelResponse>> = {
