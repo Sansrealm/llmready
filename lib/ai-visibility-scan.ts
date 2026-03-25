@@ -199,13 +199,42 @@ interface ModelResponse {
 
 async function queryChatGPT(prompt: string): Promise<ModelResponse> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
-    max_tokens: 500,
-    temperature: 0.3,
-  });
-  return { text: response.choices[0]?.message?.content ?? '', citations: [] };
+
+  try {
+    const response = await openai.responses.create({
+      model: 'gpt-4o',
+      tools: [{ type: 'web_search_preview' }],
+      input: prompt + PROMPT_SUFFIX,
+    });
+
+    const messageBlocks = response.output.filter((block) => block.type === 'message');
+
+    const text = messageBlocks
+      .flatMap((block) => block.content)
+      .filter((c) => c.type === 'output_text')
+      .map((c) => c.text)
+      .join('');
+
+    const citations = messageBlocks
+      .flatMap((block) => block.content)
+      .filter((c) => c.type === 'output_text')
+      .flatMap((c) => c.annotations ?? [])
+      .filter((a) => a.type === 'url_citation')
+      .map((a) => a.url)
+      .filter((url): url is string => !!url)
+      .slice(0, 5);
+
+    return { text, citations };
+  } catch {
+    // Fallback to chat.completions if Responses API is unavailable
+    const fallback = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
+      max_tokens: 500,
+      temperature: 0.3,
+    });
+    return { text: fallback.choices[0]?.message?.content ?? '', citations: [] };
+  }
 }
 
 async function queryPerplexity(prompt: string): Promise<ModelResponse> {
