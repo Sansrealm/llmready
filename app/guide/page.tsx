@@ -324,6 +324,10 @@ export default function GuidePage() {
                   </div>
                 </div>
 
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic mb-8">
+                  This guide evolves as LLMs, AI search, and best practices change. Check back for updates.
+                </p>
+
                 <div className="bg-blue-50 dark:bg-blue-950/50 p-8 rounded-lg mb-16 shadow-sm">
                   <p className="text-lg mb-6 text-gray-700 dark:text-gray-300">
                     Want to quickly check if your website is LLM-ready? Use our free analyzer tool to get instant insights and recommendations.

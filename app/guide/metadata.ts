@@ -43,7 +43,7 @@ export const guideMetadata = {
   title: "The Complete Guide to LLM Optimization",
   description: "Learn how to optimize your website for AI-powered search and improve your visibility in LLM responses. A comprehensive guide covering technical structure, content optimization, and authority building.",
   publishedDate: "2025-05-19",
-  modifiedDate: "2025-06-04",
+  modifiedDate: "2026-03-25",
   authors: [
     {
       name: "LLM Check Team",
