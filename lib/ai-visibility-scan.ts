@@ -1,7 +1,7 @@
 /**
  * AI Visibility Scan Engine
  *
- * Queries ChatGPT (GPT-4o), Gemini (gemini-1.5-flash), and Perplexity (sonar)
+ * Queries ChatGPT (GPT-4o), Gemini (gemini-2.0-flash-001), and Perplexity (sonar)
  * with industry-specific prompts and scores how prominently the target brand
  * appears in each model's response.
  *
@@ -257,7 +257,7 @@ async function queryPerplexity(prompt: string): Promise<ModelResponse> {
 async function queryGemini(prompt: string): Promise<ModelResponse> {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.0-flash-001',
     tools: [{ googleSearchRetrieval: {} }],
   });
   const result = await model.generateContent(prompt + PROMPT_SUFFIX);
@@ -283,7 +283,7 @@ const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<ModelResponse>> = {
 };
 
 const MODELS: ModelId[] = ['chatgpt', 'gemini', 'perplexity'];
-const QUERY_TIMEOUT_MS = 20_000;
+const QUERY_TIMEOUT_MS = 45_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
