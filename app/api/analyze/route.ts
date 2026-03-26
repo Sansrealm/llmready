@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       URL: ${url}
       Title: ${title}
       Meta Description: ${metaDescription}
-      Headings: ${headings.join(', ')}
+      Headings: ${headings.slice(0, 20).join(' | ')}
       Content Sample: ${paragraphs.join(' ').substring(0, 1000)}
       Has Schema Markup: ${hasSchema}
       Has Mobile Viewport: ${hasMobileViewport}
@@ -142,6 +142,10 @@ export async function POST(request: NextRequest) {
       - category: queries about the product/service category
       - comparison: queries comparing this product/service against alternatives
 
+      Generate exactly 5 recommendations — the 5 highest-priority fixes that will have the
+      greatest impact on LLM visibility. Order them by impact, most critical first.
+      Do not pad with minor or low-impact suggestions.
+
       Return a JSON object with this shape:
 
       {
@@ -150,6 +154,10 @@ export async function POST(request: NextRequest) {
           { "name": "...", "score": 0-100, "isPremium": ${!showPremiumContent}, "description": "..." }
         ],
         "recommendations": [
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
+          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
           { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} }
         ],
         "industry": "ecommerce|saas|media|education|healthcare|other",
@@ -187,7 +195,7 @@ export async function POST(request: NextRequest) {
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Claude scoring timed out after 45s')), 45000)
+      setTimeout(() => reject(new Error('Claude scoring timed out after 90s')), 90000)
     );
 
     let message: Awaited<ReturnType<typeof anthropic.messages.create>>;
@@ -203,8 +211,12 @@ export async function POST(request: NextRequest) {
     }
 
     const rawContent = message.content[0].type === 'text' ? message.content[0].text : '';
-    // Strip markdown fences if present
-    const raw = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    // Strip markdown fences if present (multi-pass to handle ```json and bare ```)
+    const raw = rawContent
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
     console.log('🧠 Claude response received');
 
     // 8. Parse and validate response
