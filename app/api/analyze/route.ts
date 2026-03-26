@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     // 7. Call Claude for scoring (independent of the three models being measured)
     const claudePromise = anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 3000,
       system: 'You are an expert in SEO, GEO (Generative Engine Optimization), and LLM citation analysis. Return only valid JSON — no markdown, no explanation, no code fences.',
       messages: [{ role: 'user', content: analysisPrompt }],
     });
