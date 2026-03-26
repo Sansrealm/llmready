@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPremiumStatus } from '@/lib/auth-utils';
+
+export const maxDuration = 120;
 import { runVisibilityScan } from '@/lib/ai-visibility-scan';
 import {
   getLatestVisibilityScan,

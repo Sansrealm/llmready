@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+
+export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
 import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
@@ -177,12 +179,28 @@ export async function POST(request: NextRequest) {
     `;
 
     // 7. Call Claude for scoring (independent of the three models being measured)
-    const message = await anthropic.messages.create({
+    const claudePromise = anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 2048,
       system: 'You are an expert in SEO, GEO (Generative Engine Optimization), and LLM citation analysis. Return only valid JSON — no markdown, no explanation, no code fences.',
       messages: [{ role: 'user', content: analysisPrompt }],
     });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Claude scoring timed out after 45s')), 45000)
+    );
+
+    let message: Awaited<ReturnType<typeof anthropic.messages.create>>;
+    try {
+      message = await Promise.race([claudePromise, timeoutPromise]);
+    } catch (err) {
+      const isTimeout = err instanceof Error && err.message.includes('timed out');
+      console.error('Claude scoring error:', err);
+      return NextResponse.json(
+        { error: isTimeout ? 'Analysis timed out — please try again' : 'Claude scoring failed' },
+        { status: 503 }
+      );
+    }
 
     const rawContent = message.content[0].type === 'text' ? message.content[0].text : '';
     // Strip markdown fences if present
