@@ -58,7 +58,7 @@ export default function PremiumWelcomeEmail({
             <Text style={paragraph}>The whole thing takes about 60 seconds.</Text>
 
             <Section style={buttonSection}>
-              <Button href="https://llmcheck.app" style={button}>
+              <Button href="https://llmcheck.app?utm_source=email&utm_medium=welcome&utm_campaign=premium_onboarding&utm_content=cta_button" style={button}>
                 Run your analysis →
               </Button>
             </Section>
