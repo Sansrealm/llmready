@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, DM_Mono, Instrument_Serif } from "next/font/google"
 import Script from "next/script"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -9,7 +9,9 @@ import { Analytics } from "@/components/Analytics"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { QueryProvider } from "./providers/query-provider"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" })
+const instrumentSerif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif" })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://llmcheck.app'),
@@ -96,7 +98,7 @@ export default function RootLayout({
           <link rel="manifest" href="/site.webmanifest" />
           <link rel="shortcut icon" href="/favicon.ico" />
         </head>
-        <body className={`${inter.className} bg-background text-foreground`}>
+        <body className={`${inter.variable} ${dmMono.variable} ${instrumentSerif.variable} font-sans bg-background text-foreground`}>
           {/* Google Tag Manager (noscript) */}
           <noscript>
             <iframe

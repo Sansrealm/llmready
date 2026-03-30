@@ -17,6 +17,7 @@ import ScoreHistoryWidget from '@/components/score-history-widget';
 import { ShareButton } from '@/components/share-button';
 import { AnalysisResult, DebugInfo, getPrimaryCompetitor } from '@/lib/types';
 import AiVisibilityCheck from '@/components/ai-visibility-check';
+import type { ScanSummary } from '@/components/ai-visibility-check';
 import ExitSurveyModal from '@/components/exit-survey-modal';
 
 // Premium check that uses server-side API
@@ -84,6 +85,8 @@ export default function ResultsPage() {
     // true  = component responded: scan exists
     const [visibilityScanHasRun, setVisibilityScanHasRun] = useState<boolean | null>(null);
     const [scanHasCitationGaps, setScanHasCitationGaps] = useState<boolean | null>(null);
+    const [scanIsLoading, setScanIsLoading] = useState(false);
+    const [scanSummary, setScanSummary] = useState<ScanSummary | null>(null);
 
     // When true, the next queryFn call will bypass the server-side cache
     const bypassCacheRef = useRef(false);
@@ -478,95 +481,210 @@ export default function ResultsPage() {
                         </Alert>
                     ) : analysisResult ? (
                         <div className="space-y-8">
-                            {/* Overall Score Section */}
-                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <h2 className="text-2xl font-bold mb-4">Overall LLM Readiness Score</h2>
-                                <div className="flex flex-col">
-                                    <div className="text-7xl font-bold text-blue-600">
-                                        {analysisResult.overall_score}
-                                    </div>
-                                    <div className="text-sm text-gray-500">out of 100</div>
-                                    <div className="text-xs text-gray-400 mt-1">
-                                        Scored across {analysisResult.parameters?.length ?? 12} LLM readiness parameters
-                                    </div>
-                                </div>
-                                <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-blue-600 h-2 rounded-full"
-                                        style={{ width: `${analysisResult.overall_score}%` }}
-                                    ></div>
-                                </div>
+                            {/* ── Hero: two-column ── */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                                {/* Premium features buttons */}
-                                <div className="mt-6 flex flex-wrap gap-4">
-                                    <Button
-                                        onClick={generatePdfReport}
-                                        disabled={!isSignedIn || !isPremium || pdfGenerating}
-                                        className={!isSignedIn || !isPremium ? "opacity-70" : ""}
-                                    >
-                                        {pdfGenerating ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Download className="mr-2 h-4 w-4" />
+                                {/* LEFT — Score + Narrative */}
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6 flex flex-col justify-between">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
+                                           style={{ fontFamily: 'var(--font-mono)' }}>
+                                            LLM Readiness Score
+                                        </p>
+                                        <div className="flex items-center gap-5 mb-5">
+                                            {/* Score ring */}
+                                            <div className="relative shrink-0 w-20 h-20">
+                                                <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
+                                                    <circle cx="40" cy="40" r="34" fill="none"
+                                                        className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="6" />
+                                                    <circle cx="40" cy="40" r="34" fill="none"
+                                                        stroke={analysisResult.overall_score >= 75 ? '#22c55e' : analysisResult.overall_score >= 50 ? '#3b82f6' : analysisResult.overall_score >= 30 ? '#f59e0b' : '#ef4444'}
+                                                        strokeWidth="6"
+                                                        strokeDasharray="213.6"
+                                                        strokeDashoffset={213.6 * (1 - analysisResult.overall_score / 100)}
+                                                        strokeLinecap="round" />
+                                                </svg>
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                    <span className="text-2xl font-medium leading-none text-gray-900 dark:text-white"
+                                                          style={{ fontFamily: 'var(--font-mono)' }}>
+                                                        {analysisResult.overall_score}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 mt-0.5"
+                                                          style={{ fontFamily: 'var(--font-mono)' }}>/100</span>
+                                                </div>
+                                            </div>
+                                            {/* Narrative */}
+                                            <div>
+                                                <p className="text-lg leading-snug text-gray-900 dark:text-white"
+                                                   style={{ fontFamily: 'var(--font-serif)' }}>
+                                                    {(() => {
+                                                        const s = analysisResult.overall_score;
+                                                        const params = [...(analysisResult.parameters ?? [])].sort((a, b) => a.score - b.score);
+                                                        const worst = params.slice(0, 2).filter(p => p.score < 75);
+                                                        const verdict = s >= 75 ? 'well-optimised for AI search'
+                                                            : s >= 50 ? 'partially visible to AI search, with key gaps'
+                                                            : s >= 30 ? 'below average for AI search visibility'
+                                                            : 'largely invisible to AI search engines';
+                                                        const gap = worst.length >= 2
+                                                            ? `${worst[0].name} and ${worst[1].name} are the highest-priority fixes`
+                                                            : worst.length === 1 ? `${worst[0].name} is the highest-priority fix` : '';
+                                                        return `Your site is ${verdict}.${gap ? ` ${gap}.` : ''}`;
+                                                    })()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action buttons */}
+                                    <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                        <Button
+                                            onClick={generatePdfReport}
+                                            disabled={!isSignedIn || !isPremium || pdfGenerating}
+                                            className={!isSignedIn || !isPremium ? "opacity-70" : ""}
+                                            size="sm"
+                                        >
+                                            {pdfGenerating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                                            {pdfGenerating ? 'Generating...' : 'Report'}
+                                        </Button>
+
+                                        {analysisResult?.id && (
+                                            <ShareButton
+                                                analysisId={analysisResult.id}
+                                                isPremium={isPremium}
+                                                userEmail={email}
+                                                url={url || ''}
+                                                overallScore={analysisResult.overall_score}
+                                            />
                                         )}
-                                        {pdfGenerating ? 'Generating...' : 'Download Report'}
-                                    </Button>
 
-                                    {analysisResult?.id && (
-                                        <ShareButton
-                                            analysisId={analysisResult.id}
-                                            isPremium={isPremium}
-                                            userEmail={email}
-                                            url={url || ''}
-                                            overallScore={analysisResult.overall_score}
-                                        />
-                                    )}
+                                        <Button
+                                            onClick={handleReanalyzeClick}
+                                            disabled={inCooldown || loading}
+                                            variant="outline"
+                                            size="sm"
+                                            title={inCooldown ? `Available in ${formatCooldown(cooldownRemaining)}` : "Run a fresh analysis"}
+                                        >
+                                            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                                            {loading ? 'Analyzing…' : inCooldown ? `Re-analyze in ${formatCooldown(cooldownRemaining)}` : 'Re-analyze'}
+                                        </Button>
 
-                                    <Button
-                                        onClick={handleReanalyzeClick}
-                                        disabled={inCooldown || loading}
-                                        variant="outline"
-                                        title={inCooldown ? `Available in ${formatCooldown(cooldownRemaining)}` : "Run a fresh analysis"}
-                                    >
-                                        <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                                        {loading
-                                            ? 'Analyzing...'
-                                            : inCooldown
-                                            ? `Re-analyze in ${formatCooldown(cooldownRemaining)}`
-                                            : 'Re-analyze'}
-                                    </Button>
+                                        {!isSignedIn && (
+                                            <Link href="/login">
+                                                <Button variant="outline" size="sm">Sign in</Button>
+                                            </Link>
+                                        )}
+                                    </div>
 
                                     {/* Free user re-analyze warning */}
                                     {showReanalyzeWarning && (
-                                        <div className="w-full mt-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                        <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
                                             <p className="text-sm text-amber-800 dark:text-amber-300 mb-2">
                                                 ⚠️ This will use <strong>1 of your {analysisResult?.remainingAnalyses ?? 0} remaining analyses</strong>. Continue?
                                             </p>
                                             <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleConfirmReanalyze}
-                                                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-md transition-colors"
-                                                >
+                                                <button onClick={handleConfirmReanalyze}
+                                                    className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-md transition-colors">
                                                     Confirm &amp; Re-analyze
                                                 </button>
-                                                <button
-                                                    onClick={() => setShowReanalyzeWarning(false)}
-                                                    className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline px-2"
-                                                >
+                                                <button onClick={() => setShowReanalyzeWarning(false)}
+                                                    className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline px-2">
                                                     Cancel
                                                 </button>
                                             </div>
                                         </div>
                                     )}
+                                </div>
 
-                                    {!isSignedIn && (
-                                        <Link href="/login">
-                                            <Button variant="outline">
-                                                Sign In for Premium Features
-                                            </Button>
-                                        </Link>
+                                {/* RIGHT — AI Visibility Summary */}
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
+                                       style={{ fontFamily: 'var(--font-mono)' }}>
+                                        AI Visibility
+                                    </p>
+
+                                    {!isPremium ? (
+                                        /* Non-premium teaser */
+                                        <div className="flex flex-col h-full justify-between">
+                                            <div>
+                                                <div className="text-3xl font-medium text-gray-300 dark:text-gray-700 mb-1"
+                                                     style={{ fontFamily: 'var(--font-mono)' }}>??</div>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">queries cited your brand</p>
+                                                <div className="space-y-2">
+                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map(label => (
+                                                        <div key={label} className="flex items-center gap-2">
+                                                            <span className="text-xs w-20 text-gray-400"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
+                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full" />
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>?/5</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <Link href="/pricing"
+                                                  className="mt-4 text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                                                Upgrade to see live citation data →
+                                            </Link>
+                                        </div>
+                                    ) : scanIsLoading || (!scanSummary) ? (
+                                        /* Loading state */
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                                <div className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" />
+                                                <span className="animate-pulse">Analyzing visibility across major LLMs…</span>
+                                            </div>
+                                            <div className="space-y-3 pt-1">
+                                                {[72, 56, 80, 64].map((w, i) => (
+                                                    <div key={i} className="flex items-center gap-2">
+                                                        <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
+                                                        <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                        <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* Scan data */
+                                        <div>
+                                            <div className="flex items-baseline gap-1.5 mb-1">
+                                                <span className="text-3xl font-medium text-gray-900 dark:text-white"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    {scanSummary.totalFound}
+                                                </span>
+                                                <span className="text-sm text-gray-400"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    / {scanSummary.totalQueries}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">queries mentioned your brand</p>
+
+                                            <div className="space-y-2.5">
+                                                {scanSummary.buckets.map(b => (
+                                                    <div key={b.type} className="flex items-center gap-2">
+                                                        <span className="text-xs w-20 text-gray-500 dark:text-gray-400 shrink-0"
+                                                              style={{ fontFamily: 'var(--font-mono)' }}>{b.label}</span>
+                                                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                            <div className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                                                                 style={{ width: `${b.total > 0 ? (b.cited / b.total) * 100 : 0}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 w-6 text-right shrink-0"
+                                                              style={{ fontFamily: 'var(--font-mono)' }}>
+                                                            {b.cited}/{b.total}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {scanSummary.topCompetitor && (
+                                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                                                    When AI skips you, it recommends{' '}
+                                                    <span className="font-medium text-gray-700 dark:text-gray-300">{scanSummary.topCompetitor}</span> instead.
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
+
                             </div>
 
                             {/* Upgrade block for free users */}
@@ -762,9 +880,12 @@ export default function ResultsPage() {
                                         visibilityQueries={analysisResult?.visibilityQueries}
                                         queryBuckets={analysisResult?.queryBuckets}
                                         citationGaps={analysisResult?.citationGaps}
-                                        onScanStatusKnown={(hasRun, hasCitationGaps) => {
+                                        onScanLoading={() => setScanIsLoading(true)}
+                                        onScanStatusKnown={(hasRun, hasCitationGaps, summary) => {
+                                            setScanIsLoading(false);
                                             setVisibilityScanHasRun(hasRun);
                                             setScanHasCitationGaps(hasCitationGaps);
+                                            if (summary) setScanSummary(summary);
                                         }}
                                     />
                                 </div>

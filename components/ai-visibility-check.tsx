@@ -41,6 +41,13 @@ interface ScanResponse {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+export interface ScanSummary {
+  totalFound: number;
+  totalQueries: number;
+  buckets: { type: string; label: string; cited: number; total: number }[];
+  topCompetitor: string | null;
+}
+
 interface AiVisibilityCheckProps {
   url: string;
   industry: string | null;
@@ -51,7 +58,8 @@ interface AiVisibilityCheckProps {
   visibilityQueries?: string[];
   queryBuckets?: QueryBucket[];
   citationGaps?: CitationGap[];
-  onScanStatusKnown?: (hasRun: boolean, hasCitationGaps: boolean) => void;
+  onScanLoading?: () => void;
+  onScanStatusKnown?: (hasRun: boolean, hasCitationGaps: boolean, summary?: ScanSummary) => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -149,6 +157,7 @@ export default function AiVisibilityCheck({
   visibilityQueries,
   queryBuckets,
   citationGaps,
+  onScanLoading,
   onScanStatusKnown,
 }: AiVisibilityCheckProps) {
   const [data, setData] = useState<ScanResponse | null>(null);
@@ -195,6 +204,7 @@ export default function AiVisibilityCheck({
     if (isRescan) setRescanning(true);
     else setLoading(true);
     setError(null);
+    onScanLoading?.();
 
     try {
       const res = await fetch("/api/ai-visibility-scan", {
@@ -205,10 +215,28 @@ export default function AiVisibilityCheck({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Scan failed");
       setData(json);
-      const hasCitationGaps = (json.results as PromptResult[]).some(
-        (r) => !r.perplexity.error && r.perplexity.cited === false
-      );
-      onScanStatusKnown?.(true, hasCitationGaps);
+
+      const rows = json.results as PromptResult[];
+      const hasCitationGaps = rows.some((r) => !r.perplexity.error && r.perplexity.cited === false);
+
+      // Build scan summary for hero right column
+      const queryTypeMap = new Map((queryBuckets ?? []).map((b) => [b.query, b.type]));
+      const buckets = (["brand", "problem", "category", "comparison"] as const)
+        .map((type) => {
+          const bucketRows = rows.filter((r) => queryTypeMap.get(r.prompt) === type);
+          const cited = bucketRows.filter((r) => !r.perplexity.error && r.perplexity.cited === true).length;
+          return { type, label: { brand: "Brand", problem: "Problem", category: "Category", comparison: "Comparison" }[type], cited, total: bucketRows.length };
+        })
+        .filter((b) => b.total > 0);
+
+      let topCompetitor: string | null = null;
+      for (const gap of citationGaps ?? []) {
+        const c = getPrimaryCompetitor(gap);
+        if (c) { topCompetitor = c; break; }
+      }
+
+      const summary: ScanSummary = { totalFound: json.totalFound, totalQueries: json.totalQueries, buckets, topCompetitor };
+      onScanStatusKnown?.(true, hasCitationGaps, summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
       onScanStatusKnown?.(false, false);
