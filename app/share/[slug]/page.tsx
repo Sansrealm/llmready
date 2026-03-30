@@ -186,7 +186,7 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
           <div className="rounded-2xl border border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <p className="font-semibold text-gray-900 dark:text-white">See how your site performs</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Free analysis — no account required</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Analyse your site for free</p>
             </div>
             <Link href="/">
               <Button className="bg-green-600 hover:bg-green-700 text-white font-semibold shrink-0">

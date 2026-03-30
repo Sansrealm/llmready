@@ -3,7 +3,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePremiumAccess } from '@/lib/auth-utils';
-import { AnalysisResult } from '@/lib/types';
+import { AnalysisResult, CitationGap, QueryBucket } from '@/lib/types';
+
+// ── Bucket helpers (mirrors share page logic) ──────────────────────────────────
+
+const BUCKET_ORDER = ['brand', 'problem', 'category', 'comparison'] as const;
+const BUCKET_LABELS: Record<string, string> = {
+  brand: 'Brand',
+  problem: 'Problem',
+  category: 'Category',
+  comparison: 'Comparison',
+};
+
+function buildBucketRows(citationGaps: CitationGap[], queryBuckets: QueryBucket[]) {
+  const queryTypeMap = new Map(queryBuckets.map((b) => [b.query, b.type]));
+  return BUCKET_ORDER.map((type) => {
+    const rows = citationGaps.filter((g) => queryTypeMap.get(g.query) === type);
+    const cited = rows.filter((g) => g.status === 'cited').length;
+    const total = rows.length;
+    const competitor = rows.find(
+      (g) => g.status === 'not_cited' && g.displaced_by.length > 0
+    )?.displaced_by[0] ?? null;
+    return { type, label: BUCKET_LABELS[type] ?? type, cited, total, competitor };
+  }).filter((r) => r.total > 0);
+}
 
 // Generate a beautiful, print-ready HTML report
 function generatePrintReadyHTML(
@@ -12,8 +35,12 @@ function generatePrintReadyHTML(
     userEmail: string | null,
     industry?: string | null
 ): string {
-    const { overall_score, parameters, recommendations, visibilityQueries } = analysisResult;
+    const { overall_score, parameters, recommendations, visibilityQueries, citationGaps, queryBuckets } = analysisResult;
     const resolvedIndustry = industry || analysisResult.industry || null;
+    const hasCitationData = Array.isArray(citationGaps) && citationGaps.length > 0;
+    const bucketRows = hasCitationData && Array.isArray(queryBuckets) && queryBuckets.length > 0
+      ? buildBucketRows(citationGaps!, queryBuckets)
+      : [];
 
     return `
     <!DOCTYPE html>
@@ -225,6 +252,35 @@ function generatePrintReadyHTML(
                 font-size: 1.2rem;
             }
             
+            /* Citation gap cards */
+            .citation-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-top: 16px;
+            }
+            .citation-card {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                border: 1px solid #e5e7eb;
+                border-radius: 10px;
+                background: #f9fafb;
+                padding: 12px 14px;
+            }
+            .citation-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+            .citation-query { font-size: 0.875rem; color: #374151; line-height: 1.4; }
+            .citation-meta { font-size: 0.75rem; color: #9ca3af; margin-top: 3px; }
+            .citation-pos { font-size: 0.75rem; font-weight: 600; color: #059669; flex-shrink: 0; }
+
+            /* Bucket summary table */
+            .bucket-table { width: 100%; border-collapse: collapse; margin-top: 16px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+            .bucket-table th { background: #f9fafb; padding: 10px 16px; text-align: left; font-size: 0.75rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb; }
+            .bucket-table td { padding: 12px 16px; font-size: 0.875rem; border-bottom: 1px solid #f3f4f6; }
+            .bucket-table tr:last-child td { border-bottom: none; }
+            .bucket-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+            .bucket-bar-track { height: 6px; width: 64px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+
             /* Responsive design */
             @media (max-width: 768px) {
                 body { padding: 15px; }
@@ -232,6 +288,10 @@ function generatePrintReadyHTML(
                 .section h2 { font-size: 1.5rem; }
                 .parameter-header { flex-direction: column; align-items: flex-start; }
                 .parameter-score { margin-top: 10px; }
+                .citation-grid { grid-template-columns: 1fr; }
+            }
+            @media print {
+                .citation-grid { grid-template-columns: 1fr 1fr; }
             }
         </style>
     </head>
@@ -301,16 +361,59 @@ function generatePrintReadyHTML(
             `).join('')}
         </div>
 
-        ${visibilityQueries && visibilityQueries.length > 0 ? `
+        ${hasCitationData ? `
         <div class="section">
-            <h2>🔍 AI Visibility Queries</h2>
-            <p style="color:#6b7280;margin-bottom:20px;">These are the queries your potential customers are likely typing into ChatGPT, Gemini, and Perplexity. Use them to benchmark whether your brand is being recommended.</p>
-            ${visibilityQueries.map((q, i) => `
-                <div class="parameter-card" style="display:flex;align-items:flex-start;gap:16px;">
-                    <span style="background:#dbeafe;color:#1e40af;font-weight:700;font-size:1.1rem;padding:8px 14px;border-radius:8px;flex-shrink:0;">${i + 1}</span>
-                    <p style="margin:0;color:#374151;font-size:1rem;line-height:1.6;">${q}</p>
-                </div>
-            `).join('')}
+            <h2>🔍 AI Citation Audit</h2>
+            <p style="color:#6b7280;margin-bottom:4px;">Whether Perplexity cites this site across 20 customer search queries</p>
+            <div class="citation-grid">
+                ${citationGaps!.map((gap) => `
+                    <div class="citation-card">
+                        <span class="citation-icon">${gap.status === 'cited' ? '✅' : '❌'}</span>
+                        <div style="flex:1;min-width:0;">
+                            <div class="citation-query">${gap.query}</div>
+                            <div class="citation-meta">
+                                ${gap.query_type ? `<span style="text-transform:capitalize;">${gap.query_type}</span>` : ''}
+                                ${gap.status === 'not_cited' && gap.displaced_by.length > 0 ? `· ${gap.displaced_by[0]}` : ''}
+                            </div>
+                        </div>
+                        ${gap.status === 'cited' && gap.citation_position ? `<span class="citation-pos">#${gap.citation_position}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        ${bucketRows.length > 0 ? `
+        <div class="section">
+            <h2>📊 Visibility by Query Type</h2>
+            <p style="color:#6b7280;margin-bottom:4px;">How often Perplexity cites this site across different search intents</p>
+            <table class="bucket-table">
+                <thead>
+                    <tr>
+                        <th>Query Type</th>
+                        <th style="text-align:center;">Perplexity</th>
+                        <th>Displacing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${bucketRows.map((row) => {
+                        const pct = row.total > 0 ? Math.round((row.cited / row.total) * 100) : 0;
+                        const barColor = row.cited >= 4 ? '#34d399' : row.cited >= 2 ? '#fbbf24' : '#f87171';
+                        const textColor = row.cited >= 4 ? '#059669' : row.cited >= 2 ? '#d97706' : '#dc2626';
+                        return `
+                    <tr>
+                        <td style="font-weight:500;color:#374151;">${row.label}</td>
+                        <td>
+                            <div class="bucket-bar-wrap">
+                                <span style="font-size:0.875rem;font-weight:600;color:${textColor};">${row.cited}<span style="font-size:0.75rem;font-weight:400;color:#9ca3af;">/${row.total}</span></span>
+                                <div class="bucket-bar-track"><div style="height:100%;border-radius:3px;background:${barColor};width:${pct}%;"></div></div>
+                            </div>
+                        </td>
+                        <td style="font-size:0.75rem;color:#9ca3af;">${row.competitor ?? '—'}</td>
+                    </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
         </div>
         ` : ''}
 
