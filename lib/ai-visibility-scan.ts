@@ -46,18 +46,44 @@ export interface ScanOutput {
 
 // ── Domain / brand extraction ──────────────────────────────────────────────────
 
-function extractDomainTokens(url: string): { rootDomain: string; brandName: string; brandAlias: string } {
+function extractDomainTokens(url: string, pageTitle?: string): { rootDomain: string; brandName: string; brandAlias: string } {
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
     const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
     const brandName = hostname.split('.')[0]; // "acme" from "acme.io"
-    // Alias: same as brandName for most sites (e.g. "monday" from "monday.com")
-    const brandAlias = brandName;
+
+    // Derive a human-readable alias from the page title when available.
+    // e.g. "Internet Pipes – Newsletter for Entrepreneurs" → "Internet Pipes"
+    let brandAlias = brandName;
+    if (pageTitle) {
+      const titlePart = pageTitle
+        .split(/[|\-–—]/)[0]  // take text before first separator
+        .trim();
+      if (titlePart.length >= 3 && titlePart.length <= 60) {
+        brandAlias = titlePart;
+      }
+    }
+
     return { rootDomain: hostname, brandName, brandAlias };
   } catch {
     const clean = url.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     const brandName = clean.split('.')[0];
     return { rootDomain: clean, brandName, brandAlias: brandName };
+  }
+}
+
+/**
+ * Fetches the page <title> for a URL. Returns null on any error.
+ * Used to derive a human-readable brand alias for mention detection.
+ */
+async function fetchPageTitle(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const html = await res.text();
+    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return match ? match[1].trim() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -78,8 +104,12 @@ function findMentionIndex(text: string, rootDomain: string, brandName: string, b
     patterns.push(new RegExp(`\\b${escape(brandName)}\\b`, 'i'));
   }
 
-  if (brandAlias.length >= 3 && brandAlias !== brandName) {
-    patterns.push(new RegExp(`\\b${escape(brandAlias)}\\b`, 'i'));
+  if (brandAlias.length >= 3 && brandAlias.toLowerCase() !== brandName.toLowerCase()) {
+    // Use word boundary for single-word aliases, phrase match for multi-word (e.g. "Internet Pipes")
+    const aliasPattern = brandAlias.includes(' ')
+      ? new RegExp(escape(brandAlias), 'i')
+      : new RegExp(`\\b${escape(brandAlias)}\\b`, 'i');
+    patterns.push(aliasPattern);
   }
 
   let earliest = -1;
@@ -354,7 +384,16 @@ export async function runVisibilityScan(
   visibilityQueries?: string[]
 ): Promise<ScanOutput> {
   const normalizedUrl = normalizeUrl(url);
-  const { rootDomain, brandName, brandAlias } = extractDomainTokens(url);
+
+  // Fetch the page title to derive a human-readable brand alias
+  // (e.g. "internetpipes.com" → "Internet Pipes" from the <title> tag).
+  // Non-blocking: falls back to domain slug if the fetch fails.
+  const pageTitle = await fetchPageTitle(url);
+  if (pageTitle) {
+    console.log(`[ai-visibility] page title for brand detection: "${pageTitle}"`);
+  }
+
+  const { rootDomain, brandName, brandAlias } = extractDomainTokens(url, pageTitle ?? undefined);
   const prompts =
     visibilityQueries && visibilityQueries.length >= 10
       ? visibilityQueries
