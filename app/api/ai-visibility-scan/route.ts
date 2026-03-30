@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPremiumStatus } from '@/lib/auth-utils';
+import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 120;
 import { runVisibilityScan } from '@/lib/ai-visibility-scan';
@@ -24,6 +25,53 @@ import {
 import type { CitationGap, QueryBucket } from '@/lib/types';
 
 const CACHE_MAX_AGE_HOURS = 72;
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+/**
+ * Sends all non-cited snippets to Claude Haiku in a single batch call.
+ * Returns a map of `${query}|||${model}` → extracted competitor name (or null).
+ */
+async function extractCompetitors(
+  items: Array<{ model: string; query: string; snippet: string }>
+): Promise<Map<string, string | null>> {
+  const map = new Map<string, string | null>();
+  if (items.length === 0) return map;
+
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: 'Return only valid JSON. No markdown, no explanation.',
+    messages: [{
+      role: 'user',
+      content: `You are analyzing AI search responses to identify competing products.
+
+For each response, identify the PRIMARY product or service being recommended as the main solution.
+
+Rules:
+- Return the brand name as commonly written (e.g. "ClickUp", "Microsoft Teams", "Confluence")
+- Return null if no specific product is named or if only a general category is mentioned
+- Ignore generic sites: Reddit, YouTube, Wikipedia, LinkedIn, Twitter, Forbes, TechCrunch
+- If multiple products are mentioned, return the first specific one named
+
+Snippets:
+${JSON.stringify(items.map((it, i) => ({ id: i, model: it.model, query: it.query, snippet: it.snippet.slice(0, 400) })))}
+
+Return a JSON array: [{"id": 0, "competitor": "ProductName or null"}, ...]`,
+    }],
+  });
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text : '[]';
+  const parsed: Array<{ id: number; competitor: string | null }> = JSON.parse(
+    raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim()
+  );
+
+  for (const entry of parsed) {
+    const item = items[entry.id];
+    if (item) map.set(`${item.query}|||${item.model}`, entry.competitor ?? null);
+  }
+  return map;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,7 +123,7 @@ export async function POST(req: NextRequest) {
       scan.results.filter((r) => !r.error)
     );
 
-    // ── Derive citation data from Perplexity results and write back to analyses ──
+    // ── Derive citation data from scan results and write back to analyses ──────
     if (userId) {
       try {
         const perplexityResults = scan.results.filter(
@@ -86,29 +134,41 @@ export async function POST(req: NextRequest) {
           const citedCount = perplexityResults.filter((r) => r.cited === true).length;
           const citationRate = citedCount / perplexityResults.length;
 
-          // Build a query → type map from queryBuckets if available
+          // Build query → type map from queryBuckets if available
           const queryTypeMap = new Map<string, string>();
           if (queryBuckets) {
-            for (const b of queryBuckets) {
-              queryTypeMap.set(b.query, b.type);
-            }
+            for (const b of queryBuckets) queryTypeMap.set(b.query, b.type);
           }
 
-          const domainRe = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/gi;
+          // ── Claude competitor extraction: batch all non-cited snippets ──────
+          const nonCitedWithSnippets = scan.results
+            .filter((r) => !r.error && !r.cited && r.snippet)
+            .map((r) => ({ model: r.model, query: r.prompt, snippet: r.snippet! }));
+
+          let competitorMap = new Map<string, string | null>();
+          try {
+            competitorMap = await extractCompetitors(nonCitedWithSnippets);
+            console.log(`[ai-visibility-scan] extracted competitors for ${competitorMap.size} results`);
+          } catch (extractErr) {
+            console.error('[ai-visibility-scan] competitor extraction failed (non-fatal):', extractErr);
+          }
 
           const citationGaps: CitationGap[] = perplexityResults.map((r) => {
-            const displacedBy: string[] = [];
-            if (!r.cited && r.snippet) {
-              for (const m of r.snippet.matchAll(domainRe)) {
-                if (!displacedBy.includes(m[1])) displacedBy.push(m[1]);
-              }
-            }
+            // Collect per-model competitor mentions for this query
+            const competitors_mentioned = (['chatgpt', 'gemini', 'perplexity'] as const)
+              .flatMap((model) => {
+                const key = `${r.prompt}|||${model}`;
+                if (!competitorMap.has(key)) return [];
+                return [{ model, competitor: competitorMap.get(key) ?? null }];
+              });
+
             return {
               query: r.prompt,
               query_type: queryTypeMap.get(r.prompt) ?? '',
               status: r.cited ? 'cited' : 'not_cited',
               citation_position: r.cited ? 1 : null,
-              displaced_by: displacedBy,
+              displaced_by: [],
+              competitors_mentioned,
             } as CitationGap;
           });
 

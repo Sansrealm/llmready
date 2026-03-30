@@ -53,7 +53,28 @@ export interface CitationGap {
   query_type: string;
   status: 'cited' | 'not_cited';
   citation_position: number | null;
-  displaced_by: string[];
+  displaced_by: string[]; // legacy: regex-extracted domains, often empty
+  competitors_mentioned?: {
+    model: 'chatgpt' | 'gemini' | 'perplexity';
+    competitor: string | null;
+  }[];
+}
+
+/**
+ * Returns the most-frequently-mentioned competitor across all models for a gap.
+ * Falls back to legacy displaced_by[0] for older records.
+ */
+export function getPrimaryCompetitor(gap: CitationGap): string | null {
+  if (gap.competitors_mentioned?.length) {
+    const counts = new Map<string, number>();
+    for (const c of gap.competitors_mentioned) {
+      if (c.competitor) counts.set(c.competitor, (counts.get(c.competitor) ?? 0) + 1);
+    }
+    if (counts.size > 0) {
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    }
+  }
+  return gap.displaced_by?.[0] ?? null;
 }
 
 // ============================================================================

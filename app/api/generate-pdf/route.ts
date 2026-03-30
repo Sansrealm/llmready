@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePremiumAccess } from '@/lib/auth-utils';
-import { AnalysisResult, CitationGap, QueryBucket } from '@/lib/types';
+import { AnalysisResult, CitationGap, QueryBucket, getPrimaryCompetitor } from '@/lib/types';
 
 // ── Bucket helpers (mirrors share page logic) ──────────────────────────────────
 
@@ -21,9 +21,15 @@ function buildBucketRows(citationGaps: CitationGap[], queryBuckets: QueryBucket[
     const rows = citationGaps.filter((g) => queryTypeMap.get(g.query) === type);
     const cited = rows.filter((g) => g.status === 'cited').length;
     const total = rows.length;
-    const competitor = rows.find(
-      (g) => g.status === 'not_cited' && g.displaced_by.length > 0
-    )?.displaced_by[0] ?? null;
+    const competitor = (() => {
+      for (const g of rows) {
+        if (g.status === 'not_cited') {
+          const c = getPrimaryCompetitor(g);
+          if (c) return c;
+        }
+      }
+      return null;
+    })();
     return { type, label: BUCKET_LABELS[type] ?? type, cited, total, competitor };
   }).filter((r) => r.total > 0);
 }
@@ -373,7 +379,7 @@ function generatePrintReadyHTML(
                             <div class="citation-query">${gap.query}</div>
                             <div class="citation-meta">
                                 ${gap.query_type ? `<span style="text-transform:capitalize;">${gap.query_type}</span>` : ''}
-                                ${gap.status === 'not_cited' && gap.displaced_by.length > 0 ? `· ${gap.displaced_by[0]}` : ''}
+                                ${gap.status === 'not_cited' && getPrimaryCompetitor(gap) ? `· ${getPrimaryCompetitor(gap)}` : ''}
                             </div>
                         </div>
                         ${gap.status === 'cited' && gap.citation_position ? `<span class="citation-pos">#${gap.citation_position}</span>` : ''}

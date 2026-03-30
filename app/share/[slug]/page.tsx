@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
-import { SiteMetric, Recommendation, CitationGap, QueryBucket } from '@/lib/types';
+import { SiteMetric, Recommendation, CitationGap, QueryBucket, getPrimaryCompetitor } from '@/lib/types';
 import { getAnalysisByShareSlug } from '@/lib/db';
 import { Lock, CheckCircle2, XCircle } from 'lucide-react';
 import { auth, currentUser } from '@clerk/nextjs/server';
@@ -160,8 +160,15 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
     if (gaps.length === 0) return null;
     const cited = gaps.filter((g) => g.status === 'cited').length;
     const total = gaps.length;
-    const competitor =
-      gaps.find((g) => g.status === 'not_cited' && g.displaced_by.length > 0)?.displaced_by[0] ?? null;
+    const competitor = (() => {
+      for (const g of gaps) {
+        if (g.status === 'not_cited') {
+          const c = getPrimaryCompetitor(g);
+          if (c) return c;
+        }
+      }
+      return null;
+    })();
     return { type, label: BUCKET_LABELS[type] ?? type, cited, total, competitor };
   }).filter(Boolean) as { type: string; label: string; cited: number; total: number; competitor: string | null }[];
 
@@ -279,8 +286,8 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
                     <p className="text-sm text-gray-700 dark:text-gray-300 leading-snug">{gap.query}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs text-gray-400 capitalize">{gap.query_type}</span>
-                      {gap.status === 'not_cited' && gap.displaced_by.length > 0 && (
-                        <span className="text-xs text-gray-400">· {gap.displaced_by[0]}</span>
+                      {gap.status === 'not_cited' && getPrimaryCompetitor(gap) && (
+                        <span className="text-xs text-gray-400">· {getPrimaryCompetitor(gap)}</span>
                       )}
                     </div>
                   </div>

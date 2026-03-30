@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/track-event";
 import Link from "next/link";
 import type { QueryBucket, CitationGap } from "@/lib/types";
+import { getPrimaryCompetitor } from "@/lib/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -304,9 +305,9 @@ export default function AiVisibilityCheck({
       if (m.id === "perplexity") {
         for (const r of rows) {
           const gap = citationGapMap.get(r.prompt);
-          if (gap && gap.status === "not_cited" && gap.displaced_by.length > 0) {
-            competitor = gap.displaced_by[0];
-            break;
+          if (gap && gap.status === "not_cited") {
+            const c = getPrimaryCompetitor(gap);
+            if (c) { competitor = c; break; }
           }
         }
       }

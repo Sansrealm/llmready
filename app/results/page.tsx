@@ -15,7 +15,7 @@ import Link from "next/link";
 import AdComponent from '@/components/AdComponent';
 import ScoreHistoryWidget from '@/components/score-history-widget';
 import { ShareButton } from '@/components/share-button';
-import { AnalysisResult, DebugInfo } from '@/lib/types';
+import { AnalysisResult, DebugInfo, getPrimaryCompetitor } from '@/lib/types';
 import AiVisibilityCheck from '@/components/ai-visibility-check';
 import ExitSurveyModal from '@/components/exit-survey-modal';
 
@@ -290,8 +290,15 @@ export default function ResultsPage() {
         const freq: Record<string, number> = {};
         for (const gap of analysisResult.citationGaps) {
             if (gap.status === 'not_cited') {
-                for (const domain of gap.displaced_by) {
-                    freq[domain] = (freq[domain] || 0) + 1;
+                // Prefer Claude-extracted competitors_mentioned, fall back to legacy displaced_by
+                if (gap.competitors_mentioned?.length) {
+                    for (const c of gap.competitors_mentioned) {
+                        if (c.competitor) freq[c.competitor] = (freq[c.competitor] || 0) + 1;
+                    }
+                } else {
+                    for (const domain of gap.displaced_by) {
+                        freq[domain] = (freq[domain] || 0) + 1;
+                    }
                 }
             }
         }
@@ -728,9 +735,9 @@ export default function ResultsPage() {
                                                                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
                                                                 Not cited
                                                             </span>
-                                                            {gap.displaced_by[0] && (
+                                                            {getPrimaryCompetitor(gap) && (
                                                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                                    {gap.displaced_by[0]} appeared instead
+                                                                    {getPrimaryCompetitor(gap)} appeared instead
                                                                 </p>
                                                             )}
                                                         </div>
