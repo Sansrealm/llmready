@@ -200,6 +200,7 @@ interface ModelResponse {
 async function queryChatGPT(prompt: string): Promise<ModelResponse> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  // Tier 1: Responses API with web_search_preview (requires OpenAI Tier 1+)
   try {
     const response = await openai.responses.create({
       model: 'gpt-4o',
@@ -225,16 +226,61 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
       .slice(0, 5);
 
     return { text, citations };
-  } catch {
-    // Fallback to chat.completions if Responses API is unavailable
-    const fallback = await openai.chat.completions.create({
-      model: 'gpt-4o',
+  } catch (err1) {
+    console.warn('[chatgpt] Responses API unavailable, falling back to gpt-5-search-api:', (err1 as Error).message);
+  }
+
+  // Tier 2: gpt-5-search-api via chat.completions (live search, available at lower tier)
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5-search-api',
       messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
       max_tokens: 500,
-      temperature: 0.3,
     });
-    return { text: fallback.choices[0]?.message?.content ?? '', citations: [] };
+
+    const text = response.choices[0]?.message?.content ?? '';
+    const annotations = ((response.choices[0]?.message as unknown) as Record<string, unknown>)?.annotations as Array<Record<string, unknown>> ?? [];
+    const citations = annotations
+      .filter((a) => a.type === 'url_citation')
+      .map((a) => (a.url_citation as Record<string, string>)?.url)
+      .filter((url): url is string => !!url)
+      .slice(0, 5);
+
+    return { text, citations };
+  } catch (err2) {
+    console.warn('[chatgpt] gpt-5-search-api unavailable, falling back to gpt-4o-search-preview:', (err2 as Error).message);
   }
+
+  // Tier 3: chat.completions with gpt-4o-search-preview (live search, lower tier requirement)
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-search-preview',
+      messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
+      max_tokens: 500,
+    });
+
+    const text = response.choices[0]?.message?.content ?? '';
+    // gpt-4o-search-preview returns url_citation annotations on the message
+    const annotations = ((response.choices[0]?.message as unknown) as Record<string, unknown>)?.annotations as Array<Record<string, unknown>> ?? [];
+    const citations = annotations
+      .filter((a) => a.type === 'url_citation')
+      .map((a) => (a.url_citation as Record<string, string>)?.url)
+      .filter((url): url is string => !!url)
+      .slice(0, 5);
+
+    return { text, citations };
+  } catch (err3) {
+    console.warn('[chatgpt] gpt-4o-search-preview unavailable, falling back to gpt-4o:', (err3 as Error).message);
+  }
+
+  // Tier 4: standard chat.completions — no live search, always available
+  const fallback = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
+    max_tokens: 500,
+    temperature: 0.3,
+  });
+  return { text: fallback.choices[0]?.message?.content ?? '', citations: [] };
 }
 
 async function queryPerplexity(prompt: string): Promise<ModelResponse> {
