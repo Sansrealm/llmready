@@ -17,8 +17,8 @@ export function normalizeUrl(url: string): string {
     // Force https
     parsed.protocol = 'https:';
 
-    // Lowercase hostname
-    parsed.hostname = parsed.hostname.toLowerCase();
+    // Lowercase hostname and strip www. prefix
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
 
     // Remove trailing slash from pathname (except root)
     if (parsed.pathname.endsWith('/') && parsed.pathname !== '/') {
