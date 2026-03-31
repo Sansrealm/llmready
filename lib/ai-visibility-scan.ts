@@ -269,13 +269,20 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
     console.warn('[chatgpt] Tier 1 (Responses API) failed, trying gpt-4o-search-preview:', (err1 as Error).message);
   }
 
-  // Tier 2: gpt-4o-search-preview — live search via chat.completions, no special tier required
+  // Tier 2: gpt-4o-search-preview — live search, no special tier required.
+  // Cap at 12s: Responses API already burned up to 25s, so gpt-4o (Tier 3)
+  // must have enough of the outer 45s window to run reliably.
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-search-preview',
-      messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
-      max_tokens: 500,
-    });
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: 'gpt-4o-search-preview',
+        messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
+        max_tokens: 500,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('gpt-4o-search-preview per-tier timeout')), 12_000)
+      ),
+    ]);
 
     const text = response.choices[0]?.message?.content ?? '';
     const annotations = ((response.choices[0]?.message as unknown) as Record<string, unknown>)?.annotations as Array<Record<string, unknown>> ?? [];
