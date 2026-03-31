@@ -231,12 +231,18 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // Tier 1: Responses API with web_search_preview (requires OpenAI Tier 1+)
+  // Hard cap at 25s so we don't eat the full 45s outer timeout on this tier alone.
   try {
-    const response = await openai.responses.create({
-      model: 'gpt-4o',
-      tools: [{ type: 'web_search_preview' }],
-      input: prompt + PROMPT_SUFFIX,
-    });
+    const response = await Promise.race([
+      openai.responses.create({
+        model: 'gpt-4o',
+        tools: [{ type: 'web_search_preview' }],
+        input: prompt + PROMPT_SUFFIX,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Responses API per-tier timeout')), 25_000)
+      ),
+    ]);
 
     const messageBlocks = response.output.filter((block) => block.type === 'message');
 
@@ -255,33 +261,15 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
       .filter((url): url is string => !!url)
       .slice(0, 5);
 
+    if (!text.trim()) throw new Error('Responses API returned empty text');
+
+    console.log(`[chatgpt] Tier 1 (Responses API) succeeded, text length: ${text.length}`);
     return { text, citations };
   } catch (err1) {
-    console.warn('[chatgpt] Responses API unavailable, falling back to gpt-5-search-api:', (err1 as Error).message);
+    console.warn('[chatgpt] Tier 1 (Responses API) failed, trying gpt-4o-search-preview:', (err1 as Error).message);
   }
 
-  // Tier 2: gpt-5-search-api via chat.completions (live search, available at lower tier)
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5-search-api',
-      messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
-      max_tokens: 500,
-    });
-
-    const text = response.choices[0]?.message?.content ?? '';
-    const annotations = ((response.choices[0]?.message as unknown) as Record<string, unknown>)?.annotations as Array<Record<string, unknown>> ?? [];
-    const citations = annotations
-      .filter((a) => a.type === 'url_citation')
-      .map((a) => (a.url_citation as Record<string, string>)?.url)
-      .filter((url): url is string => !!url)
-      .slice(0, 5);
-
-    return { text, citations };
-  } catch (err2) {
-    console.warn('[chatgpt] gpt-5-search-api unavailable, falling back to gpt-4o-search-preview:', (err2 as Error).message);
-  }
-
-  // Tier 3: chat.completions with gpt-4o-search-preview (live search, lower tier requirement)
+  // Tier 2: gpt-4o-search-preview — live search via chat.completions, no special tier required
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-search-preview',
@@ -290,7 +278,6 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
     });
 
     const text = response.choices[0]?.message?.content ?? '';
-    // gpt-4o-search-preview returns url_citation annotations on the message
     const annotations = ((response.choices[0]?.message as unknown) as Record<string, unknown>)?.annotations as Array<Record<string, unknown>> ?? [];
     const citations = annotations
       .filter((a) => a.type === 'url_citation')
@@ -298,12 +285,16 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
       .filter((url): url is string => !!url)
       .slice(0, 5);
 
+    if (!text.trim()) throw new Error('gpt-4o-search-preview returned empty text');
+
+    console.log(`[chatgpt] Tier 2 (gpt-4o-search-preview) succeeded, text length: ${text.length}`);
     return { text, citations };
-  } catch (err3) {
-    console.warn('[chatgpt] gpt-4o-search-preview unavailable, falling back to gpt-4o:', (err3 as Error).message);
+  } catch (err2) {
+    console.warn('[chatgpt] Tier 2 (gpt-4o-search-preview) failed, falling back to gpt-4o:', (err2 as Error).message);
   }
 
-  // Tier 4: standard chat.completions — no live search, always available
+  // Tier 3: standard gpt-4o — no live search, always available
+  console.log('[chatgpt] Tier 3 (gpt-4o standard) — no live search');
   const fallback = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt + PROMPT_SUFFIX }],
