@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkPremiumStatus } from '@/lib/auth-utils';
 import { getAnalyzedUrls } from '@/lib/db';
 
-export async function GET() {
+export async function GET(req: Request) {
   const { isPremium, userId } = await checkPremiumStatus();
 
   if (!userId) {
@@ -16,6 +16,8 @@ export async function GET() {
     );
   }
 
-  const analyses = await getAnalyzedUrls(userId, 20);
+  const url = new URL(req.url);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 200);
+  const analyses = await getAnalyzedUrls(userId, limit);
   return NextResponse.json({ analyses });
 }

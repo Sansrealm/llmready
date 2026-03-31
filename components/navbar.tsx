@@ -151,11 +151,11 @@ function MyAnalysisDropdown() {
                 </div>
               </DropdownMenuItem>
             ))}
-            {analyses && analyses.length > 10 && (
+            {analyses && analyses.length >= 10 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild className="justify-center text-xs text-blue-600">
-                  <Link href="/">View all analyses</Link>
+                <DropdownMenuItem asChild className="justify-center text-xs text-indigo-600 dark:text-indigo-400">
+                  <Link href="/analyses">View all analyses →</Link>
                 </DropdownMenuItem>
               </>
             )}
@@ -263,7 +263,7 @@ export default function Navbar() {
                 ))}
                 {isLoaded && isSignedIn && (
                   <Link
-                    href="/pricing"
+                    href="/analyses"
                     className="text-lg font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
                     onClick={() => setIsOpen(false)}
                   >

@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Download, RefreshCw, Loader2, CheckCircle } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Loader2, CheckCircle, Lock } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -602,29 +602,80 @@ export default function ResultsPage() {
                                         AI Visibility
                                     </p>
 
-                                    {!isPremium ? (
-                                        /* Non-premium teaser */
-                                        <div className="flex flex-col h-full justify-between">
-                                            <div>
-                                                <div className="text-3xl font-medium text-gray-300 dark:text-gray-700 mb-1"
-                                                     style={{ fontFamily: 'var(--font-mono)' }}>??</div>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">queries cited your brand</p>
-                                                <div className="space-y-2">
-                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map(label => (
+                                    {!isSignedIn ? (
+                                        /* Not signed in — blur gate */
+                                        <div className="relative rounded-xl overflow-hidden min-h-[160px]">
+                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
+                                                <div className="text-2xl font-medium text-gray-200 dark:text-gray-800 mb-1"
+                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
+                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
+                                                <div className="space-y-2.5">
+                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
                                                         <div key={label} className="flex items-center gap-2">
-                                                            <span className="text-xs w-20 text-gray-400"
+                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
                                                                   style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
-                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full" />
-                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right"
-                                                                  style={{ fontFamily: 'var(--font-mono)' }}>?/5</span>
+                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
+                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
+                                                            </div>
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                            <Link href="/pricing"
-                                                  className="mt-4 text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
-                                                Upgrade to see live citation data →
-                                            </Link>
+                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
+                                                <Lock className="w-5 h-5 text-indigo-400" />
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
+                                                    Sign in to see your AI visibility data
+                                                </p>
+                                                <SignInButton mode="modal">
+                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Sign in</Button>
+                                                </SignInButton>
+                                            </div>
+                                        </div>
+                                    ) : premiumLoading ? (
+                                        /* Checking subscription — avoid flash of wrong state */
+                                        <div className="space-y-3">
+                                            {[72, 56, 80, 64].map((w, i) => (
+                                                <div key={i} className="flex items-center gap-2">
+                                                    <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
+                                                    <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                    <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : !isPremium ? (
+                                        /* Signed in, not premium — blur gate */
+                                        <div className="relative rounded-xl overflow-hidden min-h-[160px]">
+                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
+                                                <div className="text-2xl font-medium text-gray-200 dark:text-gray-800 mb-1"
+                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
+                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
+                                                <div className="space-y-2.5">
+                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
+                                                        <div key={label} className="flex items-center gap-2">
+                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
+                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
+                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
+                                                            </div>
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
+                                                <Lock className="w-5 h-5 text-indigo-400" />
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
+                                                    Upgrade to see AI visibility data
+                                                </p>
+                                                <Link href="/pricing">
+                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Upgrade to Premium</Button>
+                                                </Link>
+                                            </div>
                                         </div>
                                     ) : scanIsLoading || (!scanSummary) ? (
                                         /* Loading state */
