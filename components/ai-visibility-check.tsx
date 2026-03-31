@@ -44,7 +44,7 @@ interface ScanResponse {
 export interface ScanSummary {
   totalFound: number;
   totalQueries: number;
-  buckets: { type: string; label: string; cited: number; total: number }[];
+  buckets: { type: string; label: string; found: number; total: number }[];
   topCompetitor: string | null;
 }
 
@@ -224,8 +224,14 @@ export default function AiVisibilityCheck({
       const buckets = (["brand", "problem", "category", "comparison"] as const)
         .map((type) => {
           const bucketRows = rows.filter((r) => queryTypeMap.get(r.prompt) === type);
-          const cited = bucketRows.filter((r) => !r.perplexity.error && r.perplexity.cited === true).length;
-          return { type, label: { brand: "Brand", problem: "Problem", category: "Category", comparison: "Comparison" }[type], cited, total: bucketRows.length };
+          // Sum found across all 3 models — same numbers the detailed table shows
+          const found = bucketRows.reduce((sum, r) =>
+            sum +
+            (r.chatgpt.error ? 0 : r.chatgpt.found ? 1 : 0) +
+            (r.gemini.error ? 0 : r.gemini.found ? 1 : 0) +
+            (r.perplexity.error ? 0 : r.perplexity.found ? 1 : 0), 0);
+          const total = bucketRows.length * 3; // queries × 3 models
+          return { type, label: { brand: "Brand", problem: "Problem", category: "Category", comparison: "Comparison" }[type], found, total };
         })
         .filter((b) => b.total > 0);
 

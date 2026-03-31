@@ -720,11 +720,11 @@ export default function ResultsPage() {
                                                               style={{ fontFamily: 'var(--font-mono)' }}>{b.label}</span>
                                                         <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                                                             <div className="h-full rounded-full bg-indigo-500 group-hover:bg-indigo-600 transition-all duration-500"
-                                                                 style={{ width: `${b.total > 0 ? (b.cited / b.total) * 100 : 0}%` }} />
+                                                                 style={{ width: `${b.total > 0 ? (b.found / b.total) * 100 : 0}%` }} />
                                                         </div>
-                                                        <span className="text-xs text-gray-400 w-6 text-right shrink-0"
+                                                        <span className="text-xs text-gray-400 w-8 text-right shrink-0"
                                                               style={{ fontFamily: 'var(--font-mono)' }}>
-                                                            {b.cited}/{b.total}
+                                                            {b.found}/{b.total}
                                                         </span>
                                                     </button>
                                                 ))}
