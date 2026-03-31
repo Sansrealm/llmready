@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { CheckCircle2, XCircle, Eye, RefreshCw, TrendingUp, Lock, ChevronDown } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, RefreshCw, TrendingUp, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/track-event";
 import Link from "next/link";
@@ -300,14 +300,6 @@ export default function AiVisibilityCheck({
 
   const visibilityPct = Math.round((data.totalFound / data.totalQueries) * 100);
   const canRescan = !data.cached; // cached means within 72hrs — rescan disabled
-  const snippets = data.results.flatMap((row) =>
-    MODELS.flatMap((m) => {
-      const cell = row[m.id];
-      if (!cell.found || !cell.snippet) return [];
-      return [{ model: m, prompt: row.prompt, snippet: cell.snippet }];
-    })
-  );
-
   const perModelScores = MODELS.map((m) => ({
     ...m,
     found: data.results.filter((r) => r[m.id].found).length,
@@ -454,12 +446,14 @@ export default function AiVisibilityCheck({
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
                     {bucketRows.map((row) => (
-                      <tr key={row.type} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
+                      <tr key={row.type}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors cursor-pointer"
+                          onClick={() => document.getElementById(`visibility-bucket-${row.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                         <td className="py-3 pr-4">
                           <span className="text-gray-700 dark:text-gray-300 font-medium text-sm">{row.label}</span>
                           {row.perModel[0].total > 0 && (
                             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                              {row.perModel[0].total} queries
+                              {row.perModel[0].total} queries ↓
                             </p>
                           )}
                         </td>
@@ -499,75 +493,58 @@ export default function AiVisibilityCheck({
               </div>
             </div>
 
-            {/* Collapsible full responses */}
-            <details className="group">
-              <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1 select-none list-none">
-                <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
-                See full responses ({data.totalQueries} queries)
-              </summary>
-              <div className="mt-4 space-y-4">
-                {/* 20-row query table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 dark:border-gray-800">
-                        <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">
-                          AI Query
-                        </th>
-                        {MODELS.map((m) => (
-                          <th key={m.id} className="py-2 px-3 text-center">
-                            <ModelBadge id={m.id} label={m.label} dot={m.dot} />
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
-                      {data.results.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
-                          <td className="py-3 pr-4 text-gray-700 dark:text-gray-300 text-sm leading-snug">
-                            &ldquo;{row.prompt}&rdquo;
-                          </td>
-                          {MODELS.map((m) => (
-                            <td key={m.id} className="py-3 px-3 text-center">
-                              <ResultCell cell={row[m.id]} />
-                            </td>
+            {/* Queries grouped by type */}
+            <div className="space-y-6 pt-2">
+              {BUCKET_ORDER.map((type) => {
+                const bucketResultRows = data.results.filter((r) => queryTypeMap.get(r.prompt) === type);
+                if (bucketResultRows.length === 0) return null;
+                const bucketRow = bucketRows.find((b) => b.type === type);
+                return (
+                  <div key={type} id={`visibility-bucket-${type}`} className="scroll-mt-4">
+                    {/* Group header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          {BUCKET_LABELS[type]} queries
+                        </span>
+                        <span className="text-xs text-gray-300 dark:text-gray-600">
+                          {bucketResultRows.length}
+                        </span>
+                      </div>
+                      {bucketRow && (
+                        <div className="flex items-center gap-3">
+                          {bucketRow.perModel.map((cell) => (
+                            <span key={cell.modelId} className={`text-xs font-medium ${
+                              cell.found >= 4 ? 'text-emerald-500' : cell.found >= 2 ? 'text-amber-500' : 'text-red-400'
+                            }`}>
+                              {cell.found}/{cell.total}
+                            </span>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Snippet cards */}
-                {snippets.length > 0 ? (
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                      <TrendingUp className="w-4 h-4 text-emerald-500" />
-                      Where {domain} was mentioned
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {snippets.map((s, i) => (
-                        <div
-                          key={i}
-                          className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-4 space-y-1.5"
-                        >
-                          <ModelBadge id={s.model.id} label={s.model.label} dot={s.model.dot} />
-                          <p className="text-xs text-gray-400 italic">&ldquo;{s.prompt}&rdquo;</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                            {s.snippet}
+                        </div>
+                      )}
+                    </div>
+                    {/* Query rows */}
+                    <div className="border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden divide-y divide-gray-50 dark:divide-gray-900">
+                      {bucketResultRows.map((row, i) => (
+                        <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
+                          <p className="flex-1 text-sm text-gray-700 dark:text-gray-300 leading-snug">
+                            &ldquo;{row.prompt}&rdquo;
                           </p>
+                          <div className="flex items-center gap-4 shrink-0">
+                            {MODELS.map((m) => (
+                              <div key={m.id} className="flex flex-col items-center gap-0.5 w-10">
+                                <span className="text-[10px] text-gray-400">{m.label.slice(0, 3)}</span>
+                                <ResultCell cell={row[m.id]} />
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
-                    Your LLM Readiness score and Priority Action Plan below show where to start.
-                  </div>
-                )}
-              </div>
-            </details>
+                );
+              })}
+            </div>
           </>
         ) : (
           /* Fallback: old layout for cached scans without queryBuckets */
@@ -604,29 +581,8 @@ export default function AiVisibilityCheck({
               </table>
             </div>
 
-            {/* Snippets */}
-            {snippets.length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  Where {domain} was mentioned
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {snippets.map((s, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 p-4 space-y-1.5"
-                    >
-                      <ModelBadge id={s.model.id} label={s.model.label} dot={s.model.dot} />
-                      <p className="text-xs text-gray-400 italic">&ldquo;{s.prompt}&rdquo;</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                        {s.snippet}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
+            {/* No snippets — removed */}
+            {data.results.every((r) => MODELS.every((m) => r[m.id].found === false)) && (
               <div className="rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
                 No brand mentions were detected across ChatGPT, Gemini, or Perplexity for these queries.
                 Your LLM Readiness score and Priority Action Plan below show where to start.
