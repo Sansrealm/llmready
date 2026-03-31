@@ -512,13 +512,15 @@ export default function AiVisibilityCheck({
                         </span>
                       </div>
                       {bucketRow && (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4 shrink-0">
                           {bucketRow.perModel.map((cell) => (
-                            <span key={cell.modelId} className={`text-xs font-medium ${
-                              cell.found >= 4 ? 'text-emerald-500' : cell.found >= 2 ? 'text-amber-500' : 'text-red-400'
-                            }`}>
-                              {cell.found}/{cell.total}
-                            </span>
+                            <div key={cell.modelId} className="flex flex-col items-center gap-0.5 w-10">
+                              <span className={`text-xs font-medium ${
+                                cell.found >= 4 ? 'text-emerald-500' : cell.found >= 2 ? 'text-amber-500' : 'text-red-400'
+                              }`}>
+                                {cell.found}/{cell.total}
+                              </span>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -600,11 +602,12 @@ export default function AiVisibilityCheck({
             <div className="flex items-end gap-2 h-10">
               {data.trend.map((point, i) => {
                 const pct = Math.round((point.score / point.total) * 100);
+                const pxH = Math.max(3, Math.round(40 * pct / 100));
                 return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                  <div key={i} className="flex-1 group relative flex flex-col justify-end">
                     <div
                       className="w-full bg-indigo-400 dark:bg-indigo-500 rounded-sm transition-all"
-                      style={{ height: `${Math.max(4, pct)}%` }}
+                      style={{ height: `${pxH}px` }}
                     />
                     <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap">
                       {point.score}/{point.total}

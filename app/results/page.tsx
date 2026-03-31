@@ -660,18 +660,22 @@ export default function ResultsPage() {
 
                                             <div className="space-y-2.5">
                                                 {scanSummary.buckets.map(b => (
-                                                    <div key={b.type} className="flex items-center gap-2">
-                                                        <span className="text-xs w-20 text-gray-500 dark:text-gray-400 shrink-0"
+                                                    <button
+                                                        key={b.type}
+                                                        className="w-full flex items-center gap-2 group"
+                                                        onClick={() => document.getElementById(`visibility-bucket-${b.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                                    >
+                                                        <span className="text-xs w-20 text-left text-gray-500 dark:text-gray-400 shrink-0 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
                                                               style={{ fontFamily: 'var(--font-mono)' }}>{b.label}</span>
                                                         <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                                            <div className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                                                            <div className="h-full rounded-full bg-indigo-500 group-hover:bg-indigo-600 transition-all duration-500"
                                                                  style={{ width: `${b.total > 0 ? (b.cited / b.total) * 100 : 0}%` }} />
                                                         </div>
                                                         <span className="text-xs text-gray-400 w-6 text-right shrink-0"
                                                               style={{ fontFamily: 'var(--font-mono)' }}>
                                                             {b.cited}/{b.total}
                                                         </span>
-                                                    </div>
+                                                    </button>
                                                 ))}
                                             </div>
 
