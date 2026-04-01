@@ -14,6 +14,7 @@ interface ModelCell {
   found: boolean;
   snippet: string | null;
   cited?: boolean;
+  citedUrls?: string[];  // source URLs the engine returned; absent on pre-migration cached scans
   error: boolean;
 }
 
@@ -501,6 +502,101 @@ export default function AiVisibilityCheck({
             </div>
           )}
         </div>
+
+        {/* Citation sources insight block */}
+        {hasBucketData && (() => {
+          // For each model, collect cited URLs from missed queries only
+          const engineSources = MODELS.map((m) => {
+            const missedRows = data.results.filter(r => !r[m.id].error && !r[m.id].found);
+            const hasSearchData = data.results.some(r => !r[m.id].error && (r[m.id].citedUrls ?? []).length > 0);
+            const allUrls = missedRows.flatMap(r => r[m.id].citedUrls ?? []);
+
+            const domainCounts = new Map<string, number>();
+            for (const url of allUrls) {
+              try {
+                const hostname = new URL(url).hostname.replace(/^www\./, '');
+                if (hostname) domainCounts.set(hostname, (domainCounts.get(hostname) ?? 0) + 1);
+              } catch { /* skip malformed URLs */ }
+            }
+            const topDomains = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+            return { ...m, missedCount: missedRows.length, hasSearchData, topDomains };
+          });
+
+          // Citation presence score: % of missed model×query pairs that returned any source URLs
+          const totalMissedCells = data.results.reduce((sum, r) =>
+            sum + MODELS.filter(m => !r[m.id].error && !r[m.id].found).length, 0);
+          const missedCellsWithUrls = data.results.reduce((sum, r) =>
+            sum + MODELS.filter(m => !r[m.id].error && !r[m.id].found && (r[m.id].citedUrls ?? []).length > 0).length, 0);
+          const citationPresencePct = totalMissedCells > 0
+            ? Math.round((missedCellsWithUrls / totalMissedCells) * 100)
+            : 0;
+
+          // Only render if at least one engine has missed queries with citation data
+          const anyUsefulData = engineSources.some(e => e.topDomains.length > 0);
+          const hasMissedQueries = totalMissedCells > 0;
+          if (!hasMissedQueries) return null;
+
+          return (
+            <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    On queries where you weren&apos;t cited, these sources were
+                  </p>
+                  {anyUsefulData && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {citationPresencePct}% of missed queries returned citation sources
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {engineSources.map((engine) => {
+                  if (engine.missedCount === 0) return null;
+
+                  if (!engine.hasSearchData) {
+                    return (
+                      <div key={engine.id} className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 italic">web search unavailable on this scan</span>
+                      </div>
+                    );
+                  }
+
+                  if (engine.topDomains.length === 0) {
+                    return (
+                      <div key={engine.id} className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">no source URLs returned</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={engine.id} className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">{engine.label}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {engine.topDomains.map(([domain, count]) => (
+                          <span
+                            key={domain}
+                            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                          >
+                            {domain}
+                            {count > 1 && (
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500">×{count}</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 72hr cache note */}
         {data.cached && (

@@ -208,6 +208,7 @@ export async function POST(req: NextRequest) {
           snippet: r.snippet,
           prominence: r.prominence ?? null,
           cited: r.cited,
+          cited_urls: r.citedUrls,
           score: r.score ?? null,
         }))
       ),
@@ -224,7 +225,7 @@ export async function POST(req: NextRequest) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type RawResult = Pick<VisibilityResultRow, 'model' | 'prompt' | 'found' | 'snippet' | 'prominence' | 'cited' | 'score'>;
+type RawResult = Pick<VisibilityResultRow, 'model' | 'prompt' | 'found' | 'snippet' | 'prominence' | 'cited' | 'cited_urls' | 'score'>;
 
 /**
  * Groups flat result rows into a prompt-keyed structure:
@@ -255,12 +256,13 @@ function formatResults(rows: RawResult[]) {
 }
 
 function modelCell(row: RawResult | null) {
-  if (!row) return { found: false, snippet: null, prominence: null, cited: false, score: null, error: true };
+  if (!row) return { found: false, snippet: null, prominence: null, cited: false, citedUrls: [], score: null, error: true };
   return {
     found: row.found,
     snippet: row.snippet ?? null,
     prominence: row.prominence ?? null,
     cited: row.cited,
+    citedUrls: row.cited_urls ?? [],
     score: row.score ?? null,
     error: false,
   };

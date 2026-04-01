@@ -652,7 +652,8 @@ export interface VisibilityResultRow {
   prominence: 'high' | 'medium' | 'low' | null;
   sentiment: number | null; // -1 to 1
   cited: boolean;
-  score: number | null; // null = legacy row pre-rubric scoring
+  cited_urls: string[];     // source URLs returned by the engine; empty for Tier 3 ChatGPT
+  score: number | null;     // null = legacy row pre-rubric scoring
 }
 
 /**
@@ -682,7 +683,7 @@ export async function getLatestVisibilityScan(
 
   // Fetch the 15 detail rows for this scan
   const resultsResult = await sql`
-    SELECT model, prompt, found, snippet, prominence, sentiment, cited, score
+    SELECT model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, score
     FROM ai_visibility_results
     WHERE scan_id = ${scan.id}
     ORDER BY model, prompt
@@ -727,12 +728,14 @@ export async function saveVisibilityScan(
   // Insert all result rows (sequential to avoid connection pool pressure)
   for (const r of results) {
     const queryType = queryTypeMap.get(r.prompt) ?? null;
+    const citedUrls = r.citedUrls ?? [];
     await sql`
       INSERT INTO ai_visibility_results
-        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, score, query_type)
+        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, score, query_type)
       VALUES (
         ${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null},
-        ${r.prominence ?? null}, ${null}, ${r.cited}, ${r.score ?? null}, ${queryType}
+        ${r.prominence ?? null}, ${null}, ${r.cited},
+        ${citedUrls as unknown as string}, ${r.score ?? null}, ${queryType}
       )
     `;
   }
