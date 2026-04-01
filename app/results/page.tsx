@@ -70,6 +70,16 @@ function useIsPremium() {
     };
 }
 
+// v2 parameter slug → display name mapping
+const PARAM_LABELS: Record<string, string> = {
+    answer_ready_content:    'Answer-Ready Content',
+    brand_expertise_clarity: 'Brand & Expertise Clarity',
+    structured_data_depth:   'Structured Data Depth',
+    citable_content_quality: 'Citable Content Quality',
+    eeat_authority_signals:  'E-E-A-T & Authority Signals',
+    intent_coverage_breadth: 'Comparison & Intent Coverage',
+};
+
 export default function ResultsPage() {
     const { isLoaded, isSignedIn, user } = useUser();
     const router = useRouter();
@@ -80,6 +90,7 @@ export default function ResultsPage() {
     const industry = searchParams.get("industry");
 
     const [refreshing, setRefreshing] = useState(false);
+    const [parametersExpanded, setParametersExpanded] = useState(true);
     // null = waiting for ai-visibility-check to report back
     // false = component responded: no prior scan
     // true  = component responded: scan exists
@@ -433,7 +444,7 @@ export default function ResultsPage() {
             <main className="flex-1">
                 <div className="container py-8 px-4 md:px-6">
                     <div className="flex items-center justify-between mb-2">
-                        <h1 className="text-3xl font-bold">LLM Readiness Results</h1>
+                        <h1 className="text-3xl font-bold">AI Visibility Report</h1>
                         {isSignedIn && (
                             <div className="flex items-center gap-2 shrink-0">
                                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
@@ -484,12 +495,157 @@ export default function ResultsPage() {
                             {/* ── Hero: two-column ── */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                                {/* LEFT — Score + Narrative */}
+                                {/* LEFT — AI Visibility (PRIMARY outcome metric) */}
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
+                                       style={{ fontFamily: 'var(--font-mono)' }}>
+                                        AI Visibility
+                                    </p>
+
+                                    {!isSignedIn ? (
+                                        /* Not signed in — blur gate */
+                                        <div className="relative rounded-xl overflow-hidden min-h-[180px]">
+                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
+                                                <div className="text-5xl font-bold text-gray-200 dark:text-gray-800 mb-1"
+                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
+                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
+                                                <div className="space-y-2.5">
+                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
+                                                        <div key={label} className="flex items-center gap-2">
+                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
+                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
+                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
+                                                            </div>
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
+                                                <Lock className="w-5 h-5 text-indigo-400" />
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
+                                                    Sign in to see your AI visibility data
+                                                </p>
+                                                <SignInButton mode="modal">
+                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Sign in</Button>
+                                                </SignInButton>
+                                            </div>
+                                        </div>
+                                    ) : premiumLoading ? (
+                                        /* Checking subscription — avoid flash of wrong state */
+                                        <div className="space-y-3">
+                                            {[72, 56, 80, 64].map((w, i) => (
+                                                <div key={i} className="flex items-center gap-2">
+                                                    <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
+                                                    <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                    <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : !isPremium ? (
+                                        /* Signed in, not premium — blur gate with upgrade CTA */
+                                        <div className="relative rounded-xl overflow-hidden min-h-[180px]">
+                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
+                                                <div className="text-5xl font-bold text-gray-200 dark:text-gray-800 mb-1"
+                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
+                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
+                                                <div className="space-y-2.5">
+                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
+                                                        <div key={label} className="flex items-center gap-2">
+                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
+                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
+                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
+                                                            </div>
+                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
+                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
+                                                <Lock className="w-5 h-5 text-indigo-400" />
+                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
+                                                    Upgrade to see AI visibility data
+                                                </p>
+                                                <Link href="/pricing">
+                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Upgrade to Premium</Button>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ) : scanIsLoading || (!scanSummary) ? (
+                                        /* Loading state */
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                                <div className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" />
+                                                <span className="animate-pulse">Analyzing visibility across major LLMs…</span>
+                                            </div>
+                                            <div className="space-y-3 pt-1">
+                                                {[72, 56, 80, 64].map((w, i) => (
+                                                    <div key={i} className="flex items-center gap-2">
+                                                        <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
+                                                        <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                        <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* Scan data — ground truth outcome metric */
+                                        <div>
+                                            <div className="flex items-baseline gap-2 mb-1">
+                                                <span className="text-5xl font-bold text-gray-900 dark:text-white"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    {scanSummary.totalFound}
+                                                </span>
+                                                <span className="text-xl font-medium text-gray-400"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    / {scanSummary.totalQueries}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">queries cited your brand</p>
+
+                                            <div className="space-y-2.5">
+                                                {scanSummary.buckets.map(b => (
+                                                    <button
+                                                        key={b.type}
+                                                        className="w-full flex items-center gap-2 group"
+                                                        onClick={() => document.getElementById(`visibility-bucket-${b.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                                    >
+                                                        <span className="text-xs w-20 text-left text-gray-500 dark:text-gray-400 shrink-0 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
+                                                              style={{ fontFamily: 'var(--font-mono)' }}>{b.label}</span>
+                                                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                            <div className="h-full rounded-full bg-indigo-500 group-hover:bg-indigo-600 transition-all duration-500"
+                                                                 style={{ width: `${b.total > 0 ? (b.found / b.total) * 100 : 0}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 w-8 text-right shrink-0"
+                                                              style={{ fontFamily: 'var(--font-mono)' }}>
+                                                            {b.found}/{b.total}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {scanSummary.topCompetitor && (
+                                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                                                    When AI skips you, it recommends{' '}
+                                                    <span className="font-medium text-gray-700 dark:text-gray-300">{scanSummary.topCompetitor}</span> instead.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* RIGHT — AI Optimization Score (secondary diagnostic) */}
                                 <div className="bg-white dark:bg-gray-950 rounded-lg border p-6 flex flex-col justify-between">
                                     <div>
                                         <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
                                            style={{ fontFamily: 'var(--font-mono)' }}>
-                                            LLM Readiness Score
+                                            AI Optimization Score
                                         </p>
                                         <div className="flex items-center gap-5 mb-5">
                                             {/* Score ring */}
@@ -515,7 +671,7 @@ export default function ResultsPage() {
                                             </div>
                                             {/* Narrative */}
                                             <div>
-                                                <p className="text-lg leading-snug text-gray-900 dark:text-white"
+                                                <p className="text-base leading-snug text-gray-900 dark:text-white"
                                                    style={{ fontFamily: 'var(--font-serif)' }}>
                                                     {(() => {
                                                         const s = analysisResult.overall_score;
@@ -595,152 +751,52 @@ export default function ResultsPage() {
                                     )}
                                 </div>
 
-                                {/* RIGHT — AI Visibility Summary */}
-                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                    <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
-                                       style={{ fontFamily: 'var(--font-mono)' }}>
-                                        AI Visibility
-                                    </p>
-
-                                    {!isSignedIn ? (
-                                        /* Not signed in — blur gate */
-                                        <div className="relative rounded-xl overflow-hidden min-h-[160px]">
-                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
-                                                <div className="text-2xl font-medium text-gray-200 dark:text-gray-800 mb-1"
-                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
-                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
-                                                <div className="space-y-2.5">
-                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
-                                                        <div key={label} className="flex items-center gap-2">
-                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
-                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
-                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
-                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
-                                                            </div>
-                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
-                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
-                                                <Lock className="w-5 h-5 text-indigo-400" />
-                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
-                                                    Sign in to see your AI visibility data
-                                                </p>
-                                                <SignInButton mode="modal">
-                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Sign in</Button>
-                                                </SignInButton>
-                                            </div>
-                                        </div>
-                                    ) : premiumLoading ? (
-                                        /* Checking subscription — avoid flash of wrong state */
-                                        <div className="space-y-3">
-                                            {[72, 56, 80, 64].map((w, i) => (
-                                                <div key={i} className="flex items-center gap-2">
-                                                    <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
-                                                    <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                                                    <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : !isPremium ? (
-                                        /* Signed in, not premium — blur gate */
-                                        <div className="relative rounded-xl overflow-hidden min-h-[160px]">
-                                            <div className="blur-sm pointer-events-none select-none space-y-2.5" aria-hidden="true">
-                                                <div className="text-2xl font-medium text-gray-200 dark:text-gray-800 mb-1"
-                                                     style={{ fontFamily: 'var(--font-mono)' }}>— / —</div>
-                                                <p className="text-xs text-gray-300 dark:text-gray-700 mb-3">queries cited your brand</p>
-                                                <div className="space-y-2.5">
-                                                    {['Brand', 'Problem', 'Category', 'Comparison'].map((label, i) => (
-                                                        <div key={label} className="flex items-center gap-2">
-                                                            <span className="text-xs w-20 text-gray-300 dark:text-gray-700 shrink-0"
-                                                                  style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
-                                                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                                                <div className="h-full rounded-full bg-indigo-200 dark:bg-indigo-900"
-                                                                     style={{ width: `${[45, 30, 60, 25][i]}%` }} />
-                                                            </div>
-                                                            <span className="text-xs text-gray-300 dark:text-gray-700 w-6 text-right shrink-0"
-                                                                  style={{ fontFamily: 'var(--font-mono)' }}>—</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div className="absolute inset-0 bg-white/70 dark:bg-gray-950/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 rounded-xl">
-                                                <Lock className="w-5 h-5 text-indigo-400" />
-                                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center px-4">
-                                                    Upgrade to see AI visibility data
-                                                </p>
-                                                <Link href="/pricing">
-                                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Upgrade to Premium</Button>
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    ) : scanIsLoading || (!scanSummary) ? (
-                                        /* Loading state */
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                                <div className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" />
-                                                <span className="animate-pulse">Analyzing visibility across major LLMs…</span>
-                                            </div>
-                                            <div className="space-y-3 pt-1">
-                                                {[72, 56, 80, 64].map((w, i) => (
-                                                    <div key={i} className="flex items-center gap-2">
-                                                        <div className="h-2.5 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" style={{ width: `${w * 0.4}px` }} />
-                                                        <div className="h-2.5 flex-1 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                                                        <div className="h-2.5 w-7 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        /* Scan data */
-                                        <div>
-                                            <div className="flex items-baseline gap-1.5 mb-1">
-                                                <span className="text-3xl font-medium text-gray-900 dark:text-white"
-                                                      style={{ fontFamily: 'var(--font-mono)' }}>
-                                                    {scanSummary.totalFound}
-                                                </span>
-                                                <span className="text-sm text-gray-400"
-                                                      style={{ fontFamily: 'var(--font-mono)' }}>
-                                                    / {scanSummary.totalQueries}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">queries mentioned your brand</p>
-
-                                            <div className="space-y-2.5">
-                                                {scanSummary.buckets.map(b => (
-                                                    <button
-                                                        key={b.type}
-                                                        className="w-full flex items-center gap-2 group"
-                                                        onClick={() => document.getElementById(`visibility-bucket-${b.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                                                    >
-                                                        <span className="text-xs w-20 text-left text-gray-500 dark:text-gray-400 shrink-0 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
-                                                              style={{ fontFamily: 'var(--font-mono)' }}>{b.label}</span>
-                                                        <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                                            <div className="h-full rounded-full bg-indigo-500 group-hover:bg-indigo-600 transition-all duration-500"
-                                                                 style={{ width: `${b.total > 0 ? (b.found / b.total) * 100 : 0}%` }} />
-                                                        </div>
-                                                        <span className="text-xs text-gray-400 w-8 text-right shrink-0"
-                                                              style={{ fontFamily: 'var(--font-mono)' }}>
-                                                            {b.found}/{b.total}
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {scanSummary.topCompetitor && (
-                                                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                                                    When AI skips you, it recommends{' '}
-                                                    <span className="font-medium text-gray-700 dark:text-gray-300">{scanSummary.topCompetitor}</span> instead.
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
                             </div>
+
+                            {/* ── Priority Action Plan — immediately below hero ── */}
+                            {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-2xl font-bold mb-1">Priority Action Plan</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                        Your top 5 highest-impact actions to improve AI Visibility
+                                    </p>
+                                    <div className="space-y-4">
+                                        {analysisResult.recommendations.map((rec, index) => (
+                                            <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
+                                                <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                                                    <h3 className="font-semibold text-gray-900 dark:text-white">{rec.title}</h3>
+                                                    <div className="flex gap-1.5 flex-wrap">
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${rec.difficulty === 'Easy' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : rec.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                            {rec.difficulty}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${rec.impact === 'High' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : rec.impact === 'Medium' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                            {rec.impact} Impact
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {rec.parameter && PARAM_LABELS[rec.parameter] && (
+                                                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 mb-2">
+                                                        Improves: {PARAM_LABELS[rec.parameter]}
+                                                    </span>
+                                                )}
+                                                {rec.isPremium && !isPremium ? (
+                                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic mt-1">
+                                                        🔒{' '}
+                                                        <Link href="/pricing" className="text-indigo-500 hover:underline">
+                                                            Upgrade to Premium
+                                                        </Link>{' '}
+                                                        to see the full implementation guide for this action.
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-1">
+                                                        {rec.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Upgrade block for free users */}
                             {!isPremium && (
@@ -789,35 +845,57 @@ export default function ResultsPage() {
                                 />
                             )}
 
-                            {/* Parameters Section - SUBSTANTIAL CONTENT */}
+                            {/* ── AI Optimization Score — collapsible parameters ── */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <h2 className="text-2xl font-bold mb-6">Detailed Analysis Parameters</h2>
-                                <div className="grid gap-6 md:grid-cols-2">
-                                    {analysisResult.parameters.map((param, index) => (
-                                        <div key={index} className="p-4 border rounded-lg">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <h3 className="font-semibold">{param.name}</h3>
-                                                <div className="text-lg font-bold text-blue-600">
-                                                    {param.score}/100
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                                                <div
-                                                    className="bg-blue-600 h-2 rounded-full"
-                                                    style={{ width: `${param.score}%` }}
-                                                ></div>
-                                            </div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                {param.description}
-                                            </p>
-                                            {param.isPremium && !isPremium && (
-                                                <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
-                                                    🔒 Premium feature - upgrade for detailed insights
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                <div className="flex items-center justify-between mb-1">
+                                    <h2 className="text-2xl font-bold">AI Optimization Score</h2>
+                                    <button
+                                        onClick={() => setParametersExpanded(e => !e)}
+                                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+                                        aria-expanded={parametersExpanded}
+                                    >
+                                        {parametersExpanded ? 'Collapse ↑' : 'Expand ↓'}
+                                    </button>
                                 </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                    Website factors that influence your AI Visibility — improve these to increase your score
+                                    <span className="block text-xs mt-1 text-gray-400 dark:text-gray-500">
+                                        Score based on the analyzed URL. Submit a content-rich page (e.g. /faq or a blog post) for a deeper score.
+                                    </span>
+                                </p>
+                                {parametersExpanded && (
+                                    <div className="grid gap-6 md:grid-cols-2">
+                                        {analysisResult.parameters.map((param, index) => (
+                                            <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="font-semibold text-sm">{param.name}</h3>
+                                                    <div className={`text-lg font-bold ${param.score >= 75 ? 'text-green-600 dark:text-green-400' : param.score >= 50 ? 'text-blue-600 dark:text-blue-400' : param.score >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {param.score}/100
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                                                    <div
+                                                        className={`h-2 rounded-full ${param.score >= 75 ? 'bg-green-500' : param.score >= 50 ? 'bg-blue-500' : param.score >= 30 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${param.score}%` }}
+                                                    />
+                                                </div>
+                                                {param.isPremium && !isPremium ? (
+                                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                                        🔒{' '}
+                                                        <Link href="/pricing" className="text-indigo-500 hover:underline">
+                                                            Upgrade to Premium
+                                                        </Link>{' '}
+                                                        for detailed insights on this factor.
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                                        {param.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* 🔹 CONDITIONAL AD PLACEMENT - After substantial content */}
@@ -840,47 +918,6 @@ export default function ResultsPage() {
                                     </p>
                                 </div>
                             )}
-
-                            {/* Recommendations Section - MORE SUBSTANTIAL CONTENT */}
-                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <h2 className="text-2xl font-bold mb-6">Recommendations for Improvement</h2>
-                                <div className="space-y-6">
-                                    {analysisResult.recommendations.map((rec, index) => (
-                                        <div key={index} className="p-4 border rounded-lg">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h3 className="font-semibold text-lg">{rec.title}</h3>
-                                                <div className="flex gap-2">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${rec.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                                                            rec.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-red-100 text-red-800'
-                                                        }`}>
-                                                        {rec.difficulty}
-                                                    </span>
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${rec.impact === 'High' ? 'bg-blue-100 text-blue-800' :
-                                                            rec.impact === 'Medium' ? 'bg-purple-100 text-purple-800' :
-                                                                'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {rec.impact} Impact
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                                                {rec.description}
-                                            </p>
-                                            {rec.isPremium && !isPremium && (
-                                                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
-                                                    <p className="text-sm text-orange-700 dark:text-orange-300">
-                                                        🔒 <strong>Premium Insight:</strong> Upgrade to access detailed implementation guides and advanced recommendations.
-                                                    </p>
-                                                    <Link href="/pricing" className="text-orange-600 hover:text-orange-800 text-sm font-medium">
-                                                        View Premium Plans →
-                                                    </Link>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
 
                             {/* Section 1: Top Queries — authenticated users only */}
                             {isSignedIn && topQueriesForDisplay.length > 0 && (
@@ -1145,70 +1182,6 @@ export default function ResultsPage() {
                                     </div>
                                 )}
                             </div>
-
-                            {/* Priority Action Plan — driven by lowest-scoring parameters */}
-                            {(() => {
-                                const priorityParams = [...analysisResult.parameters]
-                                    .sort((a, b) => a.score - b.score)
-                                    .slice(0, 3);
-
-                                return (
-                                    <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                        <h2 className="text-2xl font-bold mb-1">Priority Action Plan</h2>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                            Your 3 lowest-scoring areas — fix these first for the biggest score gains.
-                                        </p>
-                                        <div className="space-y-4">
-                                            {priorityParams.map((param, index) => {
-                                                const isLow = param.score < 40;
-                                                const isMid = param.score >= 40 && param.score < 70;
-                                                const badgeClass = isLow
-                                                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                                    : isMid
-                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-                                                const label = isLow ? "Critical" : isMid ? "Needs Work" : "Polish";
-
-                                                return (
-                                                    <div key={index} className="flex gap-4 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
-                                                        {/* Score circle */}
-                                                        <div className={`shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center font-bold ${badgeClass}`}>
-                                                            <span className="text-lg leading-none">{param.score}</span>
-                                                            <span className="text-[10px] opacity-70 leading-none mt-0.5">/100</span>
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                                <h3 className="font-semibold text-gray-900 dark:text-white">{param.name}</h3>
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass}`}>
-                                                                    {label}
-                                                                </span>
-                                                            </div>
-                                                            {param.isPremium && !isPremium ? (
-                                                                <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-                                                                    🔒{" "}
-                                                                    <Link href="/pricing" className="text-indigo-500 hover:underline">
-                                                                        Upgrade to Premium
-                                                                    </Link>{" "}
-                                                                    to see specific improvement steps for this area.
-                                                                </p>
-                                                            ) : (
-                                                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                                                                    {param.description}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800 text-center">
-                                            <Link href="/guide" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
-                                                Read our full LLM optimisation guide →
-                                            </Link>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
 
                             {/* Guest "create account" hook — shown after full results */}
                             {!isSignedIn && (

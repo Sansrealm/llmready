@@ -52,6 +52,7 @@ export async function saveAnalysis({
   citationGaps,
   queryBuckets,
   citationDataQuality,
+  scoringVersion,
 }: {
   userId: string;
   url: string;
@@ -63,13 +64,16 @@ export async function saveAnalysis({
   citationGaps?: CitationGap[] | null;
   queryBuckets?: QueryBucket[] | null;
   citationDataQuality?: 'sufficient' | 'insufficient' | null;
+  scoringVersion?: string | null; // 'v1' (legacy) or 'v2' (AI-specific 6-param)
 }): Promise<DbAnalysis> {
   const normalizedUrl = normalizeUrl(url);
+  const version = scoringVersion ?? 'v1';
 
   const result = await sql`
     INSERT INTO analyses (
       user_id, url, normalized_url, overall_score, parameters, recommendations,
-      citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
+      citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality,
+      scoring_version
     )
     VALUES (
       ${userId},
@@ -82,10 +86,11 @@ export async function saveAnalysis({
       ${citationRate ?? null},
       ${citationGaps != null ? JSON.stringify(citationGaps) : null},
       ${queryBuckets != null ? JSON.stringify(queryBuckets) : null},
-      ${citationDataQuality ?? null}
+      ${citationDataQuality ?? null},
+      ${version}
     )
     RETURNING id, user_id, url, normalized_url, overall_score, parameters, recommendations, analyzed_at, created_at,
-              citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality
+              citation_results, citation_rate, citation_gaps, query_buckets, citation_data_quality, scoring_version
   `;
 
   return result.rows[0] as DbAnalysis;
@@ -112,7 +117,8 @@ export async function getAnalysisHistory({
       overall_score,
       parameters,
       analyzed_at,
-      created_at
+      created_at,
+      scoring_version
     FROM analyses
     WHERE user_id = ${userId}
       AND normalized_url = ${normalizedUrl}
@@ -686,17 +692,28 @@ export async function getLatestVisibilityScan(
 }
 
 /**
- * Saves a completed scan and its 15 result rows.
+ * Saves a completed scan and its result rows.
  * Returns the created scan ID.
+ *
+ * @param queryBuckets - Optional typed query buckets from the analysis result.
+ *   When provided, each result row is annotated with the query's type
+ *   (brand | problem | category | comparison) in the `query_type` column.
  */
 export async function saveVisibilityScan(
   url: string,
   industry: string | null,
   totalFound: number,
   totalQueries: number,
-  results: VisibilityResult[]
+  results: VisibilityResult[],
+  queryBuckets?: QueryBucket[] | null
 ): Promise<string> {
   const normalizedUrl = normalizeUrl(url);
+
+  // Build query → type map for annotation
+  const queryTypeMap = new Map<string, string>();
+  if (queryBuckets) {
+    for (const b of queryBuckets) queryTypeMap.set(b.query, b.type);
+  }
 
   // Insert scan header
   const scanInsert = await sql`
@@ -709,12 +726,13 @@ export async function saveVisibilityScan(
 
   // Insert all result rows (sequential to avoid connection pool pressure)
   for (const r of results) {
+    const queryType = queryTypeMap.get(r.prompt) ?? null;
     await sql`
       INSERT INTO ai_visibility_results
-        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, score)
+        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, score, query_type)
       VALUES (
         ${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null},
-        ${r.prominence ?? null}, ${null}, ${r.cited}, ${r.score ?? null}
+        ${r.prominence ?? null}, ${null}, ${r.cited}, ${r.score ?? null}, ${queryType}
       )
     `;
   }

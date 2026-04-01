@@ -235,7 +235,7 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
         {/* Parameters — all visible to everyone */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Analysis Parameters
+            AI Optimization Score
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {analysis.parameters.map((param, i) => (

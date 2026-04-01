@@ -111,6 +111,7 @@ export interface Recommendation {
   difficulty: DifficultyLevel;
   impact: ImpactLevel;
   isPremium: boolean;
+  parameter?: string; // Slug of the AI Optimization parameter this addresses (v2+)
 }
 
 /**
@@ -170,6 +171,8 @@ export interface DbAnalysis {
   citation_gaps?: CitationGap[] | null;
   query_buckets?: QueryBucket[] | null;
   citation_data_quality?: 'sufficient' | 'insufficient' | null;
+  // Scoring version — v1 = legacy open-ended params, v2 = 6 fixed AI-specific params
+  scoring_version?: string | null;
 }
 
 /**

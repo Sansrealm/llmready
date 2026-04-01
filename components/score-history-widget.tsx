@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Label } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Lock, BarChart2 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ type Analysis = {
   id: string;
   overallScore: number;
   analyzedAt: string;
+  scoringVersion?: string; // 'v1' or 'v2' — used to mark methodology boundary in chart
 };
 
 type HistoryData = {
@@ -169,7 +170,18 @@ export default function ScoreHistoryWidget({
       date: format(new Date(analysis.analyzedAt), "MMM d"),
       score: analysis.overallScore,
       fullDate: format(new Date(analysis.analyzedAt), "MMM d, yyyy"),
+      scoringVersion: analysis.scoringVersion ?? 'v1',
     }));
+
+  // Find the date where scoring methodology changed from v1 → v2
+  // This renders a visible boundary marker on the chart so users understand
+  // a step change in their trend is a methodology update, not a performance drop.
+  const v2BoundaryDate = (() => {
+    const firstV2 = chartData.find(d => d.scoringVersion === 'v2');
+    // Only show marker if there are both v1 and v2 data points
+    const hasV1 = chartData.some(d => d.scoringVersion === 'v1');
+    return firstV2 && hasV1 ? firstV2.date : null;
+  })();
 
   // Get trend icon and color
   const getTrendIcon = () => {
@@ -256,6 +268,21 @@ export default function ScoreHistoryWidget({
                   dot={{ fill: "hsl(var(--primary))", r: 4 }}
                   activeDot={{ r: 6 }}
                 />
+                {v2BoundaryDate && (
+                  <ReferenceLine
+                    x={v2BoundaryDate}
+                    stroke="#d97706"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                  >
+                    <Label
+                      value="Scoring updated"
+                      position="insideTopRight"
+                      offset={4}
+                      style={{ fill: "#d97706", fontSize: 10, fontWeight: 500 }}
+                    />
+                  </ReferenceLine>
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -275,26 +302,43 @@ export default function ScoreHistoryWidget({
               </thead>
               <tbody className="divide-y">
                 {historyData.analyses.slice(0, 5).map((analysis, index) => {
-                  const prevScore =
-                    index < historyData.analyses.length - 1
-                      ? historyData.analyses[index + 1].overallScore
-                      : null;
+                  const prevAnalysis = index < historyData.analyses.length - 1
+                    ? historyData.analyses[index + 1]
+                    : null;
+                  const prevScore = prevAnalysis?.overallScore ?? null;
                   const change = prevScore !== null ? analysis.overallScore - prevScore : null;
                   const isLatest = index === 0;
+                  // Mark rows where scoring methodology changed
+                  const isBoundary = analysis.scoringVersion === 'v2' &&
+                    (prevAnalysis?.scoringVersion ?? 'v1') === 'v1';
 
                   return (
                     <tr key={analysis.id} className={isLatest ? "bg-blue-50 dark:bg-blue-900/20" : ""}>
                       <td className="p-3">
-                        {format(new Date(analysis.analyzedAt), "MMM d, yyyy")}
-                        {isLatest && (
-                          <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            Current
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-0.5">
+                          <span>{format(new Date(analysis.analyzedAt), "MMM d, yyyy")}</span>
+                          {isLatest && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                              Current
+                            </span>
+                          )}
+                          {isBoundary && (
+                            <span
+                              className="text-xs text-amber-600 dark:text-amber-400"
+                              title="Scoring parameters updated from v1 (open-ended) to v2 (6 fixed AI-specific parameters). Score differences at this boundary reflect a methodology change, not a performance drop."
+                            >
+                              ↑ Scoring updated to v2
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="text-center p-3 font-semibold">{analysis.overallScore}</td>
                       <td className="text-right p-3">
-                        {change !== null ? (
+                        {isBoundary ? (
+                          <span className="text-xs text-amber-500 dark:text-amber-400" title="Methodology change">
+                            v1→v2
+                          </span>
+                        ) : change !== null ? (
                           <span
                             className={
                               change > 0

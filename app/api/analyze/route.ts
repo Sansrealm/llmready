@@ -12,6 +12,26 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// ── v2 parameter weights (must sum to 1.0) ────────────────────────────────────
+const PARAM_WEIGHTS: Record<string, number> = {
+  answer_ready_content:    0.25,
+  brand_expertise_clarity: 0.20,
+  structured_data_depth:   0.20,
+  citable_content_quality: 0.15,
+  eeat_authority_signals:  0.10,
+  intent_coverage_breadth: 0.10,
+};
+
+// Map Claude's display name → slug for weighted average computation
+const PARAM_NAME_TO_SLUG: Record<string, string> = {
+  'Answer-Ready Content':       'answer_ready_content',
+  'Brand & Expertise Clarity':  'brand_expertise_clarity',
+  'Structured Data Depth':      'structured_data_depth',
+  'Citable Content Quality':    'citable_content_quality',
+  'E-E-A-T & Authority Signals':'eeat_authority_signals',
+  'Comparison & Intent Coverage':'intent_coverage_breadth',
+};
+
 // ── Main route handler ─────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -100,97 +120,202 @@ export async function POST(request: NextRequest) {
     const response = await fetch(url);
     const html = await response.text();
 
-    // 5. Parse HTML
+    // 5. Parse HTML — core signals
     const $ = cheerio.load(html);
     const title = $('title').text();
     const metaDescription = $('meta[name="description"]').attr('content') || '';
-    const headings = $('h1, h2, h3').map((i, el) => $(el).text()).get();
-    const paragraphs = $('p').map((i, el) => $(el).text()).get().slice(0, 10);
+    const headings = $('h1, h2, h3').map((i, el) => $(el).text().trim()).get().filter(Boolean);
+    const paragraphs = $('p').map((i, el) => $(el).text().trim()).get().filter(Boolean).slice(0, 15);
     const hasSchema = $('script[type="application/ld+json"]').length > 0;
     const hasMobileViewport = $('meta[name="viewport"]').length > 0;
     const images = $('img').length;
     const imagesWithAlt = $('img[alt]').length;
 
-    // 6. OpenAI prompt
+    // 6. Parse HTML — AI-specific extraction signals (v2)
+    const schemaTypes: string[] = [];
+    $('script[type="application/ld+json"]').each((_, el) => {
+      try {
+        const parsed = JSON.parse($(el).html() || '{}');
+        const types = Array.isArray(parsed)
+          ? parsed.map((p: { '@type'?: string }) => p['@type']).filter(Boolean)
+          : parsed['@type'] ? [parsed['@type']] : [];
+        schemaTypes.push(...(types as string[]));
+      } catch { /* skip malformed */ }
+    });
+
+    const questionHeadings = headings.filter(h => h.includes('?')).length;
+    const howToSignals = headings.filter(h => /how.?to|guide|tutorial|step/i.test(h)).length;
+    const hasFaqSection = schemaTypes.some(t => t === 'FAQPage') ||
+      headings.some(h => /\bfaq\b|frequently asked/i.test(h));
+    const comparisonSignals = headings.filter(h =>
+      /\bvs\.?\b|versus|alternative|compared to|comparison/i.test(h)).length;
+    const contentText = paragraphs.join(' ');
+    const statsCount = (contentText.match(/\d+%|\d+\s*(million|billion|thousand|\+\s*users|x\s*faster)/gi) || []).length;
+    const hasAuthorSignal = $('meta[name="author"]').length > 0 ||
+      $('[class*="author"], [class*="byline"]').length > 0 ||
+      schemaTypes.some(t => ['Person', 'Article', 'BlogPosting'].includes(t));
+    const hasDateSignal = $('meta[property="article:published_time"]').length > 0 ||
+      schemaTypes.some(t => ['Article', 'BlogPosting', 'NewsArticle'].includes(t));
+
+    let externalLinkCount = 0;
+    try {
+      const hostname = new URL(url).hostname;
+      externalLinkCount = $('a[href^="http"]')
+        .filter((_, el) => !$(el).attr('href')?.includes(hostname))
+        .length;
+    } catch { /* skip if URL parse fails */ }
+
+    // 7. Build Claude prompt — v2 fixed 6-parameter evaluation
     const showPremiumContent = !subscription.isAuthenticated || subscription.isPremium;
-    const analysisPrompt = `
-      Analyze this website for LLM readiness:
-      URL: ${url}
-      Title: ${title}
-      Meta Description: ${metaDescription}
-      Headings: ${headings.slice(0, 20).join(' | ')}
-      Content Sample: ${paragraphs.join(' ').substring(0, 1000)}
-      Has Schema Markup: ${hasSchema}
-      Has Mobile Viewport: ${hasMobileViewport}
-      Images: ${images}, With Alt Text: ${imagesWithAlt}
+    const analysisPrompt = `Analyze this website for AI visibility optimization.
+URL: ${url}
+Title: ${title}
+Meta Description: ${metaDescription}
 
-      Provide an analysis of how well this website is optimized for Large Language Models (LLMs).
-      Also classify the site's industry as one of: ecommerce, saas, media, education, healthcare, other.
+EXTRACTED SIGNALS:
+Schema types detected: ${schemaTypes.length > 0 ? schemaTypes.join(', ') : 'none'}
+Question headings (contain "?"): ${questionHeadings}
+How-to / guide / tutorial headings: ${howToSignals}
+FAQ section detected: ${hasFaqSection}
+Comparison / vs / alternative headings: ${comparisonSignals}
+Stat or data patterns in content: ${statsCount}
+Author or byline signals: ${hasAuthorSignal}
+Date or freshness signals: ${hasDateSignal}
+External citation links: ${externalLinkCount}
+Headings (first 25): ${headings.slice(0, 25).join(' | ')}
+Content sample: ${paragraphs.join(' ').substring(0, 1500)}
+Has mobile viewport: ${hasMobileViewport}
+Images: ${images}, with alt text: ${imagesWithAlt}
 
-      Score each parameter using this exact scale:
-      0  = completely absent or broken
-      25 = present but ineffective
-      50 = functional but below best practice
-      75 = good, meets most best practice criteria
-      100 = exceptional, optimised for LLM retrieval
-      Score conservatively. Do not assign 100 unless the criterion is genuinely best-in-class.
+Score EXACTLY these 6 parameters (no others). Each score 0–100.
 
-      Generate 20 search queries a potential customer might type into ChatGPT or Perplexity
-      when looking for this product/service, organised into 4 typed buckets of 5 queries each:
-      - brand: queries that include the brand name or site name
-      - problem: queries describing the problem this product/service solves
-      - category: queries about the product/service category
-      - comparison: queries comparing this product/service against alternatives
+Use this scoring scale for every parameter:
+  0  = completely absent or broken
+  25 = present but ineffective
+  50 = functional but below best practice
+  75 = good, meets most best practice criteria
+ 100 = exceptional, genuinely best-in-class
+Score conservatively. Do not assign 100 unless the criterion is best-in-class.
 
-      Generate exactly 5 recommendations — the 5 highest-priority fixes that will have the
-      greatest impact on LLM visibility. Order them by impact, most critical first.
-      Do not pad with minor or low-impact suggestions.
+PARAMETER SCORING CRITERIA:
 
-      Return a JSON object with this shape:
+1. "Answer-Ready Content" — slug: answer_ready_content — isPremium: false
+   AI models cite content that directly answers queries. FAQ, how-to, Q&A formats = higher citation rate.
+   0: no Q&A or how-to content, purely promotional
+   50: some question headings or how-to sections, limited depth
+   100: comprehensive FAQ (ideally FAQPage schema), rich how-to guides, direct answer format throughout
 
-      {
-        "overall_score": (0-100),
-        "parameters": [
-          { "name": "...", "score": 0-100, "isPremium": ${!showPremiumContent}, "description": "..." }
-        ],
-        "recommendations": [
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} },
-          { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent} }
-        ],
-        "industry": "ecommerce|saas|media|education|healthcare|other",
-        "query_buckets": [
-          { "query": "...", "type": "brand" },
-          { "query": "...", "type": "brand" },
-          { "query": "...", "type": "brand" },
-          { "query": "...", "type": "brand" },
-          { "query": "...", "type": "brand" },
-          { "query": "...", "type": "problem" },
-          { "query": "...", "type": "problem" },
-          { "query": "...", "type": "problem" },
-          { "query": "...", "type": "problem" },
-          { "query": "...", "type": "problem" },
-          { "query": "...", "type": "category" },
-          { "query": "...", "type": "category" },
-          { "query": "...", "type": "category" },
-          { "query": "...", "type": "category" },
-          { "query": "...", "type": "category" },
-          { "query": "...", "type": "comparison" },
-          { "query": "...", "type": "comparison" },
-          { "query": "...", "type": "comparison" },
-          { "query": "...", "type": "comparison" },
-          { "query": "...", "type": "comparison" }
-        ]
-      }
-    `;
+2. "Brand & Expertise Clarity" — slug: brand_expertise_clarity — isPremium: false
+   Vague positioning = vague AI recommendations. AI needs a clear "what is this?"
+   0: unclear what the site does, no specific value proposition
+   50: general positioning present, not memorable or specific
+   100: immediately clear what the brand does, who it's for, what makes it distinctive
 
-    // 7. Call Claude for scoring (independent of the three models being measured)
+3. "Structured Data Depth" — slug: structured_data_depth — isPremium: false
+   Schema.org types (FAQ, Article, Organization, Product) are direct structured input to AI and search parsers.
+   0: no JSON-LD or schema markup
+   50: basic Organization or WebSite schema only
+   100: rich schema (FAQPage, Article, Product, BreadcrumbList) with complete, correct fields
+
+4. "Citable Content Quality" — slug: citable_content_quality — isPremium: ${!showPremiumContent}
+   Generic copy gets skipped. Specific facts, statistics, and original data get cited.
+   0: entirely generic marketing copy, no specific data or facts
+   50: some specific details but mostly vague; few citable facts
+   100: data-rich, specific statistics, original research or case studies, concrete claims AI can cite
+
+5. "E-E-A-T & Authority Signals" — slug: eeat_authority_signals — isPremium: ${!showPremiumContent}
+   AI models inherited authority weighting from training data. Author credentials, trust signals matter.
+   0: no author info, no trust signals, no credentials
+   50: some author or company info present but thin
+   100: clear author credentials, bio pages, citations or press mentions, strong trust signals
+
+6. "Comparison & Intent Coverage" — slug: intent_coverage_breadth — isPremium: ${!showPremiumContent}
+   75% of AI queries are problem/category/comparison. Thin coverage = invisible to most queries.
+   0: no comparison content, no problem/solution framing, no alternatives coverage
+   50: some category-level content but no comparisons or vs. content
+   100: dedicated comparison pages or sections, clear problem/solution framing, covers alternatives
+
+WEIGHTED OVERALL SCORE:
+Compute overall_score as weighted average (do NOT use a separate judgment):
+  overall_score = round(
+    answer_ready_content × 0.25 +
+    brand_expertise_clarity × 0.20 +
+    structured_data_depth × 0.20 +
+    citable_content_quality × 0.15 +
+    eeat_authority_signals × 0.10 +
+    intent_coverage_breadth × 0.10
+  )
+
+INDUSTRY CLASSIFICATION:
+Classify as one of: ecommerce, saas, media, education, healthcare, other.
+
+QUERY BUCKETS:
+Generate 20 search queries a potential customer might type into ChatGPT or Perplexity, organised into 4 typed buckets of 5 queries each:
+- brand: queries that include the brand name or site name
+- problem: queries describing the problem this product/service solves
+- category: queries about the product/service category
+- comparison: queries comparing this product/service against alternatives
+
+RECOMMENDATIONS:
+Generate exactly 5 recommendations tied to AI visibility improvement.
+Each recommendation MUST:
+- Target a specific parameter by its slug (include as "parameter" field — must be one of the 6 slugs above)
+- Only recommend fixes for parameters scoring below 75
+- Explain specifically how the action increases the likelihood AI models cite this site
+- Be actionable and concrete, not generic SEO advice
+- Order: most critical (lowest weighted score impact) first
+
+Return a JSON object with this exact shape:
+
+{
+  "overall_score": <weighted average as computed above>,
+  "parameters": [
+    { "name": "Answer-Ready Content",       "score": 0-100, "isPremium": false,              "description": "..." },
+    { "name": "Brand & Expertise Clarity",  "score": 0-100, "isPremium": false,              "description": "..." },
+    { "name": "Structured Data Depth",      "score": 0-100, "isPremium": false,              "description": "..." },
+    { "name": "Citable Content Quality",    "score": 0-100, "isPremium": ${!showPremiumContent}, "description": "..." },
+    { "name": "E-E-A-T & Authority Signals","score": 0-100, "isPremium": ${!showPremiumContent}, "description": "..." },
+    { "name": "Comparison & Intent Coverage","score": 0-100, "isPremium": ${!showPremiumContent}, "description": "..." }
+  ],
+  "recommendations": [
+    { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent}, "parameter": "<slug>" },
+    { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent}, "parameter": "<slug>" },
+    { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent}, "parameter": "<slug>" },
+    { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent}, "parameter": "<slug>" },
+    { "title": "...", "description": "...", "difficulty": "Easy|Medium|Hard", "impact": "Low|Medium|High", "isPremium": ${!showPremiumContent}, "parameter": "<slug>" }
+  ],
+  "industry": "ecommerce|saas|media|education|healthcare|other",
+  "query_buckets": [
+    { "query": "...", "type": "brand" },
+    { "query": "...", "type": "brand" },
+    { "query": "...", "type": "brand" },
+    { "query": "...", "type": "brand" },
+    { "query": "...", "type": "brand" },
+    { "query": "...", "type": "problem" },
+    { "query": "...", "type": "problem" },
+    { "query": "...", "type": "problem" },
+    { "query": "...", "type": "problem" },
+    { "query": "...", "type": "problem" },
+    { "query": "...", "type": "category" },
+    { "query": "...", "type": "category" },
+    { "query": "...", "type": "category" },
+    { "query": "...", "type": "category" },
+    { "query": "...", "type": "category" },
+    { "query": "...", "type": "comparison" },
+    { "query": "...", "type": "comparison" },
+    { "query": "...", "type": "comparison" },
+    { "query": "...", "type": "comparison" },
+    { "query": "...", "type": "comparison" }
+  ]
+}
+
+Note: Score based on the submitted URL only. If the site has richer content on sub-pages (e.g. /faq, /blog), the score reflects only what's visible at the analyzed URL.`;
+
+    // 8. Call Claude for scoring (independent of the three models being measured)
     const claudePromise = anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
-      system: 'You are an expert in SEO, GEO (Generative Engine Optimization), and LLM citation analysis. Return only valid JSON — no markdown, no explanation, no code fences.',
+      max_tokens: 3500,
+      system: 'You are an expert in GEO (Generative Engine Optimization) and AI citation analysis. You help websites improve their visibility in AI-generated answers. Return only valid JSON — no markdown, no explanation, no code fences.',
       messages: [{ role: 'user', content: analysisPrompt }],
     });
 
@@ -219,7 +344,7 @@ export async function POST(request: NextRequest) {
       .trim();
     console.log('🧠 Claude response received');
 
-    // 8. Parse and validate response
+    // 9. Parse and validate response
     let analysisResult: AnalysisResult;
     try {
       const parsed = JSON.parse(raw || '{}');
@@ -233,12 +358,34 @@ export async function POST(request: NextRequest) {
       }
       analysisResult = parsed as AnalysisResult;
 
-      // Clamp scores to valid 0–100 integer range
-      analysisResult.overall_score = Math.round(Math.max(0, Math.min(100, analysisResult.overall_score)));
+      // Clamp individual parameter scores to valid 0–100 integer range
       analysisResult.parameters = analysisResult.parameters.map(p => ({
         ...p,
         score: Math.round(Math.max(0, Math.min(100, p.score))),
       }));
+
+      // Override overall_score with deterministic weighted average.
+      // This ensures the score is always explainable regardless of what Claude returns.
+      // PARAM_WEIGHTS sum to 1.0; if all 6 params matched, weightedSum IS the final score.
+      // If only some matched (fallback), we normalize by weightApplied.
+      let weightedSum = 0;
+      let weightApplied = 0;
+      for (const param of analysisResult.parameters) {
+        const slug = PARAM_NAME_TO_SLUG[param.name];
+        const weight = slug ? (PARAM_WEIGHTS[slug] ?? 0) : 0;
+        if (weight > 0) {
+          weightedSum += param.score * weight;
+          weightApplied += weight;
+        }
+      }
+      if (weightApplied > 0.5) {
+        // Normalize: if weights sum to 1 (all 6 matched), this equals weightedSum
+        const normalizedScore = weightedSum / Math.min(weightApplied, 1.0);
+        analysisResult.overall_score = Math.round(Math.max(0, Math.min(100, normalizedScore)));
+      } else {
+        // Fallback: use Claude's value (cached v1 analyses / unexpected param names)
+        analysisResult.overall_score = Math.round(Math.max(0, Math.min(100, analysisResult.overall_score)));
+      }
 
       // Extract GPT-detected industry
       if (typeof parsed.industry === 'string' && parsed.industry) {
@@ -260,7 +407,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Increment analysis count ONLY after successful analysis
+    // 10. Increment analysis count ONLY after successful analysis
     if (subscription.isAuthenticated && subscription.userId) {
       try {
         const newCount = await incrementAnalysisCount(subscription.userId);
@@ -286,8 +433,9 @@ export async function POST(request: NextRequest) {
           parameters: analysisResult.parameters,
           recommendations: analysisResult.recommendations ?? null,
           queryBuckets: analysisResult.queryBuckets ?? null,
+          scoringVersion: 'v2',
         });
-        console.log('✅ Analysis saved to database');
+        console.log('✅ Analysis saved to database (scoring_version: v2)');
         analysisResult.id = savedAnalysis.id;
       } catch (dbError) {
         console.error('❌ Failed to save analysis to database:', dbError);

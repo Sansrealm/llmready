@@ -115,12 +115,14 @@ export async function POST(req: NextRequest) {
     const scan = await runVisibilityScan(url, industry ?? null, visibilityQueries);
 
     // Save to DB (only non-error results to keep data clean)
+    // Pass queryBuckets so each result row gets its query_type annotated
     await saveVisibilityScan(
       url,
       industry ?? null,
       scan.totalFound,
       scan.totalQueries,
-      scan.results.filter((r) => !r.error)
+      scan.results.filter((r) => !r.error),
+      queryBuckets ?? null
     );
 
     // ── Derive citation data from scan results and write back to analyses ──────

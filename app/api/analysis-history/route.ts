@@ -64,6 +64,7 @@ export async function GET(request: Request) {
         overallScore: analysis.overall_score,
         parameters: analysis.parameters,
         analyzedAt: analysis.analyzed_at,
+        scoringVersion: analysis.scoring_version ?? 'v1',
       })),
       total: analyses.length,
       firstAnalysis: analyses.length > 0 ? analyses[analyses.length - 1].analyzed_at : null,
