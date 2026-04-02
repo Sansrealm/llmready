@@ -674,13 +674,38 @@ export default function ResultsPage() {
                                                 <p className="text-base leading-snug text-gray-900 dark:text-white"
                                                    style={{ fontFamily: 'var(--font-serif)' }}>
                                                     {(() => {
+                                                        // When scan data is available use actual visibility as primary signal
+                                                        if (scanSummary) {
+                                                            const visibilityPct = Math.round((scanSummary.totalFound / scanSummary.totalQueries) * 100);
+                                                            const verdict =
+                                                                visibilityPct >= 80 ? 'highly visible across AI search engines'
+                                                                : visibilityPct >= 60 ? 'visible in most AI search responses'
+                                                                : visibilityPct >= 40 ? 'appearing in AI search, but with significant gaps'
+                                                                : visibilityPct >= 20 ? 'gaining some AI search presence'
+                                                                : 'rarely appearing in AI search responses';
+                                                            // Identify the weakest bucket to surface a specific gap
+                                                            const sortedBuckets = [...scanSummary.buckets]
+                                                                .filter(b => b.total > 0)
+                                                                .sort((a, b) => (a.found / a.total) - (b.found / b.total));
+                                                            const weakest = sortedBuckets[0];
+                                                            let gapNote = '';
+                                                            if (weakest) {
+                                                                const bucketPct = Math.round((weakest.found / weakest.total) * 100);
+                                                                if (bucketPct < 80) {
+                                                                    gapNote = ` Biggest gap: ${weakest.label.toLowerCase()} queries (${bucketPct}% cited).`;
+                                                                }
+                                                            }
+                                                            return `Your brand is ${verdict}.${gapNote}`;
+                                                        }
+                                                        // Fallback: scan hasn't run yet — use readiness score but avoid
+                                                        // "invisible" language since we have no actual visibility data
                                                         const s = analysisResult.overall_score;
                                                         const params = [...(analysisResult.parameters ?? [])].sort((a, b) => a.score - b.score);
                                                         const worst = params.slice(0, 2).filter(p => p.score < 75);
                                                         const verdict = s >= 75 ? 'well-optimised for AI search'
-                                                            : s >= 50 ? 'partially visible to AI search, with key gaps'
-                                                            : s >= 30 ? 'below average for AI search visibility'
-                                                            : 'largely invisible to AI search engines';
+                                                            : s >= 50 ? 'partially optimised for AI search'
+                                                            : s >= 30 ? 'below average for AI search readiness'
+                                                            : 'needs significant AI search optimisation';
                                                         const gap = worst.length >= 2
                                                             ? `${worst[0].name} and ${worst[1].name} are the highest-priority fixes`
                                                             : worst.length === 1 ? `${worst[0].name} is the highest-priority fix` : '';

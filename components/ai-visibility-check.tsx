@@ -71,6 +71,29 @@ const MODELS: { id: keyof Omit<PromptResult, "prompt">; label: string; color: st
   { id: "perplexity", label: "Perplexity", color: "text-violet-600 dark:text-violet-400",   dot: "bg-violet-500"  },
 ];
 
+// Domains that are Google/infra noise — filtered from all citation displays
+const CITATION_BLOCKLIST = new Set([
+  "vertexaisearch.cloud.google.com",
+  "cloudsearch.google.com",
+  "googleapis.com",
+  "gstatic.com",
+  "googleusercontent.com",
+  "google.com",
+  "bing.com",
+  "microsoft.com",
+  "openai.com",
+  "perplexity.ai",
+]);
+
+function isBlocklisted(hostname: string): boolean {
+  if (CITATION_BLOCKLIST.has(hostname)) return true;
+  // Also block any subdomain of a blocklisted root
+  for (const blocked of CITATION_BLOCKLIST) {
+    if (hostname.endsWith(`.${blocked}`)) return true;
+  }
+  return false;
+}
+
 const BUCKET_ORDER = ["brand", "problem", "category", "comparison"] as const;
 const BUCKET_LABELS: Record<string, string> = {
   brand:      "Brand",
@@ -515,7 +538,9 @@ export default function AiVisibilityCheck({
             for (const u of allUrls) {
               try {
                 const hostname = new URL(u).hostname.replace(/^www\./, '');
-                if (hostname) domainCounts.set(hostname, (domainCounts.get(hostname) ?? 0) + 1);
+                if (hostname && !isBlocklisted(hostname)) {
+                  domainCounts.set(hostname, (domainCounts.get(hostname) ?? 0) + 1);
+                }
               } catch { /* skip malformed URLs */ }
             }
             const topDomains = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -556,7 +581,7 @@ export default function AiVisibilityCheck({
                 for (const u of row[m.id].citedUrls ?? []) {
                   try {
                     const host = new URL(u).hostname.replace(/^www\./, '');
-                    if (host && host !== ownDomain) hostsThisQuery.add(host);
+                    if (host && host !== ownDomain && !isBlocklisted(host)) hostsThisQuery.add(host);
                   } catch { /* skip */ }
                 }
               }
