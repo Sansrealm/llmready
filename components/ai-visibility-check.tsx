@@ -505,25 +505,23 @@ export default function AiVisibilityCheck({
 
         {/* Citation sources insight block */}
         {hasBucketData && (() => {
-          // For each model, collect cited URLs from missed queries only
+          // ── Section 1: platform breakdown (missed queries only) ──────────────
           const engineSources = MODELS.map((m) => {
             const missedRows = data.results.filter(r => !r[m.id].error && !r[m.id].found);
             const hasSearchData = data.results.some(r => !r[m.id].error && (r[m.id].citedUrls ?? []).length > 0);
             const allUrls = missedRows.flatMap(r => r[m.id].citedUrls ?? []);
 
             const domainCounts = new Map<string, number>();
-            for (const url of allUrls) {
+            for (const u of allUrls) {
               try {
-                const hostname = new URL(url).hostname.replace(/^www\./, '');
+                const hostname = new URL(u).hostname.replace(/^www\./, '');
                 if (hostname) domainCounts.set(hostname, (domainCounts.get(hostname) ?? 0) + 1);
               } catch { /* skip malformed URLs */ }
             }
             const topDomains = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-
             return { ...m, missedCount: missedRows.length, hasSearchData, topDomains };
           });
 
-          // Citation presence score: % of missed model×query pairs that returned any source URLs
           const totalMissedCells = data.results.reduce((sum, r) =>
             sum + MODELS.filter(m => !r[m.id].error && !r[m.id].found).length, 0);
           const missedCellsWithUrls = data.results.reduce((sum, r) =>
@@ -532,68 +530,135 @@ export default function AiVisibilityCheck({
             ? Math.round((missedCellsWithUrls / totalMissedCells) * 100)
             : 0;
 
-          // Only render if at least one engine has missed queries with citation data
-          const anyUsefulData = engineSources.some(e => e.topDomains.length > 0);
           const hasMissedQueries = totalMissedCells > 0;
           if (!hasMissedQueries) return null;
 
+          const anyPlatformData = engineSources.some(e => e.topDomains.length > 0);
+
+          // ── Section 2: brand neighbourhood (all queries, per bucket) ─────────
+          // Count each external domain once per query across all engines,
+          // then aggregate per bucket. Excludes the user's own root domain.
+          let ownDomain = "";
+          try {
+            ownDomain = new URL(url.startsWith("http") ? url : `https://${url}`)
+              .hostname.replace(/^www\./, "");
+          } catch { /* keep empty */ }
+
+          const bucketNeighbourhood = BUCKET_ORDER.map(type => {
+            const bucketRows = data.results.filter(r => queryTypeMap.get(r.prompt) === type);
+            const domainCounts = new Map<string, number>();
+
+            for (const row of bucketRows) {
+              // Deduplicate per query so one domain appearing in all 3 engines
+              // still counts as 1 co-citation for this query.
+              const hostsThisQuery = new Set<string>();
+              for (const m of MODELS) {
+                for (const u of row[m.id].citedUrls ?? []) {
+                  try {
+                    const host = new URL(u).hostname.replace(/^www\./, '');
+                    if (host && host !== ownDomain) hostsThisQuery.add(host);
+                  } catch { /* skip */ }
+                }
+              }
+              for (const host of hostsThisQuery) {
+                domainCounts.set(host, (domainCounts.get(host) ?? 0) + 1);
+              }
+            }
+
+            const topDomains = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+            return { type, label: BUCKET_LABELS[type] ?? type, topDomains, total: bucketRows.length };
+          }).filter(b => b.total > 0 && b.topDomains.length > 0);
+
+          const hasNeighbourhoodData = bucketNeighbourhood.length > 0;
+
           return (
-            <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
+            <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-4">
+
+              {/* Platform breakdown */}
+              <div className="space-y-3">
                 <div>
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                     On queries where you weren&apos;t cited, these sources were
                   </p>
-                  {anyUsefulData && (
+                  {anyPlatformData && (
                     <p className="text-xs text-gray-400 mt-0.5">
                       {citationPresencePct}% of missed queries returned citation sources
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-2.5">
+                  {engineSources.map((engine) => {
+                    if (engine.missedCount === 0) return null;
+
+                    if (!engine.hasSearchData) {
+                      return (
+                        <div key={engine.id} className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500 italic">web search unavailable on this scan</span>
+                        </div>
+                      );
+                    }
+
+                    if (engine.topDomains.length === 0) {
+                      return (
+                        <div key={engine.id} className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">no source URLs returned</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={engine.id} className="flex items-start gap-2">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">{engine.label}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {engine.topDomains.map(([domain, count]) => (
+                            <span
+                              key={domain}
+                              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                            >
+                              {domain}
+                              {count > 1 && <span className="text-[10px] text-gray-400 dark:text-gray-500">×{count}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {engineSources.map((engine) => {
-                  if (engine.missedCount === 0) return null;
-
-                  if (!engine.hasSearchData) {
-                    return (
-                      <div key={engine.id} className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 italic">web search unavailable on this scan</span>
-                      </div>
-                    );
-                  }
-
-                  if (engine.topDomains.length === 0) {
-                    return (
-                      <div key={engine.id} className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">no source URLs returned</span>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={engine.id} className="flex items-start gap-2">
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">{engine.label}</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {engine.topDomains.map(([domain, count]) => (
-                          <span
-                            key={domain}
-                            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                          >
-                            {domain}
-                            {count > 1 && (
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500">×{count}</span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
+              {/* Brand neighbourhood */}
+              {hasNeighbourhoodData && (
+                <>
+                  <div className="border-t border-gray-100 dark:border-gray-800" />
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Citation neighbourhood by query type</p>
+                      <p className="text-xs text-gray-400 mt-0.5">domains that co-appear with you across AI responses in each category</p>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="space-y-2.5">
+                      {bucketNeighbourhood.map(({ type, label, topDomains }) => (
+                        <div key={type} className="flex items-start gap-2">
+                          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">{label}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {topDomains.map(([domain, count]) => (
+                              <span
+                                key={domain}
+                                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300"
+                              >
+                                {domain}
+                                {count > 1 && <span className="text-[10px] text-indigo-400 dark:text-indigo-500">×{count}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           );
         })()}
