@@ -52,23 +52,40 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ── Domain / brand extraction ──────────────────────────────────────────────────
 
-function extractDomainTokens(url: string, pageTitle?: string): { rootDomain: string; brandName: string; brandAlias: string } {
+interface PageMeta {
+  ogSiteName: string | null;
+  ogTitle:    string | null;
+  title:      string | null;
+}
+
+/**
+ * Resolves rootDomain, brandName, and brandAlias from a URL and optional page metadata.
+ *
+ * Brand name priority (most → least reliable):
+ *   1. og:site_name  — canonical brand name on virtually every major site ("Volvo Cars")
+ *   2. og:title      — first segment before separator ("Volvo Cars | Official Website")
+ *   3. <title>       — same split logic as og:title
+ *   4. URL slug      — last resort ("volvocars" from volvocars.com)
+ */
+function extractDomainTokens(url: string, pageMeta?: PageMeta): { rootDomain: string; brandName: string; brandAlias: string } {
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
     const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
-    const brandName = hostname.split('.')[0]; // "acme" from "acme.io"
+    const slugFallback = hostname.split('.')[0];
 
-    // Derive a human-readable alias from the page title when available.
-    // e.g. "Internet Pipes – Newsletter for Entrepreneurs" → "Internet Pipes"
-    let brandAlias = brandName;
-    if (pageTitle) {
-      const titlePart = pageTitle
-        .split(/[|\-–—]/)[0]  // take text before first separator
-        .trim();
-      if (titlePart.length >= 3 && titlePart.length <= 60) {
-        brandAlias = titlePart;
-      }
-    }
+    const firstSegment = (s: string) => {
+      const part = s.split(/[|\-–—]/)[0].trim();
+      return part.length >= 3 && part.length <= 60 ? part : null;
+    };
+
+    const resolved =
+      pageMeta?.ogSiteName?.trim() ||
+      (pageMeta?.ogTitle   ? firstSegment(pageMeta.ogTitle)   : null) ||
+      (pageMeta?.title     ? firstSegment(pageMeta.title)     : null) ||
+      slugFallback;
+
+    const brandName  = resolved ?? slugFallback;
+    const brandAlias = brandName;
 
     return { rootDomain: hostname, brandName, brandAlias };
   } catch {
@@ -113,22 +130,44 @@ function extractProductTokens(html: string): string[] {
 }
 
 /**
- * Fetches the page title and product tokens for a URL.
+ * Extracts a meta tag content value from HTML.
+ * Handles both attribute orderings: property/name before content, and vice-versa.
+ */
+function extractMeta(html: string, attr: string, value: string): string | null {
+  const pattern = new RegExp(
+    `<meta[^>]+${attr}=["']${escapeRegex(value)}["'][^>]+content=["']([^"']+)["']` +
+    `|<meta[^>]+content=["']([^"']+)["'][^>]+${attr}=["']${escapeRegex(value)}["']`,
+    'i'
+  );
+  const m = html.match(pattern);
+  return m ? (m[1] ?? m[2] ?? null) : null;
+}
+
+/**
+ * Fetches page metadata for brand detection and product token extraction.
+ * Single network request — reuses the HTML for all fields.
  * Non-blocking — returns nulls/empty on any error.
  */
-async function fetchPageMetadata(url: string): Promise<{ title: string | null; productTokens: string[] }> {
+async function fetchPageMetadata(url: string): Promise<{
+  ogSiteName: string | null;
+  ogTitle: string | null;
+  title: string | null;
+  productTokens: string[];
+}> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     const html = await res.text();
-    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = match ? match[1].trim() : null;
+    const ogSiteName = extractMeta(html, 'property', 'og:site_name');
+    const ogTitle    = extractMeta(html, 'property', 'og:title');
+    const titleM     = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title      = titleM ? titleM[1].trim() : null;
     const productTokens = extractProductTokens(html);
     if (productTokens.length > 0) {
       console.log(`[ai-visibility] product tokens from page: ${productTokens.join(', ')}`);
     }
-    return { title, productTokens };
+    return { ogSiteName, ogTitle, title, productTokens };
   } catch {
-    return { title: null, productTokens: [] };
+    return { ogSiteName: null, ogTitle: null, title: null, productTokens: [] };
   }
 }
 
@@ -152,6 +191,15 @@ function findMentionIndex(
 
   if (brandName.length >= 3) {
     patterns.push(new RegExp(`\\b${escapeRegex(brandName)}\\b`, 'i'));
+
+    // For multi-word brand names (e.g. "Volvo Cars"), also match the first word alone.
+    // AI responses frequently use the abbreviated form ("Volvo offers...").
+    if (brandName.includes(' ')) {
+      const firstWord = brandName.split(' ')[0];
+      if (firstWord.length >= 3) {
+        patterns.push(new RegExp(`\\b${escapeRegex(firstWord)}\\b`, 'i'));
+      }
+    }
   }
 
   if (brandAlias.length >= 3 && brandAlias.toLowerCase() !== brandName.toLowerCase()) {
@@ -484,14 +532,12 @@ export async function runVisibilityScan(
 ): Promise<ScanOutput> {
   const normalizedUrl = normalizeUrl(url);
 
-  // Fetch page title (brand alias) and product tokens (Option B) in one request.
-  // Non-blocking: falls back to domain slug / empty tokens if the fetch fails.
-  const { title: pageTitle, productTokens } = await fetchPageMetadata(url);
-  if (pageTitle) {
-    console.log(`[ai-visibility] page title for brand detection: "${pageTitle}"`);
-  }
+  // Fetch page metadata (og tags, title, product tokens) in one request.
+  // Non-blocking: all fields fall back to null/empty on any error.
+  const { ogSiteName, ogTitle, title, productTokens } = await fetchPageMetadata(url);
 
-  const { rootDomain, brandName, brandAlias } = extractDomainTokens(url, pageTitle ?? undefined);
+  const { rootDomain, brandName, brandAlias } = extractDomainTokens(url, { ogSiteName, ogTitle, title });
+  console.log(`[ai-visibility] resolved brand: "${brandName}" (ogSiteName=${ogSiteName ?? 'n/a'}, ogTitle=${ogTitle?.slice(0, 40) ?? 'n/a'}, title=${title?.slice(0, 40) ?? 'n/a'})`);
   const prompts =
     visibilityQueries && visibilityQueries.length >= 10
       ? visibilityQueries
