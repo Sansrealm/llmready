@@ -132,6 +132,8 @@ export interface AnalysisResult {
   citationDataQuality?: 'sufficient' | 'insufficient';
   analyzed_at?: string; // ISO timestamp of when this analysis was run
   cached?: boolean; // true when result was served from DB cache
+  page_blocked?: boolean; // true when the target page returned 403/401 — scores are unreliable
+  httpStatus?: number; // HTTP status from the page fetch (only set when page_blocked)
 }
 
 /**

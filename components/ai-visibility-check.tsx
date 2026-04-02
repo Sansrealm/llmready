@@ -48,6 +48,7 @@ export interface ScanSummary {
   totalQueries: number;
   buckets: { type: string; label: string; found: number; total: number }[];
   topCompetitor: string | null;
+  pageHttpStatus?: number; // HTTP status from the target page fetch (0 = timeout/refused)
 }
 
 interface AiVisibilityCheckProps {
@@ -306,7 +307,7 @@ export default function AiVisibilityCheck({
         if (c) { topCompetitor = c; break; }
       }
 
-      const summary: ScanSummary = { totalFound: json.totalFound, totalQueries: json.totalQueries, buckets, topCompetitor };
+      const summary: ScanSummary = { totalFound: json.totalFound, totalQueries: json.totalQueries, buckets, topCompetitor, pageHttpStatus: json.httpStatus };
       onScanStatusKnown?.(true, hasCitationGaps, summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed. Please try again.");

@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
         totalQueries: cached.scan.total_queries,
         results: formatResults(cached.results),
         trend: buildTrend(history),
+        httpStatus: 200, // site was accessible when cached
       });
     }
 
@@ -221,6 +222,7 @@ export async function POST(req: NextRequest) {
       scannedAt: scan.scannedAt.toISOString(),
       totalFound: scan.totalFound,
       totalQueries: scan.totalQueries,
+      httpStatus: scan.httpStatus,
       results: formatResults(
         enrichedResults.map((r) => ({
           model: r.model,

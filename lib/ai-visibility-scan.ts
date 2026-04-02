@@ -44,6 +44,7 @@ export interface ScanOutput {
   totalQueries: number;
   results: VisibilityResult[];
   scannedAt: Date;
+  httpStatus: number; // HTTP status of the target page fetch (0 = timeout/refused)
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -153,9 +154,11 @@ async function fetchPageMetadata(url: string): Promise<{
   ogTitle: string | null;
   title: string | null;
   productTokens: string[];
+  httpStatus: number;
 }> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const httpStatus = res.status;
     const html = await res.text();
     const ogSiteName = extractMeta(html, 'property', 'og:site_name');
     const ogTitle    = extractMeta(html, 'property', 'og:title');
@@ -165,9 +168,9 @@ async function fetchPageMetadata(url: string): Promise<{
     if (productTokens.length > 0) {
       console.log(`[ai-visibility] product tokens from page: ${productTokens.join(', ')}`);
     }
-    return { ogSiteName, ogTitle, title, productTokens };
+    return { ogSiteName, ogTitle, title, productTokens, httpStatus };
   } catch {
-    return { ogSiteName: null, ogTitle: null, title: null, productTokens: [] };
+    return { ogSiteName: null, ogTitle: null, title: null, productTokens: [], httpStatus: 0 };
   }
 }
 
@@ -534,7 +537,7 @@ export async function runVisibilityScan(
 
   // Fetch page metadata (og tags, title, product tokens) in one request.
   // Non-blocking: all fields fall back to null/empty on any error.
-  const { ogSiteName, ogTitle, title, productTokens } = await fetchPageMetadata(url);
+  const { ogSiteName, ogTitle, title, productTokens, httpStatus } = await fetchPageMetadata(url);
 
   const { rootDomain, brandName, brandAlias } = extractDomainTokens(url, { ogSiteName, ogTitle, title });
   console.log(`[ai-visibility] resolved brand: "${brandName}" (ogSiteName=${ogSiteName ?? 'n/a'}, ogTitle=${ogTitle?.slice(0, 40) ?? 'n/a'}, title=${title?.slice(0, 40) ?? 'n/a'})`);
@@ -644,5 +647,6 @@ export async function runVisibilityScan(
     totalQueries: results.length,
     results,
     scannedAt: new Date(),
+    httpStatus,
   };
 }

@@ -647,6 +647,26 @@ export default function ResultsPage() {
                                            style={{ fontFamily: 'var(--font-mono)' }}>
                                             AI Optimization Score
                                         </p>
+                                        {/* Page blocked banner — replaces score ring when crawler was rejected */}
+                                        {(() => {
+                                            const blockedStatus = analysisResult.httpStatus ?? scanSummary?.pageHttpStatus;
+                                            const isBlocked = analysisResult.page_blocked === true || [0, 401, 403].includes(blockedStatus ?? 200);
+                                            const statusLabel = blockedStatus === 403 ? '403 Access Denied'
+                                                : blockedStatus === 401 ? '401 Unauthorized'
+                                                : blockedStatus === 0 ? 'connection refused'
+                                                : 'access denied';
+                                            if (isBlocked) return (
+                                                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 mb-5">
+                                                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Optimization score unavailable</p>
+                                                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                                                        Page returned {statusLabel} — this site blocks automated crawlers. Unblock AI crawler user-agents to enable scoring.
+                                                    </p>
+                                                </div>
+                                            );
+                                            return null;
+                                        })()}
+
+                                        {!analysisResult.page_blocked && ![0, 401, 403].includes(analysisResult.httpStatus ?? (scanSummary?.pageHttpStatus ?? 200)) && (
                                         <div className="flex items-center gap-5 mb-5">
                                             {/* Score ring */}
                                             <div className="relative shrink-0 w-20 h-20">
@@ -714,6 +734,7 @@ export default function ResultsPage() {
                                                 </p>
                                             </div>
                                         </div>
+                                        )}
                                     </div>
 
                                     {/* Action buttons */}

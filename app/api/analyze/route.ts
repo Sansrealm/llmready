@@ -118,6 +118,11 @@ export async function POST(request: NextRequest) {
 
     // 4. Fetch website content
     const response = await fetch(url);
+    const fetchStatus = response.status;
+    const pageBlocked = fetchStatus === 403 || fetchStatus === 401;
+    if (pageBlocked) {
+      console.warn(`[analyze] page blocked (HTTP ${fetchStatus}): ${url}`);
+    }
     const html = await response.text();
 
     // 5. Parse HTML — core signals
@@ -455,6 +460,7 @@ Note: Score based on the submitted URL only. If the site has richer content on s
     return NextResponse.json({
       ...analysisResult,
       analyzed_at: new Date().toISOString(),
+      ...(pageBlocked && { page_blocked: true, httpStatus: fetchStatus }),
     });
   } catch (error) {
     console.error('🔥 Analysis error:', error);
