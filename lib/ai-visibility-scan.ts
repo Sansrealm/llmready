@@ -32,6 +32,7 @@ export interface VisibilityResult {
   prominence: Prominence | null;  // null when not found
   cited: boolean;                 // direct URL to brand domain in response
   citedUrls: string[];            // all source URLs the engine returned for this query
+  mentionedBrands: string[];      // brands extracted from response text by Haiku (excludes target brand)
   score: number;                  // 0–100 weighted composite
   error: boolean;
 }
@@ -416,7 +417,7 @@ export async function runVisibilityScan(
 
       if (outcome.status === 'rejected') {
         console.error(`[ai-visibility] ${model} failed for "${prompt}":`, outcome.reason);
-        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
       }
 
       try {
@@ -438,10 +439,11 @@ export async function runVisibilityScan(
           }
         }
 
-        return { model, prompt, ...analysis, citedUrls: citations, error: false } satisfies VisibilityResult;
+        // mentionedBrands is populated by the route after the scan via Haiku extraction
+        return { model, prompt, ...analysis, citedUrls: citations, mentionedBrands: [], error: false } satisfies VisibilityResult;
       } catch (err) {
         console.error(`[ai-visibility] analysis failed for ${model}/"${prompt}":`, err);
-        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
       }
     })
   );

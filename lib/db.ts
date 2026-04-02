@@ -650,10 +650,11 @@ export interface VisibilityResultRow {
   found: boolean;
   snippet: string | null;
   prominence: 'high' | 'medium' | 'low' | null;
-  sentiment: number | null; // -1 to 1
+  sentiment: number | null;    // -1 to 1
   cited: boolean;
-  cited_urls: string[];     // source URLs returned by the engine; empty for Tier 3 ChatGPT
-  score: number | null;     // null = legacy row pre-rubric scoring
+  cited_urls: string[];        // source URLs returned by the engine; empty for Tier 3 ChatGPT
+  mentioned_brands: string[];  // brand names extracted from response text (excludes target brand)
+  score: number | null;        // null = legacy row pre-rubric scoring
 }
 
 /**
@@ -683,7 +684,7 @@ export async function getLatestVisibilityScan(
 
   // Fetch the 15 detail rows for this scan
   const resultsResult = await sql`
-    SELECT model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, score
+    SELECT model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, mentioned_brands, score
     FROM ai_visibility_results
     WHERE scan_id = ${scan.id}
     ORDER BY model, prompt
@@ -729,13 +730,15 @@ export async function saveVisibilityScan(
   for (const r of results) {
     const queryType = queryTypeMap.get(r.prompt) ?? null;
     const citedUrls = r.citedUrls ?? [];
+    const mentionedBrands = r.mentionedBrands ?? [];
     await sql`
       INSERT INTO ai_visibility_results
-        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, score, query_type)
+        (scan_id, model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, mentioned_brands, score, query_type)
       VALUES (
         ${scanId}, ${r.model}, ${r.prompt}, ${r.found}, ${r.snippet ?? null},
         ${r.prominence ?? null}, ${null}, ${r.cited},
-        ${citedUrls as unknown as string}, ${r.score ?? null}, ${queryType}
+        ${citedUrls as unknown as string}, ${mentionedBrands as unknown as string},
+        ${r.score ?? null}, ${queryType}
       )
     `;
   }

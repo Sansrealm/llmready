@@ -14,7 +14,8 @@ interface ModelCell {
   found: boolean;
   snippet: string | null;
   cited?: boolean;
-  citedUrls?: string[];  // source URLs the engine returned; absent on pre-migration cached scans
+  citedUrls?: string[];       // source URLs the engine returned; absent on pre-migration cached scans
+  mentionedBrands?: string[]; // brand names extracted from response text; absent on pre-migration cached scans
   error: boolean;
 }
 
@@ -561,55 +562,45 @@ export default function AiVisibilityCheck({
           const anyPlatformData = engineSources.some(e => e.topDomains.length > 0);
 
           // ── Section 2: brand neighbourhood (all queries, per bucket) ─────────
-          // Count each external domain once per query across all engines,
-          // then aggregate per bucket. Excludes the user's own root domain.
-          let ownDomain = "";
-          try {
-            ownDomain = new URL(url.startsWith("http") ? url : `https://${url}`)
-              .hostname.replace(/^www\./, "");
-          } catch { /* keep empty */ }
-
+          // Uses mentionedBrands extracted from response text (server-side, target brand excluded).
+          // Count each brand once per query across all 3 engines, then aggregate per bucket.
           const bucketNeighbourhood = BUCKET_ORDER.map(type => {
             const bucketRows = data.results.filter(r => queryTypeMap.get(r.prompt) === type);
-            const domainCounts = new Map<string, number>();
+            const brandCounts = new Map<string, number>();
 
             for (const row of bucketRows) {
-              // Deduplicate per query so one domain appearing in all 3 engines
-              // still counts as 1 co-citation for this query.
-              const hostsThisQuery = new Set<string>();
+              // Deduplicate per query: brand appearing in multiple engines still counts once.
+              const brandsThisQuery = new Set<string>();
               for (const m of MODELS) {
-                for (const u of row[m.id].citedUrls ?? []) {
-                  try {
-                    const host = new URL(u).hostname.replace(/^www\./, '');
-                    if (host && host !== ownDomain && !isBlocklisted(host)) hostsThisQuery.add(host);
-                  } catch { /* skip */ }
+                for (const brand of row[m.id].mentionedBrands ?? []) {
+                  if (brand) brandsThisQuery.add(brand);
                 }
               }
-              for (const host of hostsThisQuery) {
-                domainCounts.set(host, (domainCounts.get(host) ?? 0) + 1);
+              for (const brand of brandsThisQuery) {
+                brandCounts.set(brand, (brandCounts.get(brand) ?? 0) + 1);
               }
             }
 
-            const topDomains = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-            return { type, label: BUCKET_LABELS[type] ?? type, topDomains, total: bucketRows.length };
-          }).filter(b => b.total > 0 && b.topDomains.length > 0);
+            const topBrands = [...brandCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+            return { type, label: BUCKET_LABELS[type] ?? type, topBrands, total: bucketRows.length };
+          }).filter(b => b.total > 0 && b.topBrands.length > 0);
 
           const hasNeighbourhoodData = bucketNeighbourhood.length > 0;
 
           return (
             <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 space-y-4">
 
-              {/* Platform breakdown */}
+              {/* Sources AI retrieved */}
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                    On queries where you weren&apos;t cited, these sources were
+                    Sources AI retrieved
                   </p>
-                  {anyPlatformData && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {citationPresencePct}% of missed queries returned citation sources
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {anyPlatformData
+                      ? `source URLs each engine cited on missed queries · ${citationPresencePct}% of missed queries had citation data`
+                      : "source URLs each engine cited on missed queries"}
+                  </p>
                 </div>
 
                 <div className="space-y-2.5">
@@ -654,26 +645,26 @@ export default function AiVisibilityCheck({
                 </div>
               </div>
 
-              {/* Brand neighbourhood */}
+              {/* Brands AI recommended */}
               {hasNeighbourhoodData && (
                 <>
                   <div className="border-t border-gray-100 dark:border-gray-800" />
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Citation neighbourhood by query type</p>
-                      <p className="text-xs text-gray-400 mt-0.5">domains that co-appear with you across AI responses in each category</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Brands AI recommended</p>
+                      <p className="text-xs text-gray-400 mt-0.5">brands appearing in AI responses across your query categories</p>
                     </div>
                     <div className="space-y-2.5">
-                      {bucketNeighbourhood.map(({ type, label, topDomains }) => (
+                      {bucketNeighbourhood.map(({ type, label, topBrands }) => (
                         <div key={type} className="flex items-start gap-2">
                           <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">{label}</span>
                           <div className="flex flex-wrap gap-1.5">
-                            {topDomains.map(([domain, count]) => (
+                            {topBrands.map(([brand, count]) => (
                               <span
-                                key={domain}
+                                key={brand}
                                 className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300"
                               >
-                                {domain}
+                                {brand}
                                 {count > 1 && <span className="text-[10px] text-indigo-400 dark:text-indigo-500">×{count}</span>}
                               </span>
                             ))}
