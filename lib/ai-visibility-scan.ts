@@ -46,6 +46,10 @@ export interface ScanOutput {
   scannedAt: Date;
 }
 
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // ── Domain / brand extraction ──────────────────────────────────────────────────
 
 function extractDomainTokens(url: string, pageTitle?: string): { rootDomain: string; brandName: string; brandAlias: string } {
@@ -75,17 +79,56 @@ function extractDomainTokens(url: string, pageTitle?: string): { rootDomain: str
 }
 
 /**
- * Fetches the page <title> for a URL. Returns null on any error.
- * Used to derive a human-readable brand alias for mention detection.
+ * Extracts product-name tokens from page HTML.
+ * Targets common product naming patterns across industries:
+ *   - Letter+number codes: "CX-90", "RX350", "PS5", "Model 3"
+ *   - TitleCase+number run-ons: "iPhone15", "Mazda3", "Galaxy S24"
+ * Used by findMentionIndex to catch brand-implicit responses that name
+ * the product without repeating the parent brand name.
  */
-async function fetchPageTitle(url: string): Promise<string | null> {
+function extractProductTokens(html: string): string[] {
+  const tokens = new Set<string>();
+
+  // Pull text from title, h1/h2, and meta description
+  const sources: string[] = [];
+  const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleM) sources.push(titleM[1]);
+  for (const m of html.matchAll(/<h[12][^>]*>([^<]+)<\/h[12]>/gi)) sources.push(m[1]);
+  const descM = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+  if (descM) sources.push(descM[1]);
+
+  const combined = sources.join(' ');
+
+  // Pattern 1: letter(s) + optional separator + digit(s) (CX-90, RX350, Model 3, PS5)
+  for (const m of combined.matchAll(/\b([A-Z]{1,4}[-\s]?\d{1,4}[A-Za-z]?)\b/g)) {
+    if (m[1].length >= 3) tokens.add(m[1]);
+  }
+  // Pattern 2: TitleCase word fused with digits (iPhone15, Mazda3, GalaxyS24)
+  for (const m of combined.matchAll(/\b([A-Z][a-z]+\d+[A-Za-z]*)\b/g)) {
+    if (m[1].length >= 4) tokens.add(m[1]);
+  }
+
+  return [...tokens].slice(0, 10);
+}
+
+/**
+ * Fetches the page title and product tokens for a URL.
+ * Non-blocking — returns nulls/empty on any error.
+ */
+async function fetchPageMetadata(url: string): Promise<{ title: string | null; productTokens: string[] }> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     const html = await res.text();
     const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    return match ? match[1].trim() : null;
+    const title = match ? match[1].trim() : null;
+    const productTokens = extractProductTokens(html);
+    if (productTokens.length > 0) {
+      console.log(`[ai-visibility] product tokens from page: ${productTokens.join(', ')}`);
+    }
+    return { title, productTokens };
   } catch {
-    return null;
+    return { title: null, productTokens: [] };
   }
 }
 
@@ -93,25 +136,37 @@ async function fetchPageTitle(url: string): Promise<string | null> {
 
 /**
  * Returns the character index of the first brand/domain mention, or -1.
- * Checks: root domain URL, exact brand word-boundary, alias word-boundary.
+ * Checks: root domain URL, brand word-boundary, alias word-boundary,
+ * and (Option B) product token patterns scraped from the brand's page.
  */
-function findMentionIndex(text: string, rootDomain: string, brandName: string, brandAlias: string): number {
-  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+function findMentionIndex(
+  text: string,
+  rootDomain: string,
+  brandName: string,
+  brandAlias: string,
+  productTokens: string[] = [],
+): number {
   const patterns: RegExp[] = [
-    new RegExp(escape(rootDomain).replace(/\\\./g, '\\.'), 'i'),
+    new RegExp(escapeRegex(rootDomain).replace(/\\\./g, '\\.'), 'i'),
   ];
 
   if (brandName.length >= 3) {
-    patterns.push(new RegExp(`\\b${escape(brandName)}\\b`, 'i'));
+    patterns.push(new RegExp(`\\b${escapeRegex(brandName)}\\b`, 'i'));
   }
 
   if (brandAlias.length >= 3 && brandAlias.toLowerCase() !== brandName.toLowerCase()) {
-    // Use word boundary for single-word aliases, phrase match for multi-word (e.g. "Internet Pipes")
     const aliasPattern = brandAlias.includes(' ')
-      ? new RegExp(escape(brandAlias), 'i')
-      : new RegExp(`\\b${escape(brandAlias)}\\b`, 'i');
+      ? new RegExp(escapeRegex(brandAlias), 'i')
+      : new RegExp(`\\b${escapeRegex(brandAlias)}\\b`, 'i');
     patterns.push(aliasPattern);
+  }
+
+  // Option B: product token patterns (e.g. "CX-90", "Mazda3") scraped from the brand page.
+  // Catches brand-implicit responses that name a product without the parent brand.
+  for (const token of productTokens) {
+    if (token.length >= 3) {
+      patterns.push(new RegExp(escapeRegex(token), 'i'));
+    }
   }
 
   let earliest = -1;
@@ -201,9 +256,10 @@ async function analyzeVisibility(
   text: string,
   rootDomain: string,
   brandName: string,
-  brandAlias: string
+  brandAlias: string,
+  productTokens: string[] = [],
 ): Promise<Pick<VisibilityResult, 'found' | 'snippet' | 'prominence' | 'cited' | 'score'>> {
-  const mentionIndex = findMentionIndex(text, rootDomain, brandName, brandAlias);
+  const mentionIndex = findMentionIndex(text, rootDomain, brandName, brandAlias, productTokens);
 
   if (mentionIndex === -1) {
     return { found: false, snippet: null, prominence: null, cited: false, score: 0 };
@@ -352,6 +408,49 @@ async function queryGemini(prompt: string): Promise<ModelResponse> {
   return { text: result.response.text(), citations };
 }
 
+/**
+ * Returns true if the response appears to be focused on a *different* entity
+ * rather than the target brand. Used as a guard in the Option A query-context
+ * fallback to prevent crediting a response that recommends a competitor.
+ *
+ * Heuristic: if any TitleCase proper noun (not a stop-word, not the target brand)
+ * appears 3+ times, the response is likely about that entity instead.
+ * Best-effort — once mentionedBrands extraction is live this can be derived
+ * from the Haiku output instead.
+ */
+function isCompetitorFocusedResponse(text: string, brandName: string, rootDomain: string): boolean {
+  const titleCaseWords = text.match(/\b[A-Z][a-z]{2,20}\b/g) ?? [];
+
+  const STOP_WORDS = new Set([
+    'the','this','that','these','those','there','their','they','them',
+    'for','and','with','from','into','over','after','about','before',
+    'some','such','both','each','most','other','more','also','just',
+    'when','where','what','how','why','which','while','than','then',
+    'you','your','its','our','all','but','not','are','was','were',
+    'has','have','had','will','can','may','should','would','could',
+    // common product/pricing words that start sentences
+    'price','prices','model','models','base','trim','year','version',
+    'starting','standard','available','including','offering','option',
+    'features','package','includes','offers','comes','provides',
+    'compare','compared','unlike','however','although','while',
+  ]);
+
+  const brandLower = brandName.toLowerCase();
+  const domainToken = rootDomain.split('.')[0].toLowerCase();
+
+  const freq = new Map<string, number>();
+  for (const w of titleCaseWords) {
+    const lower = w.toLowerCase();
+    if (STOP_WORDS.has(lower) || lower === brandLower || lower === domainToken) continue;
+    freq.set(lower, (freq.get(lower) ?? 0) + 1);
+  }
+
+  for (const count of freq.values()) {
+    if (count >= 3) return true;
+  }
+  return false;
+}
+
 const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<ModelResponse>> = {
   chatgpt: queryChatGPT,
   gemini: queryGemini,
@@ -385,10 +484,9 @@ export async function runVisibilityScan(
 ): Promise<ScanOutput> {
   const normalizedUrl = normalizeUrl(url);
 
-  // Fetch the page title to derive a human-readable brand alias
-  // (e.g. "internetpipes.com" → "Internet Pipes" from the <title> tag).
-  // Non-blocking: falls back to domain slug if the fetch fails.
-  const pageTitle = await fetchPageTitle(url);
+  // Fetch page title (brand alias) and product tokens (Option B) in one request.
+  // Non-blocking: falls back to domain slug / empty tokens if the fetch fails.
+  const { title: pageTitle, productTokens } = await fetchPageMetadata(url);
   if (pageTitle) {
     console.log(`[ai-visibility] page title for brand detection: "${pageTitle}"`);
   }
@@ -422,7 +520,7 @@ export async function runVisibilityScan(
 
       try {
         const { text, citations } = outcome.value;
-        const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias);
+        const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias, productTokens);
 
         // For Perplexity, override `cited` using the structured citations array
         // (ranked sources Perplexity retrieved from its index) rather than
@@ -435,6 +533,49 @@ export async function runVisibilityScan(
             // Recompute score with corrected citation value
             if (analysis.found && analysis.prominence) {
               analysis.score = computeScore(analysis.prominence, citedViaIndex);
+            }
+          }
+        }
+
+        // Citation-based found fallback: if text matching failed but the brand domain
+        // appears in the model's source citations (e.g. Gemini grounding chunks), mark
+        // as found with conservative attribution. Mirrors the Perplexity cited override.
+        if (!analysis.found) {
+          const citationFallback = citations.find((u) => u.includes(rootDomain));
+          if (citationFallback) {
+            console.log(`[ai-visibility] citation-fallback found for ${rootDomain} (${model}): ${citationFallback}`);
+            analysis.found = true;
+            analysis.snippet = `Retrieved from ${citationFallback}`;
+            analysis.prominence = 'low';
+            analysis.cited = true;
+            analysis.score = computeScore('low', true);
+          }
+        }
+
+        // Option A — query-context signal: if both text matching and citation matching
+        // failed, but the prompt itself names the brand, infer a likely hit when:
+        //   1. response is substantive (≥ 50 words)
+        //   2. model doesn't hedge ("I don't have", "I cannot", etc.)
+        //   3. response isn't focused on a *different* entity (competitor guard)
+        // Conservative: low prominence, no citation credit.
+        if (!analysis.found) {
+          const queryNamesBrand = [brandName, rootDomain].some(
+            (token) => new RegExp(`\\b${escapeRegex(token)}\\b`, 'i').test(prompt)
+          );
+
+          if (queryNamesBrand) {
+            const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+            const hedgePattern = /\b(i don'?t have|i cannot|i can'?t|i'?m unable|no information|not available|don'?t know|unable to find|i apologize)\b/i;
+            const substantive = wordCount >= 50 && !hedgePattern.test(text);
+            const notCompetitorFocused = !isCompetitorFocusedResponse(text, brandName, rootDomain);
+
+            if (substantive && notCompetitorFocused) {
+              console.log(`[ai-visibility] query-context fallback for ${rootDomain} (${model}): prompt names brand, response is substantive (${wordCount}w)`);
+              analysis.found = true;
+              analysis.snippet = text.slice(0, 160).trimEnd() + (text.length > 160 ? '…' : '');
+              analysis.prominence = 'low';
+              // cited stays false — no URL evidence
+              analysis.score = computeScore('low', false);
             }
           }
         }
