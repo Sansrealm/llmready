@@ -607,9 +607,7 @@ export default function AiVisibilityCheck({
                     Sources AI retrieved
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {anyPlatformData
-                      ? `source URLs each engine cited on missed queries · ${citationPresencePct}% of missed queries had citation data`
-                      : "source URLs each engine cited on missed queries"}
+                    Sites each engine pulls from in your category — getting cited here directly improves your visibility
                   </p>
                 </div>
 
@@ -630,7 +628,7 @@ export default function AiVisibilityCheck({
                       return (
                         <div key={engine.id} className="flex items-center gap-2">
                           <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-20 shrink-0">{engine.label}</span>
-                          <span className="text-xs text-gray-400 dark:text-gray-500">no source URLs returned</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Answered from AI training data — no traceable sources</span>
                         </div>
                       );
                     }
@@ -685,6 +683,9 @@ export default function AiVisibilityCheck({
                   </div>
                 </>
               )}
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+                Earning mentions or backlinks from these sites feeds directly into each engine&apos;s retrieval index
+              </p>
             </div>
           );
         })()}
