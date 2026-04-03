@@ -651,6 +651,9 @@ export default function AiVisibilityCheck({
                     );
                   })}
                 </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+                  Earning mentions or backlinks from these sites feeds directly into each engine&apos;s retrieval index
+                </p>
               </div>
 
               {/* Brands AI recommended */}
@@ -683,9 +686,6 @@ export default function AiVisibilityCheck({
                   </div>
                 </>
               )}
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
-                Earning mentions or backlinks from these sites feeds directly into each engine&apos;s retrieval index
-              </p>
             </div>
           );
         })()}
