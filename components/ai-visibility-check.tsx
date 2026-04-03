@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { CheckCircle2, XCircle, Eye, RefreshCw, Lock, ChevronDown } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/track-event";
 import Link from "next/link";
@@ -26,10 +28,11 @@ interface PromptResult {
   perplexity: ModelCell;
 }
 
-interface TrendPoint {
-  score: number;
-  total: number;
+interface ModelTrendPoint {
   date: string;
+  chatgpt: number;
+  gemini: number;
+  perplexity: number;
 }
 
 interface ScanResponse {
@@ -38,7 +41,7 @@ interface ScanResponse {
   totalFound: number;
   totalQueries: number;
   results: PromptResult[];
-  trend: TrendPoint[];
+  trend: ModelTrendPoint[];
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -72,6 +75,12 @@ const MODELS: { id: keyof Omit<PromptResult, "prompt">; label: string; color: st
   { id: "gemini",     label: "Gemini",     color: "text-blue-600 dark:text-blue-400",       dot: "bg-blue-500"    },
   { id: "perplexity", label: "Perplexity", color: "text-violet-600 dark:text-violet-400",   dot: "bg-violet-500"  },
 ];
+
+const MODEL_CHART_COLORS: Record<string, string> = {
+  chatgpt:    "#10b981",
+  gemini:     "#3b82f6",
+  perplexity: "#8b5cf6",
+};
 
 // Domains that are Google/infra noise — filtered from all citation displays
 const CITATION_BLOCKLIST = new Set([
@@ -826,31 +835,72 @@ export default function AiVisibilityCheck({
           </>
         )}
 
-        {/* Trend bars */}
+        {/* Visibility trend chart — per-model lines */}
         {data.trend.length >= 2 && (
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-2">
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-3">
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Visibility trend
+              Visibility trend by model
             </p>
-            <div className="flex items-end gap-2 h-10">
-              {data.trend.map((point, i) => {
-                const pct = Math.round((point.score / point.total) * 100);
-                const pxH = Math.max(3, Math.round(40 * pct / 100));
-                return (
-                  <div key={i} className="flex-1 group relative flex flex-col justify-end">
-                    <div
-                      className="w-full bg-indigo-400 dark:bg-indigo-500 rounded-sm transition-all"
-                      style={{ height: `${pxH}px` }}
+            <div className="flex flex-wrap gap-3 text-xs">
+              {MODELS.map((m) => (
+                <span key={m.id} className="flex items-center gap-1.5">
+                  <span className={`w-2.5 h-2.5 rounded-full ${m.dot}`} />
+                  <span className={m.color}>{m.label}</span>
+                </span>
+              ))}
+            </div>
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={data.trend.map((p) => ({
+                    ...p,
+                    label: format(new Date(p.date), "MMM d"),
+                    fullDate: format(new Date(p.date), "MMM d, yyyy"),
+                  }))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                  <XAxis
+                    dataKey="label"
+                    className="text-xs"
+                    stroke="currentColor"
+                    tick={{ fill: "currentColor" }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    className="text-xs"
+                    stroke="currentColor"
+                    tick={{ fill: "currentColor" }}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "6px",
+                    }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate ?? ""}
+                    formatter={(value: number, name: string) => {
+                      const label = MODELS.find((m) => m.id === name)?.label ?? name;
+                      return [`${value}%`, label];
+                    }}
+                  />
+                  {MODELS.map((m) => (
+                    <Line
+                      key={m.id}
+                      type="monotone"
+                      dataKey={m.id}
+                      stroke={MODEL_CHART_COLORS[m.id]}
+                      strokeWidth={2}
+                      dot={{ fill: MODEL_CHART_COLORS[m.id], r: 3 }}
+                      activeDot={{ r: 5 }}
                     />
-                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                      {point.score}/{point.total}
-                    </span>
-                  </div>
-                );
-              })}
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
             <p className="text-xs text-gray-400">
-              {data.trend.length} scan{data.trend.length > 1 ? "s" : ""} — hover bars to see scores
+              {data.trend.length} scan{data.trend.length > 1 ? "s" : ""} — visibility % per model over time
             </p>
           </div>
         )}

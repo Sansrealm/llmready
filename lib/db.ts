@@ -644,6 +644,16 @@ export interface VisibilityScanRow {
   scanned_at: string;
 }
 
+export interface VisibilityTrendRow {
+  id: string;
+  scanned_at: string;
+  total_found: number;
+  total_queries: number;
+  model: string;
+  model_found: number;
+  model_total: number;
+}
+
 export interface VisibilityResultRow {
   model: string;
   prompt: string;
@@ -763,6 +773,34 @@ export async function getVisibilityScanHistory(
   `;
 
   return result.rows as VisibilityScanRow[];
+}
+
+/**
+ * Returns per-scan, per-model found counts for the visibility trend chart.
+ * Joins scans with results to break down found counts by ChatGPT/Gemini/Perplexity.
+ */
+export async function getVisibilityTrendByModel(
+  url: string
+): Promise<VisibilityTrendRow[]> {
+  const normalizedUrl = normalizeUrl(url);
+
+  const result = await sql`
+    SELECT
+      s.id,
+      s.scanned_at,
+      s.total_found,
+      s.total_queries,
+      r.model,
+      COUNT(*) FILTER (WHERE r.found = true)::int AS model_found,
+      COUNT(*)::int AS model_total
+    FROM ai_visibility_scans s
+    JOIN ai_visibility_results r ON r.scan_id = s.id
+    WHERE s.normalized_url = ${normalizedUrl}
+    GROUP BY s.id, s.scanned_at, s.total_found, s.total_queries, r.model
+    ORDER BY s.scanned_at ASC, r.model ASC
+  `;
+
+  return result.rows as VisibilityTrendRow[];
 }
 
 /**

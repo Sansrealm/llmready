@@ -17,10 +17,11 @@ import { runVisibilityScan } from '@/lib/ai-visibility-scan';
 import {
   getLatestVisibilityScan,
   saveVisibilityScan,
-  getVisibilityScanHistory,
+  getVisibilityTrendByModel,
   updateAnalysisCitationData,
   normalizeUrl,
   type VisibilityResultRow,
+  type VisibilityTrendRow,
 } from '@/lib/db';
 import type { CitationGap, QueryBucket } from '@/lib/types';
 
@@ -106,14 +107,14 @@ export async function POST(req: NextRequest) {
     const cached = await getLatestVisibilityScan(url, CACHE_MAX_AGE_HOURS);
 
     if (cached) {
-      const history = await getVisibilityScanHistory(url);
+      const trendRows = await getVisibilityTrendByModel(url);
       return NextResponse.json({
         cached: true,
         scannedAt: cached.scan.scanned_at,
         totalFound: cached.scan.total_found,
         totalQueries: cached.scan.total_queries,
         results: formatResults(cached.results),
-        trend: buildTrend(history),
+        trend: buildTrend(trendRows),
         httpStatus: 200, // site was accessible when cached
       });
     }
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const history = await getVisibilityScanHistory(url);
+    const trendRows = await getVisibilityTrendByModel(url);
 
     return NextResponse.json({
       cached: false,
@@ -236,7 +237,7 @@ export async function POST(req: NextRequest) {
           score: r.score ?? null,
         }))
       ),
-      trend: buildTrend(history),
+      trend: buildTrend(trendRows),
     });
   } catch (error) {
     console.error('[ai-visibility-scan] error:', error);
@@ -294,15 +295,34 @@ function modelCell(row: RawResult | null) {
 }
 
 /**
- * Builds a minimal trend array from scan history headers.
- * Used by the UI to show a "visibility over time" line.
+ * Pivots flat per-model rows into one object per scan with per-model percentages.
+ * Used by the UI to render a multi-line Recharts trend chart.
  */
-function buildTrend(
-  history: Array<{ total_found: number; total_queries: number; scanned_at: string }>
-) {
-  return history.map((h) => ({
-    score: h.total_found,
-    total: h.total_queries,
-    date: h.scanned_at,
-  }));
+function buildTrend(rows: VisibilityTrendRow[]) {
+  const byScan = new Map<string, {
+    scanned_at: string;
+    models: Record<string, { found: number; total: number }>;
+  }>();
+
+  for (const r of rows) {
+    let entry = byScan.get(r.id);
+    if (!entry) {
+      entry = { scanned_at: r.scanned_at, models: {} };
+      byScan.set(r.id, entry);
+    }
+    entry.models[r.model] = { found: Number(r.model_found), total: Number(r.model_total) };
+  }
+
+  return Array.from(byScan.values()).map((e) => {
+    const pct = (model: string) => {
+      const m = e.models[model];
+      return m && m.total > 0 ? Math.round((m.found / m.total) * 100) : 0;
+    };
+    return {
+      date: e.scanned_at,
+      chatgpt: pct('chatgpt'),
+      gemini: pct('gemini'),
+      perplexity: pct('perplexity'),
+    };
+  });
 }
