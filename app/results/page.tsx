@@ -882,129 +882,6 @@ export default function ResultsPage() {
                                 </div>
                             )}
 
-                            {/* Score History Widget - PREMIUM ONLY */}
-                            {url && (
-                                <ScoreHistoryWidget
-                                    url={url}
-                                    isPremium={isPremium}
-                                    isLoading={premiumLoading}
-                                />
-                            )}
-
-                            {/* ── AI Optimization Score — collapsible parameters ── */}
-                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                <div className="flex items-center justify-between mb-1">
-                                    <h2 className="text-2xl font-bold">AI Optimization Score</h2>
-                                    <button
-                                        onClick={() => setParametersExpanded(e => !e)}
-                                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
-                                        aria-expanded={parametersExpanded}
-                                    >
-                                        {parametersExpanded ? 'Collapse ↑' : 'Expand ↓'}
-                                    </button>
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                                    Website factors that influence your AI Visibility — improve these to increase your score
-                                    <span className="block text-xs mt-1 text-gray-400 dark:text-gray-500">
-                                        Score based on the analyzed URL. Submit a content-rich page (e.g. /faq or a blog post) for a deeper score.
-                                    </span>
-                                </p>
-                                {parametersExpanded && (
-                                    <div className="grid gap-6 md:grid-cols-2">
-                                        {analysisResult.parameters.map((param, index) => (
-                                            <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <h3 className="font-semibold text-sm">{param.name}</h3>
-                                                    <div className={`text-lg font-bold ${param.score >= 75 ? 'text-green-600 dark:text-green-400' : param.score >= 50 ? 'text-blue-600 dark:text-blue-400' : param.score >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                        {param.score}/100
-                                                    </div>
-                                                </div>
-                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
-                                                    <div
-                                                        className={`h-2 rounded-full ${param.score >= 75 ? 'bg-green-500' : param.score >= 50 ? 'bg-blue-500' : param.score >= 30 ? 'bg-amber-500' : 'bg-red-500'}`}
-                                                        style={{ width: `${param.score}%` }}
-                                                    />
-                                                </div>
-                                                {param.isPremium && !isPremium ? (
-                                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-                                                        🔒{' '}
-                                                        <Link href="/pricing" className="text-indigo-500 hover:underline">
-                                                            Upgrade to Premium
-                                                        </Link>{' '}
-                                                        for detailed insights on this factor.
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                                                        {param.description}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 🔹 CONDITIONAL AD PLACEMENT - After substantial content */}
-                            {shouldShowAds && (
-                                <div className="my-8">
-                                    <AdComponent adSlot="7142437859" />
-                                </div>
-                            )}
-
-                            {/* 🔹 DEBUG INFO - Development only */}
-                            {process.env.NODE_ENV === 'development' && !shouldShowAds && (
-                                <div className="my-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-sm text-yellow-700">
-                                        🚫 <strong>Ads Hidden (Dev Mode)</strong> - Reasons:
-                                        {isPremium && ' Premium user,'}
-                                        {loading && ' Loading,'}
-                                        {error && ' Error state,'}
-                                        {!analysisResult && ' No results,'}
-                                        {!hasEnoughContent && ' Insufficient content'}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Section 1: Top Queries — authenticated users only */}
-                            {isSignedIn && topQueriesForDisplay.length > 0 && (
-                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
-                                    <h2 className="text-xl font-bold mb-1">How you appear when customers search</h2>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                                        These are the queries most likely driving traffic to your competitors
-                                    </p>
-                                    <div className="space-y-3">
-                                        {topQueriesForDisplay.map((gap, i) => (
-                                            <div key={i} className="flex items-start justify-between gap-4 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">{gap.query}</p>
-                                                    <span className="text-xs text-gray-400 dark:text-gray-500 capitalize mt-0.5 inline-block">{gap.query_type}</span>
-                                                </div>
-                                                <div className="shrink-0 text-right">
-                                                    {gap.status === 'cited' ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                                                            Cited
-                                                        </span>
-                                                    ) : (
-                                                        <div className="text-right">
-                                                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-full">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-                                                                Not cited
-                                                            </span>
-                                                            {getPrimaryCompetitor(gap) && (
-                                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                                    {getPrimaryCompetitor(gap)} appeared instead
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* AI Visibility Check Section */}
                             {url && (
                                 <div id="ai-visibility-section">
@@ -1137,6 +1014,129 @@ export default function ResultsPage() {
                                         </div>
                                     )}
                                 </div>
+                            )}
+
+                            {/* ── AI Optimization Score — collapsible parameters ── */}
+                            <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                <div className="flex items-center justify-between mb-1">
+                                    <h2 className="text-2xl font-bold">AI Optimization Score</h2>
+                                    <button
+                                        onClick={() => setParametersExpanded(e => !e)}
+                                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+                                        aria-expanded={parametersExpanded}
+                                    >
+                                        {parametersExpanded ? 'Collapse ↑' : 'Expand ↓'}
+                                    </button>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                    Website factors that influence your AI Visibility — improve these to increase your score
+                                    <span className="block text-xs mt-1 text-gray-400 dark:text-gray-500">
+                                        Score based on the analyzed URL. Submit a content-rich page (e.g. /faq or a blog post) for a deeper score.
+                                    </span>
+                                </p>
+                                {parametersExpanded && (
+                                    <div className="grid gap-6 md:grid-cols-2">
+                                        {analysisResult.parameters.map((param, index) => (
+                                            <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="font-semibold text-sm">{param.name}</h3>
+                                                    <div className={`text-lg font-bold ${param.score >= 75 ? 'text-green-600 dark:text-green-400' : param.score >= 50 ? 'text-blue-600 dark:text-blue-400' : param.score >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {param.score}/100
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                                                    <div
+                                                        className={`h-2 rounded-full ${param.score >= 75 ? 'bg-green-500' : param.score >= 50 ? 'bg-blue-500' : param.score >= 30 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${param.score}%` }}
+                                                    />
+                                                </div>
+                                                {param.isPremium && !isPremium ? (
+                                                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                                        🔒{' '}
+                                                        <Link href="/pricing" className="text-indigo-500 hover:underline">
+                                                            Upgrade to Premium
+                                                        </Link>{' '}
+                                                        for detailed insights on this factor.
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                                        {param.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 🔹 CONDITIONAL AD PLACEMENT - After substantial content */}
+                            {shouldShowAds && (
+                                <div className="my-8">
+                                    <AdComponent adSlot="7142437859" />
+                                </div>
+                            )}
+
+                            {/* 🔹 DEBUG INFO - Development only */}
+                            {process.env.NODE_ENV === 'development' && !shouldShowAds && (
+                                <div className="my-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p className="text-sm text-yellow-700">
+                                        🚫 <strong>Ads Hidden (Dev Mode)</strong> - Reasons:
+                                        {isPremium && ' Premium user,'}
+                                        {loading && ' Loading,'}
+                                        {error && ' Error state,'}
+                                        {!analysisResult && ' No results,'}
+                                        {!hasEnoughContent && ' Insufficient content'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Section 1: Top Queries — authenticated users only */}
+                            {isSignedIn && topQueriesForDisplay.length > 0 && (
+                                <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
+                                    <h2 className="text-xl font-bold mb-1">How you appear when customers search</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                                        These are the queries most likely driving traffic to your competitors
+                                    </p>
+                                    <div className="space-y-3">
+                                        {topQueriesForDisplay.map((gap, i) => (
+                                            <div key={i} className="flex items-start justify-between gap-4 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">{gap.query}</p>
+                                                    <span className="text-xs text-gray-400 dark:text-gray-500 capitalize mt-0.5 inline-block">{gap.query_type}</span>
+                                                </div>
+                                                <div className="shrink-0 text-right">
+                                                    {gap.status === 'cited' ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                                            Cited
+                                                        </span>
+                                                    ) : (
+                                                        <div className="text-right">
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-full">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                                                                Not cited
+                                                            </span>
+                                                            {getPrimaryCompetitor(gap) && (
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                                    {getPrimaryCompetitor(gap)} appeared instead
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Score History Widget - PREMIUM ONLY */}
+                            {url && (
+                                <ScoreHistoryWidget
+                                    url={url}
+                                    isPremium={isPremium}
+                                    isLoading={premiumLoading}
+                                />
                             )}
 
                             {/* Guest "create account" hook — shown after full results */}
