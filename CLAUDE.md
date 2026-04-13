@@ -42,9 +42,11 @@ npm start
 ## Critical Architecture Patterns
 
 ### Analysis Flow
-1. User submits URL via `/app/page.tsx` (form)
+1. User submits URL via `/app/page.tsx` (form). If not signed in, the UI opens Clerk sign-in and queues the URL in sessionStorage; the request resumes post-signin. `/api/analyze` is not reachable without a Clerk session — the route returns 401 on unauthenticated requests.
 2. POST to `/app/api/analyze/route.ts`:
-   - Checks user auth & limits via Clerk metadata (`getUserSubscription()`)
+   - Hard auth gate: returns 401 if `!subscription.isAuthenticated`
+   - Checks user limits via Clerk metadata (`getUserSubscription()`)
+   - Rate-limited via Upstash (see `lib/rate-limit.ts`)
    - Fetches page, detects `page_blocked` (HTTP 401/403 or refused) → `fetchStatus`
    - Parses website with Cheerio; extracts v2 signals (schema types, question headings, FAQ, comparison markers)
    - Sends to **Claude** for v2 scoring + recommendations + query buckets
@@ -52,7 +54,7 @@ npm start
    - Saves result to Vercel Postgres with `scoring_version='v2'`
    - Returns structured results (includes `page_blocked`, `httpStatus` when relevant)
 3. Navigate to `/app/results/page.tsx`
-4. Display results based on user tier (guest/free/premium/agency)
+4. Display results based on user tier (free/premium/agency)
 
 ### AI Visibility Scan Flow (`/app/api/ai-visibility-scan/route.ts`)
 1. **Premium-only** (403 otherwise)
@@ -76,7 +78,7 @@ npm start
 6. Subscription management via Stripe billing portal
 
 ### User Limits & Tiers (`ANALYSIS_LIMITS` in `lib/auth-utils.ts`)
-- **Guests**: 1 analysis (localStorage-based)
+- **Guests**: cannot analyze. `/api/analyze` returns 401 `Sign in required`. UI opens Clerk sign-in before any analyze request is made; `pendingURL`/`pendingEmail` are persisted through sessionStorage and resumed post-signin.
 - **Free signed-in**: limited analyses/month (Clerk metadata), 3 free parameters only, no visibility scan
 - **Premium**: unlimited analyses, all 6 parameters, visibility scan, history, PDF, email reports, Chrome extension
 - **Agency**: higher limits than Premium (see `ANALYSIS_LIMITS.AGENCY`)

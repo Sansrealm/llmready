@@ -4,8 +4,8 @@ import Anthropic from '@anthropic-ai/sdk';
 export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
-import { limitAnalyze, getClientIp } from '@/lib/rate-limit';
-import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
+import { limitAnalyze } from '@/lib/rate-limit';
+import { saveAnalysis, getAnalysisByUrl } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 
 // Anthropic client — used for website scoring (independent of measured models)
@@ -40,21 +40,25 @@ export async function POST(request: NextRequest) {
     // Get user subscription info using centralized utility
     const subscription = await getUserSubscription();
 
+    // Server-side auth gate. The UI routes unauthenticated users through
+    // Clerk sign-in before hitting this endpoint; this rejects direct
+    // (scripted / curl) bypasses so every analysis is attributable to a
+    // Clerk user and counted against their tier limit.
+    if (!subscription.isAuthenticated || !subscription.userId) {
+      return NextResponse.json(
+        { error: 'Sign in required' },
+        { status: 401 }
+      );
+    }
+
     console.log(`🔐 User authentication status: ${
-      subscription.isAuthenticated
-        ? subscription.isPremium
-          ? `Premium (${subscription.analysisCount}/${subscription.limit})`
-          : `Free (${subscription.analysisCount}/${subscription.limit})`
-        : 'Guest'
+      subscription.isPremium
+        ? `Premium (${subscription.analysisCount}/${subscription.limit})`
+        : `Free (${subscription.analysisCount}/${subscription.limit})`
     }`);
 
     // Rate limit: burst protection on top of Clerk-based monthly caps.
-    // Authed users keyed by userId; guests keyed by IP.
-    const rl = await limitAnalyze(
-      subscription.userId
-        ? { userId: subscription.userId }
-        : { ip: getClientIp(request.headers) }
-    );
+    const rl = await limitAnalyze({ userId: subscription.userId });
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.' },
@@ -462,16 +466,6 @@ Note: Score based on the submitted URL only. If the site has richer content on s
         analysisResult.id = savedAnalysis.id;
       } catch (dbError) {
         console.error('❌ Failed to save analysis to database:', dbError);
-      }
-    }
-
-    // 12. Capture guest email if provided
-    if (!subscription.isAuthenticated && email) {
-      try {
-        await captureGuestEmail(email);
-        console.log('✅ Guest email captured for outreach');
-      } catch (emailError) {
-        console.error('⚠️ Failed to capture guest email:', emailError);
       }
     }
 
