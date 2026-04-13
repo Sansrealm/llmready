@@ -139,3 +139,56 @@ export function computeVerdict(rate: number): Verdict {
 export function formatPct(rate: number): number {
   return Math.round(rate * 100);
 }
+
+// ----------------------------------------------------------------------------
+// Parameter contribution — display helper for share / PDF parameter cards
+// ----------------------------------------------------------------------------
+//
+// The on-screen /results page shows raw 0–100 parameter scores which makes the
+// overall weighted average hard to reverse-engineer (e.g. a parameter at 60
+// contributing 12 points toward a 27/100 total is not obvious). For shared
+// reports and the PDF we render each card as the parameter's weighted
+// *contribution* toward the 100-point total.
+//
+// The weight table is hard-coded here (mirrors PARAM_WEIGHTS in
+// app/api/analyze/route.ts). Keep in sync with the scoring route.
+
+const PARAM_NAME_TO_SLUG: Record<string, string> = {
+  'Answer-Ready Content':         'answer_ready_content',
+  'Brand & Expertise Clarity':    'brand_expertise_clarity',
+  'Structured Data Depth':        'structured_data_depth',
+  'Citable Content Quality':      'citable_content_quality',
+  'E-E-A-T & Authority Signals':  'eeat_authority_signals',
+  'Comparison & Intent Coverage': 'intent_coverage_breadth',
+};
+
+const PARAM_WEIGHTS: Record<string, number> = {
+  answer_ready_content:    0.25,
+  brand_expertise_clarity: 0.20,
+  structured_data_depth:   0.20,
+  citable_content_quality: 0.15,
+  eeat_authority_signals:  0.10,
+  intent_coverage_breadth: 0.10,
+};
+
+/**
+ * Compute a parameter's weighted contribution toward the 100-point total.
+ *
+ * Returns `null` if the parameter name isn't recognised — callers should fall
+ * back to showing the raw score so unknown / legacy parameters still render.
+ *
+ * Rounded to whole integers (matches product example: score 5 × 0.25 → "1 / 25").
+ */
+export function computeParamContribution(
+  name: string,
+  score: number,
+): { contribution: number; max: number } | null {
+  const slug = PARAM_NAME_TO_SLUG[name];
+  if (!slug) return null;
+  const weight = PARAM_WEIGHTS[slug];
+  if (weight === undefined) return null;
+  return {
+    contribution: Math.round(score * weight),
+    max: Math.round(weight * 100),
+  };
+}

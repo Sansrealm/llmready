@@ -15,6 +15,7 @@ import {
 import {
   computeCitationStats,
   computeVerdict,
+  computeParamContribution,
   formatPct,
   ENGINES,
   type CitationStats,
@@ -431,17 +432,24 @@ function generatePrintReadyHTML(
   ` : '';
 
   // ── Fragment: structural support section (only on non-fallback path) ──
+  // Heading flips on citation rate: "extend" framing only makes sense for
+  // strong-visibility sites. For sites that need to climb, surface the gap.
+  const supportHeading = visibility && visibility.stats.rate >= 0.6
+    ? 'How to extend your visibility further'
+    : 'Why your score could be even higher';
+
   const supportHTML = !usesFallback ? `
     <div class="section">
       <div class="support-header">
-        <h2>Why your score could be even higher</h2>
+        <h2>${supportHeading}</h2>
         <span class="support-score" style="color: ${structColor(overall_score)};">
           ${overall_score}<span class="support-score-total">/100</span>
         </span>
       </div>
       <p class="section-subtitle">
         Structural and markup signals that make content easier for AI models to parse and cite.
-        These are the levers to pull to lift the visibility numbers above.
+        Each card shows how many points the parameter contributes toward the 100-point total —
+        the levers to pull to lift the visibility numbers above.
       </p>
       <div class="param-grid">
         ${parameters.map(p => renderParamCard(p.name, p.score, p.description)).join('')}
@@ -483,11 +491,15 @@ function generatePrintReadyHTML(
 
 function renderParamCard(name: string, score: number, description: string): string {
   const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : score >= 40 ? '#f97316' : '#ef4444';
+  const contribution = computeParamContribution(name, score);
+  const scoreHtml = contribution
+    ? `${contribution.contribution} <span style="font-size:0.75rem;color:#94a3b8;font-weight:500;">/ ${contribution.max} pts</span>`
+    : `${score}`;
   return `
     <div class="param-card">
       <div class="param-head">
         <div class="param-name">${escapeHtml(name)}</div>
-        <div class="param-score" style="color: ${color};">${score}</div>
+        <div class="param-score" style="color: ${color};">${scoreHtml}</div>
       </div>
       <div class="param-bar">
         <div class="param-bar-fill" style="width: ${score}%; background: ${color};"></div>

@@ -32,6 +32,7 @@ import {
 import {
   computeCitationStats,
   computeVerdict,
+  computeParamContribution,
   formatPct,
   ENGINES,
   type VerdictTone,
@@ -309,25 +310,28 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
                 Readiness breakdown
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {analysis.parameters.map((param, i) => (
-                  <div key={i} className="p-4 bg-card rounded-xl border border-border">
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-semibold text-sm">{param.name}</h3>
-                      <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
-                        {param.score}
-                      </span>
+                {analysis.parameters.map((param, i) => {
+                  const c = computeParamContribution(param.name, param.score);
+                  return (
+                    <div key={i} className="p-4 bg-card rounded-xl border border-border">
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-semibold text-sm">{param.name}</h3>
+                        <span className={`text-base font-bold ${scoreColor(param.score)}`}>
+                          {c ? <>{c.contribution} <span className="text-xs font-normal text-gray-400">/ {c.max} pts</span></> : param.score}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
+                        <div
+                          className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
+                          style={{ width: `${param.score}%` }}
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {param.description}
+                      </p>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
-                      <div
-                        className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
-                        style={{ width: `${param.score}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {param.description}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>
@@ -570,12 +574,17 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Supporting: AI Readiness (structural) — only on non-fallback path */}
-        {!usesFallback && (
+        {/* Supporting: AI Readiness (structural) — only on non-fallback path.
+            Heading flips based on how the site is doing: "extend" framing for
+            strong-visibility sites (>=60% cited), "why could be higher" for
+            sites that need to climb out of a gap. */}
+        {!usesFallback && stats && (
           <div>
             <div className="flex items-baseline justify-between gap-4 mb-1">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Why your score could be even higher
+                {stats.rate >= 0.6
+                  ? 'How to extend your visibility further'
+                  : 'Why your score could be even higher'}
               </h2>
               <span className={`text-2xl font-bold ${scoreColor(analysis.overall_score)}`}>
                 {analysis.overall_score}
@@ -584,28 +593,32 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               Structural and markup signals that make content easier for AI models to parse
-              and cite. These are the levers to pull to lift the visibility numbers above.
+              and cite. Each card shows how many points the parameter contributes toward the
+              100-point total — the levers to pull to lift the visibility numbers above.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {analysis.parameters.map((param, i) => (
-                <div key={i} className="p-4 bg-card rounded-xl border border-border">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-sm">{param.name}</h3>
-                    <span className={`text-xl font-bold ${scoreColor(param.score)}`}>
-                      {param.score}
-                    </span>
+              {analysis.parameters.map((param, i) => {
+                const c = computeParamContribution(param.name, param.score);
+                return (
+                  <div key={i} className="p-4 bg-card rounded-xl border border-border">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-semibold text-sm">{param.name}</h3>
+                      <span className={`text-base font-bold ${scoreColor(param.score)}`}>
+                        {c ? <>{c.contribution} <span className="text-xs font-normal text-gray-400">/ {c.max} pts</span></> : param.score}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
+                      <div
+                        className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
+                        style={{ width: `${param.score}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {param.description}
+                    </p>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-3">
-                    <div
-                      className={`h-1.5 rounded-full ${scoreBarColor(param.score)}`}
-                      style={{ width: `${param.score}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {param.description}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
