@@ -5,7 +5,7 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import { findUserByStripeSubscription, findUserByStripeCustomer } from '@/lib/stripe-utils';
-import { addToRetryQueue, type WebhookMetadata } from '@/lib/queue/webhook-retry';
+import { alertWebhookFailure } from '@/lib/alerts';
 import PremiumWelcomeEmail from '@/emails/premium-welcome';
 
 // Initialize Stripe with the secret key
@@ -159,16 +159,20 @@ export async function POST(request: NextRequest) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
 
-                    // Add to retry queue
-                    addToRetryQueue(userId, {
-                        premiumUser: true,
-                        subscriptionId: session.subscription as string,
-                        customerId: session.customer as string,
-                        updatedAt: new Date().toISOString(),
-                    }, errorMessage);
+                    await alertWebhookFailure({
+                        event: 'checkout.session.completed',
+                        userId,
+                        error: errorMessage,
+                        extra: { subscriptionId: session.subscription, customerId: session.customer },
+                    });
 
-                    console.log(`➕ Added to retry queue: ${userId}`);
-                    // Continue processing - webhook will still return 200 to Stripe
+                    // Return 500 so Stripe retries natively (up to ~3 days with backoff).
+                    // Welcome email intentionally skipped on this path — it fires after a
+                    // successful metadata update on a subsequent retry.
+                    return NextResponse.json(
+                        { error: 'Failed to update user metadata; Stripe will retry' },
+                        { status: 500 }
+                    );
                 }
 
                 // Fire-and-forget welcome email — does not block webhook response
@@ -261,16 +265,17 @@ export async function POST(request: NextRequest) {
                         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                         console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
 
-                        // Add to retry queue
-                        addToRetryQueue(userId, {
-                            premiumUser: isActive,
-                            subscriptionStatus: subscription.status,
-                            subscriptionId: subscription.id,
-                            updatedAt: new Date().toISOString(),
-                        }, errorMessage);
+                        await alertWebhookFailure({
+                            event: 'customer.subscription.updated',
+                            userId,
+                            error: errorMessage,
+                            extra: { subscriptionId: subscription.id, status: subscription.status },
+                        });
 
-                        console.log(`➕ Added to retry queue: ${userId}`);
-                        // Continue processing - webhook will still return 200 to Stripe
+                        return NextResponse.json(
+                            { error: 'Failed to update user metadata; Stripe will retry' },
+                            { status: 500 }
+                        );
                     }
                 } catch (error) {
                     console.error('Error updating subscription status:', error);
@@ -328,15 +333,17 @@ export async function POST(request: NextRequest) {
                         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                         console.error(`❌ Failed to update Clerk metadata for ${userId}:`, errorMessage);
 
-                        // Add to retry queue
-                        addToRetryQueue(userId, {
-                            premiumUser: false,
-                            subscriptionStatus: 'canceled',
-                            updatedAt: new Date().toISOString(),
-                        }, errorMessage);
+                        await alertWebhookFailure({
+                            event: 'customer.subscription.deleted',
+                            userId,
+                            error: errorMessage,
+                            extra: { subscriptionId: subscription.id },
+                        });
 
-                        console.log(`➕ Added to retry queue: ${userId}`);
-                        // Continue processing - webhook will still return 200 to Stripe
+                        return NextResponse.json(
+                            { error: 'Failed to update user metadata; Stripe will retry' },
+                            { status: 500 }
+                        );
                     }
                 } catch (error) {
                     console.error('Error removing premium status:', error);
