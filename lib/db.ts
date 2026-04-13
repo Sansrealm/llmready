@@ -704,6 +704,40 @@ export async function getLatestVisibilityScan(
 }
 
 /**
+ * Fetch the most recent visibility scan for a URL with no age cap.
+ *
+ * Used by the public share page and PDF report where a cached scan that's
+ * older than 72h should still surface — the alternative is a "pre-scan
+ * fallback" layout, which we only want when no scan has ever run.
+ */
+export async function getLatestVisibilityScanAnyAge(
+  url: string
+): Promise<{ scan: VisibilityScanRow; results: VisibilityResultRow[] } | null> {
+  const normalizedUrl = normalizeUrl(url);
+
+  const scanResult = await sql`
+    SELECT id, normalized_url, industry, total_found, total_queries, scanned_at
+    FROM ai_visibility_scans
+    WHERE normalized_url = ${normalizedUrl}
+    ORDER BY scanned_at DESC
+    LIMIT 1
+  `;
+
+  if (scanResult.rows.length === 0) return null;
+
+  const scan = scanResult.rows[0] as VisibilityScanRow;
+
+  const resultsResult = await sql`
+    SELECT model, prompt, found, snippet, prominence, sentiment, cited, cited_urls, mentioned_brands, score
+    FROM ai_visibility_results
+    WHERE scan_id = ${scan.id}
+    ORDER BY model, prompt
+  `;
+
+  return { scan, results: resultsResult.rows as VisibilityResultRow[] };
+}
+
+/**
  * Saves a completed scan and its result rows.
  * Returns the created scan ID.
  *
