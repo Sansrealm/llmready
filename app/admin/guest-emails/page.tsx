@@ -1,15 +1,15 @@
 import { getGuestEmailsForOutreach } from '@/lib/db';
-import { auth } from '@clerk/nextjs/server';
+import { checkAdminStatus } from '@/lib/auth-utils';
 
 export const dynamic = 'force-dynamic';
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
 /**
  * Admin Dashboard: Guest Email List
  *
  * Displays all captured guest emails for outreach campaigns.
- * Protected by Clerk authentication (TODO: Add admin role check).
+ * Gated by Clerk `publicMetadata.isAdmin === true`.
  *
  * Features:
  * - View all guest emails sorted by most recent
@@ -18,14 +18,11 @@ import { Button } from '@/components/ui/button';
  * - Excludes opted-out users automatically
  */
 export default async function GuestEmailsPage() {
-  // Authentication check
-  const { userId } = await auth();
+  const { isAdmin } = await checkAdminStatus();
 
-  // TODO: Add admin role check from Clerk metadata
-  // For now, any authenticated user can access
-  // Future: Check if user.publicMetadata.isAdmin === true
-  if (!userId) {
-    redirect('/');
+  // Return 404 (not 401/403) so non-admins can't discover the page exists
+  if (!isAdmin) {
+    notFound();
   }
 
   // Fetch guest emails (excludes opted-out automatically)

@@ -28,6 +28,7 @@ export interface UserSubscription {
   customerId?: string; // Stripe customer ID
   updatedAt?: string; // ISO timestamp of last metadata update
   lastAnalysisReset?: string; // ISO timestamp of last analysis count reset
+  isAdmin?: boolean; // True if user has admin access (set manually in Clerk dashboard)
 }
 
 // ============================================================================

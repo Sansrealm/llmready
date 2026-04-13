@@ -266,6 +266,38 @@ export async function validatePremiumAccess(): Promise<{
 }
 
 /**
+ * Checks whether the current user has admin access.
+ *
+ * Admin is granted by setting `publicMetadata.isAdmin = true` on the Clerk user
+ * (via the Clerk dashboard — there's no self-serve path). Use this wherever an
+ * endpoint or page exposes data that should not be visible to ordinary signed-in
+ * users (guest-email list, retry-queue controls, future admin surfaces).
+ *
+ * @returns Object with admin status and userId (both derived from Clerk)
+ */
+export async function checkAdminStatus(): Promise<{
+  isAdmin: boolean;
+  userId: string | null;
+}> {
+  try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return { isAdmin: false, userId: null };
+    }
+
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const metadata = (user.publicMetadata as Partial<UserSubscription>) || {};
+
+    return { isAdmin: metadata.isAdmin === true, userId };
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return { isAdmin: false, userId: null };
+  }
+}
+
+/**
  * Export limit constants for use in client-side code
  */
 export const ANALYSIS_LIMITS = {
