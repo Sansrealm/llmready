@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Lock } from "lucide-react"
+import { computeParamContribution } from "@/lib/visibility-report"
 
 interface ParameterScoreCardProps {
   name: string
@@ -34,8 +35,20 @@ export function ParameterScoreCard({ name, score, description, isPremium = false
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className={`text-2xl font-bold ${getColorClass(score)}`}>{score}</span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">out of 100</span>
+              {(() => {
+                const c = computeParamContribution(name, score)
+                return c ? (
+                  <>
+                    <span className={`text-xl font-bold ${getColorClass(score)}`}>{c.contribution}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">/ {c.max} pts</span>
+                  </>
+                ) : (
+                  <>
+                    <span className={`text-2xl font-bold ${getColorClass(score)}`}>{score}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">out of 100</span>
+                  </>
+                )
+              })()}
             </div>
             <Progress value={score} className="h-2" />
           </div>

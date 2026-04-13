@@ -16,6 +16,7 @@ import AdComponent from '@/components/AdComponent';
 import ScoreHistoryWidget from '@/components/score-history-widget';
 import { ShareButton } from '@/components/share-button';
 import { AnalysisResult, DebugInfo, getPrimaryCompetitor } from '@/lib/types';
+import { computeParamContribution } from '@/lib/visibility-report';
 import AiVisibilityCheck from '@/components/ai-visibility-check';
 import type { ScanSummary } from '@/components/ai-visibility-check';
 import ExitSurveyModal from '@/components/exit-survey-modal';
@@ -640,14 +641,13 @@ export default function ResultsPage() {
                                     )}
                                 </div>
 
-                                {/* RIGHT — AI Optimization Score (secondary diagnostic) */}
+                                {/* RIGHT — Key insight + analysis timestamp + actions.
+                                    The AI Optimization Score radial lives in the AI Optimization
+                                    block lower on the page; this block is narrative-only so the
+                                    visibility statement no longer sits next to a structural score. */}
                                 <div className="bg-white dark:bg-gray-950 rounded-lg border p-6 flex flex-col justify-between">
                                     <div>
-                                        <p className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4"
-                                           style={{ fontFamily: 'var(--font-mono)' }}>
-                                            AI Optimization Score
-                                        </p>
-                                        {/* Page blocked banner — replaces score ring when crawler was rejected */}
+                                        {/* Page blocked banner — replaces narrative when crawler was rejected */}
                                         {(() => {
                                             const blockedStatus = analysisResult.httpStatus ?? scanSummary?.pageHttpStatus;
                                             const isBlocked = analysisResult.page_blocked === true || [0, 401, 403].includes(blockedStatus ?? 200);
@@ -667,72 +667,60 @@ export default function ResultsPage() {
                                         })()}
 
                                         {!analysisResult.page_blocked && ![0, 401, 403].includes(analysisResult.httpStatus ?? (scanSummary?.pageHttpStatus ?? 200)) && (
-                                        <div className="flex items-center gap-5 mb-5">
-                                            {/* Score ring */}
-                                            <div className="relative shrink-0 w-20 h-20">
-                                                <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
-                                                    <circle cx="40" cy="40" r="34" fill="none"
-                                                        className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="6" />
-                                                    <circle cx="40" cy="40" r="34" fill="none"
-                                                        stroke={analysisResult.overall_score >= 75 ? '#22c55e' : analysisResult.overall_score >= 50 ? '#3b82f6' : analysisResult.overall_score >= 30 ? '#f59e0b' : '#ef4444'}
-                                                        strokeWidth="6"
-                                                        strokeDasharray="213.6"
-                                                        strokeDashoffset={213.6 * (1 - analysisResult.overall_score / 100)}
-                                                        strokeLinecap="round" />
-                                                </svg>
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                                    <span className="text-2xl font-medium leading-none text-gray-900 dark:text-white"
-                                                          style={{ fontFamily: 'var(--font-mono)' }}>
-                                                        {analysisResult.overall_score}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400 mt-0.5"
-                                                          style={{ fontFamily: 'var(--font-mono)' }}>/100</span>
-                                                </div>
-                                            </div>
-                                            {/* Narrative */}
-                                            <div>
-                                                <p className="text-base leading-snug text-gray-900 dark:text-white"
-                                                   style={{ fontFamily: 'var(--font-serif)' }}>
-                                                    {(() => {
-                                                        // When scan data is available use actual visibility as primary signal
-                                                        if (scanSummary) {
-                                                            const visibilityPct = Math.round((scanSummary.totalFound / scanSummary.totalQueries) * 100);
-                                                            const verdict =
-                                                                visibilityPct >= 80 ? 'highly visible across AI search engines'
-                                                                : visibilityPct >= 60 ? 'visible in most AI search responses'
-                                                                : visibilityPct >= 40 ? 'appearing in AI search, but with significant gaps'
-                                                                : visibilityPct >= 20 ? 'gaining some AI search presence'
-                                                                : 'rarely appearing in AI search responses';
-                                                            // Identify the weakest bucket to surface a specific gap
-                                                            const sortedBuckets = [...scanSummary.buckets]
-                                                                .filter(b => b.total > 0)
-                                                                .sort((a, b) => (a.found / a.total) - (b.found / b.total));
-                                                            const weakest = sortedBuckets[0];
-                                                            let gapNote = '';
-                                                            if (weakest) {
-                                                                const bucketPct = Math.round((weakest.found / weakest.total) * 100);
-                                                                if (bucketPct < 80) {
-                                                                    gapNote = ` Biggest gap: ${weakest.label.toLowerCase()} queries (${bucketPct}% cited).`;
-                                                                }
+                                        <div className="mb-5">
+                                            <p className="text-base leading-snug text-gray-900 dark:text-white"
+                                               style={{ fontFamily: 'var(--font-serif)' }}>
+                                                {(() => {
+                                                    // When scan data is available use actual visibility as primary signal
+                                                    if (scanSummary) {
+                                                        const visibilityPct = Math.round((scanSummary.totalFound / scanSummary.totalQueries) * 100);
+                                                        const verdict =
+                                                            visibilityPct >= 80 ? 'highly visible across AI search engines'
+                                                            : visibilityPct >= 60 ? 'visible in most AI search responses'
+                                                            : visibilityPct >= 40 ? 'appearing in AI search, but with significant gaps'
+                                                            : visibilityPct >= 20 ? 'gaining some AI search presence'
+                                                            : 'rarely appearing in AI search responses';
+                                                        // Identify the weakest bucket to surface a specific gap
+                                                        const sortedBuckets = [...scanSummary.buckets]
+                                                            .filter(b => b.total > 0)
+                                                            .sort((a, b) => (a.found / a.total) - (b.found / b.total));
+                                                        const weakest = sortedBuckets[0];
+                                                        let gapNote = '';
+                                                        if (weakest) {
+                                                            const bucketPct = Math.round((weakest.found / weakest.total) * 100);
+                                                            if (bucketPct < 80) {
+                                                                gapNote = ` Biggest gap: ${weakest.label.toLowerCase()} queries (${bucketPct}% cited).`;
                                                             }
-                                                            return `Your brand is ${verdict}.${gapNote}`;
                                                         }
-                                                        // Fallback: scan hasn't run yet — use readiness score but avoid
-                                                        // "invisible" language since we have no actual visibility data
-                                                        const s = analysisResult.overall_score;
-                                                        const params = [...(analysisResult.parameters ?? [])].sort((a, b) => a.score - b.score);
-                                                        const worst = params.slice(0, 2).filter(p => p.score < 75);
-                                                        const verdict = s >= 75 ? 'well-optimised for AI search'
-                                                            : s >= 50 ? 'partially optimised for AI search'
-                                                            : s >= 30 ? 'below average for AI search readiness'
-                                                            : 'needs significant AI search optimisation';
-                                                        const gap = worst.length >= 2
-                                                            ? `${worst[0].name} and ${worst[1].name} are the highest-priority fixes`
-                                                            : worst.length === 1 ? `${worst[0].name} is the highest-priority fix` : '';
-                                                        return `Your site is ${verdict}.${gap ? ` ${gap}.` : ''}`;
-                                                    })()}
+                                                        return `Your brand is ${verdict}.${gapNote}`;
+                                                    }
+                                                    // Fallback: scan hasn't run yet — use readiness score but avoid
+                                                    // "invisible" language since we have no actual visibility data
+                                                    const s = analysisResult.overall_score;
+                                                    const params = [...(analysisResult.parameters ?? [])].sort((a, b) => a.score - b.score);
+                                                    const worst = params.slice(0, 2).filter(p => p.score < 75);
+                                                    const verdict = s >= 75 ? 'well-optimised for AI search'
+                                                        : s >= 50 ? 'partially optimised for AI search'
+                                                        : s >= 30 ? 'below average for AI search readiness'
+                                                        : 'needs significant AI search optimisation';
+                                                    const gap = worst.length >= 2
+                                                        ? `${worst[0].name} and ${worst[1].name} are the highest-priority fixes`
+                                                        : worst.length === 1 ? `${worst[0].name} is the highest-priority fix` : '';
+                                                    return `Your site is ${verdict}.${gap ? ` ${gap}.` : ''}`;
+                                                })()}
+                                            </p>
+                                            {analysisResult.analyzed_at && (
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-3"
+                                                   style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    Analyzed {new Date(analysisResult.analyzed_at).toLocaleString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric',
+                                                        hour: 'numeric',
+                                                        minute: '2-digit',
+                                                    })}
                                                 </p>
-                                            </div>
+                                            )}
                                         </div>
                                         )}
                                     </div>
@@ -1019,7 +1007,32 @@ export default function ResultsPage() {
                             {/* ── AI Optimization Score — collapsible parameters ── */}
                             <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
                                 <div className="flex items-center justify-between mb-1">
-                                    <h2 className="text-2xl font-bold">AI Optimization Score</h2>
+                                    <div className="flex items-center gap-4">
+                                        <h2 className="text-2xl font-bold">AI Optimization Score</h2>
+                                        {/* Score ring moved from the top-right widget so the structural
+                                            score sits with its own parameter breakdown, not next to the
+                                            visibility-derived narrative. */}
+                                        <div className="relative shrink-0 w-16 h-16">
+                                            <svg viewBox="0 0 80 80" className="w-16 h-16 -rotate-90">
+                                                <circle cx="40" cy="40" r="34" fill="none"
+                                                    className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="6" />
+                                                <circle cx="40" cy="40" r="34" fill="none"
+                                                    stroke={analysisResult.overall_score >= 75 ? '#22c55e' : analysisResult.overall_score >= 50 ? '#3b82f6' : analysisResult.overall_score >= 30 ? '#f59e0b' : '#ef4444'}
+                                                    strokeWidth="6"
+                                                    strokeDasharray="213.6"
+                                                    strokeDashoffset={213.6 * (1 - analysisResult.overall_score / 100)}
+                                                    strokeLinecap="round" />
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-lg font-medium leading-none text-gray-900 dark:text-white"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>
+                                                    {analysisResult.overall_score}
+                                                </span>
+                                                <span className="text-[9px] text-gray-400 mt-0.5"
+                                                      style={{ fontFamily: 'var(--font-mono)' }}>/100</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <button
                                         onClick={() => setParametersExpanded(e => !e)}
                                         className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
@@ -1036,12 +1049,14 @@ export default function ResultsPage() {
                                 </p>
                                 {parametersExpanded && (
                                     <div className="grid gap-6 md:grid-cols-2">
-                                        {analysisResult.parameters.map((param, index) => (
+                                        {analysisResult.parameters.map((param, index) => {
+                                            const c = computeParamContribution(param.name, param.score);
+                                            return (
                                             <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
                                                 <div className="flex justify-between items-center mb-2">
                                                     <h3 className="font-semibold text-sm">{param.name}</h3>
-                                                    <div className={`text-lg font-bold ${param.score >= 75 ? 'text-green-600 dark:text-green-400' : param.score >= 50 ? 'text-blue-600 dark:text-blue-400' : param.score >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                        {param.score}/100
+                                                    <div className={`text-base font-bold ${param.score >= 75 ? 'text-green-600 dark:text-green-400' : param.score >= 50 ? 'text-blue-600 dark:text-blue-400' : param.score >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {c ? <>{c.contribution} <span className="text-xs font-normal text-gray-400">/ {c.max} pts</span></> : `${param.score}/100`}
                                                     </div>
                                                 </div>
                                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
@@ -1064,7 +1079,8 @@ export default function ResultsPage() {
                                                     </p>
                                                 )}
                                             </div>
-                                        ))}
+                                        );
+                                        })}
                                     </div>
                                 )}
                             </div>
