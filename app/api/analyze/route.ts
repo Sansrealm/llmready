@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
+import { limitAnalyze, getClientIp } from '@/lib/rate-limit';
 import { saveAnalysis, getAnalysisByUrl, captureGuestEmail } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 
@@ -46,6 +47,23 @@ export async function POST(request: NextRequest) {
           : `Free (${subscription.analysisCount}/${subscription.limit})`
         : 'Guest'
     }`);
+
+    // Rate limit: burst protection on top of Clerk-based monthly caps.
+    // Authed users keyed by userId; guests keyed by IP.
+    const rl = await limitAnalyze(
+      subscription.userId
+        ? { userId: subscription.userId }
+        : { ip: getClientIp(request.headers) }
+    );
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) },
+        }
+      );
+    }
 
     // Get request data
     const requestData = await request.json() as AnalysisRequest;

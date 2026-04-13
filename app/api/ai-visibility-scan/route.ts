@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPremiumStatus } from '@/lib/auth-utils';
+import { limitVisibilityScan } from '@/lib/rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 120;
@@ -88,6 +89,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Premium subscription required' },
         { status: 403 }
+      );
+    }
+
+    // ── Rate limit: burst protection on top of the 72h cache ───────────────
+    const rl = await limitVisibilityScan(userId);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) },
+        }
       );
     }
 
