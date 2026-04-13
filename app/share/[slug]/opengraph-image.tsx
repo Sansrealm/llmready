@@ -301,56 +301,61 @@ export default async function Image({
 function VisibilityScore({ cited, total, rate }: { cited: number; total: number; rate: number }) {
   const sc = rateColor(rate);
   return (
-    <div
-      style={{
-        display: "flex",
-        position: "relative",
-        alignItems: "flex-end",
-        gap: "6px",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {/* Row 1 — cited / total */}
       <div
         style={{
-          position: "absolute",
-          width: "320px",
-          height: "200px",
-          borderRadius: "50%",
-          background: `radial-gradient(ellipse at center, ${sc}55 0%, ${sc}18 45%, transparent 70%)`,
-          left: "-30px",
-          top: "-40px",
-        }}
-      />
-      <span
-        style={{
-          color: sc,
-          fontSize: "140px",
-          fontWeight: 900,
-          lineHeight: 1,
-          letterSpacing: "-0.04em",
+          display: "flex",
+          position: "relative",
+          alignItems: "flex-end",
+          gap: "6px",
         }}
       >
-        {cited}
-      </span>
+        <div
+          style={{
+            position: "absolute",
+            width: "320px",
+            height: "200px",
+            borderRadius: "50%",
+            background: `radial-gradient(ellipse at center, ${sc}55 0%, ${sc}18 45%, transparent 70%)`,
+            left: "-30px",
+            top: "-40px",
+          }}
+        />
+        <span
+          style={{
+            color: sc,
+            fontSize: "140px",
+            fontWeight: 900,
+            lineHeight: 1,
+            letterSpacing: "-0.04em",
+          }}
+        >
+          {cited}
+        </span>
+        <span
+          style={{
+            color: "#64748B",
+            fontSize: "56px",
+            fontWeight: 800,
+            marginBottom: "14px",
+          }}
+        >
+          /{total}
+        </span>
+      </div>
+      {/* Row 2 — percentage on its own line. Previously rendered inline with
+          a middle-dot separator ("· 90%"), which at small sizes looked like
+          a decimal (".90%"). Stacking matches the live share-page hero. */}
       <span
         style={{
-          color: "#1E293B",
-          fontSize: "56px",
-          fontWeight: 800,
-          marginBottom: "14px",
-        }}
-      >
-        /{total}
-      </span>
-      <span
-        style={{
-          color: "white",
-          fontSize: "32px",
+          color: "#E2E8F0",
+          fontSize: "30px",
           fontWeight: 700,
-          marginBottom: "22px",
-          marginLeft: "14px",
+          letterSpacing: "0.01em",
         }}
       >
-        · {formatPct(rate)}%
+        {formatPct(rate)}% cited
       </span>
     </div>
   );
@@ -391,7 +396,7 @@ function FallbackScore({ score }: { score: number }) {
       </span>
       <span
         style={{
-          color: "#1E293B",
+          color: "#64748B",
           fontSize: "38px",
           fontWeight: 700,
           marginBottom: "18px",
