@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPremiumStatus } from '@/lib/auth-utils';
 import { limitVisibilityScan } from '@/lib/rate-limit';
+import { logLlmSpend } from '@/lib/llm-spend';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 120;
@@ -39,6 +40,7 @@ async function extractMentionedBrands(
   items: Array<{ model: string; query: string; snippet: string }>,
   targetBrandName: string,
   targetDomain: string,
+  userId: string,
 ): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>();
   if (items.length === 0) return map;
@@ -73,6 +75,17 @@ Return a JSON array: [{"id": 0, "brands": ["Brand1", "Brand2"]}, ...]`,
   const parsed: Array<{ id: number; brands: string[] }> = JSON.parse(
     raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim()
   );
+
+  // Log LLM spend (non-blocking)
+  void logLlmSpend({
+    userId,
+    endpoint:  'extract-brands',
+    provider:  'anthropic',
+    model:     'claude-haiku-4-5-20251001',
+    tokensIn:  message.usage.input_tokens,
+    tokensOut: message.usage.output_tokens,
+    requestId: message.id,
+  });
 
   for (const entry of parsed) {
     const item = items[entry.id];
@@ -133,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fresh scan ──────────────────────────────────────────────────────────
-    const scan = await runVisibilityScan(url, industry ?? null, visibilityQueries);
+    const scan = await runVisibilityScan(url, industry ?? null, userId, visibilityQueries);
 
     // ── Brand extraction: single batched Haiku call across all snippets ──────
     // Runs before the DB save so mentioned_brands is written on the first insert.
@@ -152,7 +165,7 @@ export async function POST(req: NextRequest) {
         .map((r) => ({ model: r.model, query: r.prompt, snippet: r.snippet! }));
 
       if (allSnippets.length > 0) {
-        brandsMap = await extractMentionedBrands(allSnippets, targetBrandName, targetDomain);
+        brandsMap = await extractMentionedBrands(allSnippets, targetBrandName, targetDomain, userId);
         console.log(`[ai-visibility-scan] brand extraction complete — ${brandsMap.size} results`);
       }
     } catch (extractErr) {

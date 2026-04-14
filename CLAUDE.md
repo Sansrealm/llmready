@@ -349,6 +349,7 @@ Before pushing changes, verify:
 - `getPrimaryCompetitor(gap)` is in `lib/types.ts` — use it wherever you need the top competing domain from a citation gap
 - `lib/track-event.ts` should be called for meaningful user actions (scan started, upgrade clicked, etc.)
 - Rate limits live in `lib/rate-limit.ts` (Upstash Redis). Any new LLM-spend-critical endpoint MUST add a limiter and return 429 with a `Retry-After` header when exceeded. Limiters fail open if Upstash is down and send an alert via `lib/alerts.ts`.
+- **Every outbound LLM call MUST log spend** via `logLlmSpend()` in `lib/llm-spend.ts` right after the call returns. Fire-and-forget — `void logLlmSpend({...})` pattern. Never await with concern for errors; the helper catches its own DB failures. The pricing table inside `lib/llm-spend.ts` needs a row per model — if a new model is added, update `PRICING`, otherwise cost defaults to 0 with a console warning. The `llm_spend` table (migration `db/migrations/005_llm_spend.sql`) is read-only logging for now; budget enforcement via `getUserSpendTotal()` is a future step.
 - **Shared / printable reports lead with AI Visibility**, not the structural AI Readiness score. The share page (`app/share/[slug]/page.tsx`) and PDF route (`app/api/generate-pdf/route.ts`) both compute their hero from `ai_visibility_results` via `getLatestVisibilityScanAnyAge()` in `lib/db.ts` and `computeCitationStats()` / `computeVerdict()` in `lib/visibility-report.ts`. The structural score (`overall_score`) appears below the fold as a supporting section, never the headline. Supporting-section heading is **conditional on citation rate**: `≥60%` → "How to extend your visibility further"; `<60%` → "Why your score could be even higher". Verdict thresholds from citation rate: ≥80 Strong, 60–79 At Risk, 40–59 Low, <40 Critical: Not Cited. Parameter cards in shared/printable reports show each parameter's weighted point contribution (e.g. `12 / 20 pts`) via `computeParamContribution()`, so the six cards sum visually to the overall score. When no scan data exists (pre-scan analyses), both paths fall back to the structural-led layout with an amber banner prompting re-analysis. The on-screen `/results` page already handles this correctly — do not touch it.
 
 ## Git Commit Guidelines
@@ -402,7 +403,7 @@ Live list of open technical debt. Severity reflects ops/revenue impact, not effo
 | Gap | Where | Why it matters |
 |---|---|---|
 | No error monitoring | — | Production app with paying customers — failures surface only via customer complaints or `console.error`. Ship Sentry (or equivalent) before anything else. |
-| No per-user LLM spend tracking / budget caps | — | A runaway client or compromised account can burn the OpenAI/Anthropic/Gemini/Perplexity budget silently. |
+| No budget caps on LLM spend | — | Per-call logging to `llm_spend` is now live (step 1 shipped). Step 2 — per-user / per-tier budget caps with pre-call rejection — is still open; a compromised account can burn through real money until caps land. Blocked on: baseline data (wait for ~1–2 weeks of logs before setting caps). |
 
 ### P1 — important (reliability / quality)
 

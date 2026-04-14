@@ -5,6 +5,7 @@ export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
 import { limitAnalyze } from '@/lib/rate-limit';
+import { logLlmSpend } from '@/lib/llm-spend';
 import { saveAnalysis, getAnalysisByUrl } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 
@@ -370,6 +371,17 @@ Note: Score based on the submitted URL only. If the site has richer content on s
       .replace(/\s*```$/i, '')
       .trim();
     console.log('🧠 Claude response received');
+
+    // Log LLM spend (non-blocking, never fails the request)
+    void logLlmSpend({
+      userId:    subscription.userId,
+      endpoint:  'analyze',
+      provider:  'anthropic',
+      model:     'claude-sonnet-4-6',
+      tokensIn:  message.usage.input_tokens,
+      tokensOut: message.usage.output_tokens,
+      requestId: message.id,
+    });
 
     // 9. Parse and validate response
     let analysisResult: AnalysisResult;

@@ -18,6 +18,7 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getPromptsForIndustry } from './ai-visibility-prompts';
 import { normalizeUrl } from './db';
+import { logLlmSpend, type SpendProvider } from './llm-spend';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,27 @@ interface ModelResponse {
   citations: string[];
 }
 
-async function queryChatGPT(prompt: string): Promise<ModelResponse> {
+/** Non-blocking helper so spend logging never changes control flow. */
+function logScanSpend(
+  userId: string,
+  provider: SpendProvider,
+  model: string,
+  tokensIn: number,
+  tokensOut: number,
+  requestId: string | null,
+) {
+  void logLlmSpend({
+    userId,
+    endpoint:  'ai-visibility-scan',
+    provider,
+    model,
+    tokensIn,
+    tokensOut,
+    requestId,
+  });
+}
+
+async function queryChatGPT(prompt: string, userId: string): Promise<ModelResponse> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // Tier 1: Responses API with web_search_preview (requires OpenAI Tier 1+)
@@ -372,6 +393,10 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
 
     if (!text.trim()) throw new Error('Responses API returned empty text');
 
+    // Responses API: usage shape is { input_tokens, output_tokens }.
+    const usage = (response as unknown as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+    logScanSpend(userId, 'openai', 'gpt-4o', usage?.input_tokens ?? 0, usage?.output_tokens ?? 0, response.id ?? null);
+
     console.log(`[chatgpt] Tier 1 (Responses API) succeeded, text length: ${text.length}`);
     return { text, citations };
   } catch (err1) {
@@ -403,6 +428,8 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
 
     if (!text.trim()) throw new Error('gpt-4o-search-preview returned empty text');
 
+    logScanSpend(userId, 'openai', 'gpt-4o-search-preview', response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0, response.id ?? null);
+
     console.log(`[chatgpt] Tier 2 (gpt-4o-search-preview) succeeded, text length: ${text.length}`);
     return { text, citations };
   } catch (err2) {
@@ -417,10 +444,11 @@ async function queryChatGPT(prompt: string): Promise<ModelResponse> {
     max_tokens: 500,
     temperature: 0.3,
   });
+  logScanSpend(userId, 'openai', 'gpt-4o', fallback.usage?.prompt_tokens ?? 0, fallback.usage?.completion_tokens ?? 0, fallback.id ?? null);
   return { text: fallback.choices[0]?.message?.content ?? '', citations: [] };
 }
 
-async function queryPerplexity(prompt: string): Promise<ModelResponse> {
+async function queryPerplexity(prompt: string, userId: string): Promise<ModelResponse> {
   const perplexity = new OpenAI({
     apiKey: process.env.PERPLEXITY_API_KEY,
     baseURL: 'https://api.perplexity.ai',
@@ -434,16 +462,23 @@ async function queryPerplexity(prompt: string): Promise<ModelResponse> {
   // `citations` field alongside `choices`. Using this directly is more
   // reliable than regex-parsing URLs from the generated text.
   const citations = (response as unknown as { citations?: string[] }).citations ?? [];
+
+  logScanSpend(userId, 'perplexity', 'sonar', response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0, response.id ?? null);
+
   return { text: response.choices[0]?.message?.content ?? '', citations };
 }
 
-async function queryGemini(prompt: string): Promise<ModelResponse> {
+async function queryGemini(prompt: string, userId: string): Promise<ModelResponse> {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     tools: [{ googleSearch: {} } as object],
   });
   const result = await model.generateContent(prompt + PROMPT_SUFFIX);
+
+  // Gemini SDK: usage on response.usageMetadata. No stable request id exposed.
+  const usage = result.response.usageMetadata;
+  logScanSpend(userId, 'google', 'gemini-2.5-flash', usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0, null);
 
   // Extract grounded source URLs from grounding metadata.
   // Falls back to [] if grounding is unavailable (e.g. Vertex AI key without grounding enabled).
@@ -502,7 +537,7 @@ function isCompetitorFocusedResponse(text: string, brandName: string, rootDomain
   return false;
 }
 
-const MODEL_FNS: Record<ModelId, (prompt: string) => Promise<ModelResponse>> = {
+const MODEL_FNS: Record<ModelId, (prompt: string, userId: string) => Promise<ModelResponse>> = {
   chatgpt: queryChatGPT,
   gemini: queryGemini,
   perplexity: queryPerplexity,
@@ -531,6 +566,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function runVisibilityScan(
   url: string,
   industry: string | null,
+  userId: string,
   visibilityQueries?: string[]
 ): Promise<ScanOutput> {
   const normalizedUrl = normalizeUrl(url);
@@ -553,7 +589,7 @@ export async function runVisibilityScan(
   // Phase 1: fire all LLM queries in parallel
   const rawResponses = await Promise.allSettled(
     tasks.map(({ prompt, model }) =>
-      withTimeout(MODEL_FNS[model](prompt), QUERY_TIMEOUT_MS)
+      withTimeout(MODEL_FNS[model](prompt, userId), QUERY_TIMEOUT_MS)
     )
   );
 

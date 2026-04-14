@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
+import { logLlmSpend } from '@/lib/llm-spend';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -268,6 +269,17 @@ export async function POST(request) {
             ],
             max_tokens: 1500,
             temperature: 0.3, // Lower temperature for more consistent, accurate responses
+        });
+
+        // Log LLM spend (non-blocking)
+        void logLlmSpend({
+            userId,
+            endpoint:  'generate-fix',
+            provider:  'openai',
+            model:     'gpt-4o',
+            tokensIn:  completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            requestId: completion.id ?? null,
         });
 
         const responseText = completion.choices[0]?.message?.content;
