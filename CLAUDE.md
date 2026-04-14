@@ -17,6 +17,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **UI Components**: shadcn/ui with Radix UI primitives
 - **Chrome Extension**: live on Web Store, ID `ajcjkkbebpgofanpddihbkilmcnjddad`
 
+## SOP — Product Update / Feature Build Loop
+
+**Mandatory checklist for every change.** Read `PRODUCT_LIMITATIONS.md` once at the start of every session and again whenever a request smells like "fix" or "improve" existing behaviour.
+
+### Before writing any code
+1. **Read `PRODUCT_LIMITATIONS.md`.** If the change touches anything documented there as a fundamental constraint, STOP and surface it to the user instead of "fixing" it silently.
+2. **Read the relevant existing code end-to-end.** Trace the data path before proposing changes. Don't guess at structure or behaviour. (Diagnosis rule: never state cause without tracing — `feedback_no_guessing` memory.)
+3. **Check Known Gaps** below in this file. If the change relates to an open gap, reference its row.
+4. **For non-trivial changes (>~30 lines or any cross-file refactor):** propose the approach + tradeoffs + open questions BEFORE coding. Get user buy-in. Don't disappear into 500 lines.
+5. **For risky changes** (Stripe / Clerk / CSP / OG image / scoring weights): confirm the deploy strategy (preview branch vs direct to main) before pushing.
+
+### While coding
+6. **Server-side auth + premium checks always.** Never trust client. Use `lib/auth-utils.ts` helpers; admin routes use `checkAdminStatus()`.
+7. **Every new LLM call gets `logLlmSpend()`** from `lib/llm-spend.ts`. Fire-and-forget; never await with concern.
+8. **Every new LLM-spend-critical endpoint gets a rate-limit check** via `lib/rate-limit.ts` and returns 429 with `Retry-After`.
+9. **Every UI change considers all tier render paths**: guest / free / premium / agency. Test each.
+10. **All DB access through `lib/db.ts`.** Add new queries there, not inline in routes.
+11. **Display-only changes** (share / PDF / OG): respect the visibility-first rule — citation data leads, structural score is supporting.
+
+### Before commit
+12. **`npm run build` must pass.** Then `npx tsc --noEmit` for type safety.
+13. **Test against the actual user paths** affected — don't just trust the build.
+14. **Commit per logical change.** Clear `<type>: <summary>` messages, no Co-Authored-By line.
+
+### Before push
+15. **Hold pushes until the user explicitly says "push"** (memory rule). Local commits are fine.
+16. **For risky changes, push to a preview branch first.** Verify on the Vercel preview before merging to main.
+
+### After ship
+17. **Update `CLAUDE.md`** if behaviour, file paths, rules, or roadmap state changed.
+18. **Update `PRODUCT_LIMITATIONS.md`** if the change exposed a new constraint that future sessions might mistake for a bug.
+19. **Update Known Gaps** if the work resolved a P0/P1/P2 item.
+
 ## Development Commands
 
 ```bash
