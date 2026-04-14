@@ -7,7 +7,7 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Download, RefreshCw, Loader2, CheckCircle, Lock } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Loader2, CheckCircle, Lock, Plus } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -757,6 +757,16 @@ export default function ResultsPage() {
                                             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                                             {loading ? 'Analyzing…' : inCooldown ? `Re-analyze in ${formatCooldown(cooldownRemaining)}` : 'Re-analyze'}
                                         </Button>
+
+                                        {/* Analyze a different URL — shortcut for agencies running multiple
+                                            analyses back to back. Re-uses the homepage form; URL / industry
+                                            fields reset. */}
+                                        <Link href="/">
+                                            <Button variant="outline" size="sm" title="Start a fresh analysis on a different URL">
+                                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                Analyze another
+                                            </Button>
+                                        </Link>
 
                                         {!isSignedIn && (
                                             <Link href="/login">

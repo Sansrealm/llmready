@@ -444,3 +444,13 @@ Make the AI Visibility report (real LLM citation data: ChatGPT/Gemini/Perplexity
 Improve views and reports for agency-tier subscribers. Starting point is existing scan history. Likely scope: better multi-domain report views, cleaner exportable reports, improved dashboard for agencies managing multiple clients. Includes competitor comparison view — primitives exist (`mentioned_brands`, `citation_gaps`, `getPrimaryCompetitor()`).
 ⚠️ **Depends on** fixing `mentioned_brands` cross-LLM normalisation (P1 gap) — ship that before this phase or the feature inherits dirty data.
 User management (seats, client access) is out of scope for now.
+
+### Scaffolded but un-shipped — "Fix this" generator
+Backend endpoint `app/api/generate-fix/route.js` exists and is fully working (OpenAI `gpt-4o`, 5 fix types: `title-tag`, `meta-description`, `schema-markup`, `internal-links`, `content-improvement`, returns confidence score). **No frontend caller.** Intended UX:
+- **Audience:** premium + agency only
+- **Trigger:** per low-scoring structural parameter (Answer-Ready Content, Brand & Expertise Clarity, Structured Data Depth, Citable Content Quality, E-E-A-T, Intent Coverage). Button appears only on cards scoring below a threshold.
+- **Flow:** one-shot generation, copy-to-clipboard pattern, no direct third-party integration (no Webflow / WordPress / CMS APIs). User copies the generated text and applies it to their own site.
+- **Pairs with multi-URL analysis:** more valuable once users can add multiple URLs per domain (blog posts, product pages, /faq, etc.) — gives them per-page fixes at scale.
+- **Constraint:** UI must be intuitive and must NOT clutter the existing results-page experience. Probably an inline drawer / expandable section on the card rather than a new page or modal-heavy flow.
+- **Cost guard:** rate-limit + spend cap tie-in (step 2 of `lib/llm-spend.ts` work). Per-fix cost is ~$0.01–0.02.
+- **Do NOT delete the endpoint** — this is a planned feature awaiting UI, not dead code.
