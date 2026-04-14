@@ -19,10 +19,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## SOP — Product Update / Feature Build Loop
 
-**Mandatory checklist for every change.** Read `PRODUCT_LIMITATIONS.md` once at the start of every session and again whenever a request smells like "fix" or "improve" existing behaviour.
+**Mandatory checklist for every change.** Read `PRODUCT_GUARDRAILS.md` once at the start of every session and again whenever a request smells like "fix" or "improve" existing behaviour.
 
 ### Before writing any code
-1. **Read `PRODUCT_LIMITATIONS.md`.** If the change touches anything documented there as a fundamental constraint, STOP and surface it to the user instead of "fixing" it silently.
+1. **Read `PRODUCT_GUARDRAILS.md`.** If the change touches anything documented there as a fundamental constraint, STOP and surface it to the user instead of "fixing" it silently.
 2. **Read the relevant existing code end-to-end.** Trace the data path before proposing changes. Don't guess at structure or behaviour. (Diagnosis rule: never state cause without tracing — `feedback_no_guessing` memory.)
 3. **Check Known Gaps** below in this file. If the change relates to an open gap, reference its row.
 4. **For non-trivial changes (>~30 lines or any cross-file refactor):** propose the approach + tradeoffs + open questions BEFORE coding. Get user buy-in. Don't disappear into 500 lines.
@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### After ship
 17. **Update `CLAUDE.md`** if behaviour, file paths, rules, or roadmap state changed.
-18. **Update `PRODUCT_LIMITATIONS.md`** if the change exposed a new constraint that future sessions might mistake for a bug.
+18. **Update `PRODUCT_GUARDRAILS.md`** if the change exposed a new constraint that future sessions might mistake for a bug.
 19. **Update Known Gaps** if the work resolved a P0/P1/P2 item.
 
 ## Development Commands

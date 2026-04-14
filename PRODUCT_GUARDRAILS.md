@@ -1,4 +1,4 @@
-# Product Limitations
+# Product Guardrails
 
 > **For Claude Code: Read this BEFORE any fix, refactor, or "improvement" to existing functionality.** If the behaviour you're about to change is documented here, surface it to the user — do not silently "fix" a fundamental constraint.
 
