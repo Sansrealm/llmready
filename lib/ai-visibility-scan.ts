@@ -33,6 +33,7 @@ export interface VisibilityResult {
   prominence: Prominence | null;  // null when not found
   cited: boolean;                 // direct URL to brand domain in response
   citedUrls: string[];            // all source URLs the engine returned for this query
+  citationPosition: number | null;// 1-based rank in citedUrls for the brand domain; NULL when no URL evidence (see PRODUCT_GUARDRAILS.md #9)
   mentionedBrands: string[];      // brands extracted from response text by Haiku (excludes target brand)
   score: number;                  // 0–100 weighted composite
   error: boolean;
@@ -282,6 +283,27 @@ function detectCitation(text: string, rootDomain: string): boolean {
   const escaped = rootDomain.replace(/\./g, '\\.');
   const urlPattern = new RegExp(`https?://[^\\s)\\]"'>]*${escaped}`, 'i');
   return urlPattern.test(text);
+}
+
+/**
+ * Find the 1-based position of the brand's URL within the engine's structured
+ * cited_urls array. Returns null when the brand isn't present.
+ *
+ * IMPORTANT: only call this against the engine's structured citation list
+ * (Perplexity citations, Gemini groundingChunks, ChatGPT annotations). Do NOT
+ * compute a position when the row was credited via Layer 1 (text match) or
+ * Layer 3 (query-context fallback) — see PRODUCT_GUARDRAILS.md #9. NULL is the
+ * correct value when no URL evidence exists.
+ */
+export function findCitationPosition(
+  citedUrls: string[] | null | undefined,
+  rootDomain: string,
+): number | null {
+  if (!citedUrls?.length || !rootDomain) return null;
+  for (let i = 0; i < citedUrls.length; i++) {
+    if (citedUrls[i].includes(rootDomain)) return i + 1;
+  }
+  return null;
 }
 
 // ── Score computation ─────────────────────────────────────────────────────────
@@ -600,7 +622,7 @@ export async function runVisibilityScan(
 
       if (outcome.status === 'rejected') {
         console.error(`[ai-visibility] ${model} failed for "${prompt}":`, outcome.reason);
-        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], citationPosition: null, mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
       }
 
       try {
@@ -665,11 +687,17 @@ export async function runVisibilityScan(
           }
         }
 
+        // citationPosition is computed ONLY from the structured cited_urls array
+        // for this specific row. NULL when the brand isn't in the URL list — even
+        // if found via Layer 1 (text) or Layer 3 (query-context). See
+        // PRODUCT_GUARDRAILS.md #9: honest NULL beats fabricated rank.
+        const citationPosition = findCitationPosition(citations, rootDomain);
+
         // mentionedBrands is populated by the route after the scan via Haiku extraction
-        return { model, prompt, ...analysis, citedUrls: citations, mentionedBrands: [], error: false } satisfies VisibilityResult;
+        return { model, prompt, ...analysis, citedUrls: citations, citationPosition, mentionedBrands: [], error: false } satisfies VisibilityResult;
       } catch (err) {
         console.error(`[ai-visibility] analysis failed for ${model}/"${prompt}":`, err);
-        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
+        return { model, prompt, found: false, snippet: null, prominence: null, cited: false, citedUrls: [], citationPosition: null, mentionedBrands: [], score: 0, error: true } satisfies VisibilityResult;
       }
     })
   );

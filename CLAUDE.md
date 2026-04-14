@@ -289,8 +289,10 @@ id, normalized_url, industry, total_found, total_queries, created_at
 ```sql
 id, scan_id, model, prompt, query_type,
 found, snippet, prominence VARCHAR(10), sentiment NUMERIC(4,3),
-cited BOOLEAN, cited_urls JSONB, mentioned_brands JSONB, score INTEGER
+cited BOOLEAN, cited_urls JSONB, citation_position INTEGER,
+mentioned_brands JSONB, score INTEGER
 ```
+- `citation_position` is the brand's 1-based rank in the engine's structured `cited_urls` array. NULL when no URL evidence exists (Layer 1 text-match credit or Layer 3 query-context credit). See `PRODUCT_GUARDRAILS.md` #9.
 
 ### Other tables
 `guest_emails`, `visibility_waitlist`, `exit_survey_responses`

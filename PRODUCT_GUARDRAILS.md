@@ -114,3 +114,23 @@ When a site blocks our crawler, the score is correctly hidden behind an amber ba
 - Inferring "same brand" from substring overlap
 
 **Where:** `lib/ai-visibility-scan.ts` (writeback path), share/PDF rendering, future agency competitor view.
+
+---
+
+## 9. The 3-layer found-flag waterfall in `runVisibilityScan` is intentional
+
+`lib/ai-visibility-scan.ts:597–666` runs three detection passes in order, each more conservative than the last:
+
+1. **Text matching** (`findMentionIndex`, `detectCitation`) — scans the response prose for brand domain, brand name (with first-word match for multi-word brands), and product tokens scraped from the brand's own page (`CX-90`, `iPhone15`).
+2. **Citation fallback** — only fires if Layer 1 missed. Checks the structured `cited_urls[]` array for the brand domain. Found here → `prominence='low'`, `cited=true`. Conservative attribution: "engine retrieved you, even though it didn't say your name."
+3. **Query-context fallback** — only fires if Layers 1 AND 2 both missed. If the prompt itself names the brand AND the response is substantive (≥50 words, no hedging) AND not focused on a competitor (TitleCase frequency guard), infer a hit at `prominence='low'`, `cited=false`. This catches Gemini training-data answers that respond on-topic without echoing the brand name.
+
+Per-engine override exists for Perplexity (line 613–623): if Perplexity's structured citations disagree with Layer 1's regex result, citations win.
+
+**Don't try to "fix" by:**
+- Replacing the text-regex layers with "just check `cited_urls`" — re-introduces false negatives on Gemini training-data answers, brand-mentioned-by-name-only responses, and product-token-only responses (e.g. "the new CX-90 has...").
+- Collapsing the layers into a single function for "simplicity."
+- Removing the competitor-focused guard in Layer 3 — it stops crediting "Toyota recommended instead of Mazda" responses to Mazda.
+- Using `cited_urls` to compute the brand's retrieval position when the row was credited via Layer 1 or Layer 3 — that pretends to give a number that wasn't actually measured. `citation_position` should be NULL when no URL evidence exists.
+
+**Where:** `lib/ai-visibility-scan.ts:597–666` (the waterfall), `lib/ai-visibility-scan.ts:281` (`detectCitation`), commit `a11f298`.

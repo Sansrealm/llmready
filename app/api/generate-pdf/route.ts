@@ -50,17 +50,19 @@ function buildPerQueryRows(
   const queryTypeMap = new Map<string, string>();
   if (queryBuckets) for (const b of queryBuckets) queryTypeMap.set(b.query, b.type);
 
-  const byQuery = new Map<string, { prompt: string; queryType: string; citedBy: string[] }>();
+  // citedBy carries optional rank per engine; NULL when no URL evidence
+  // (Layer 1/3 credit). See PRODUCT_GUARDRAILS.md #9.
+  const byQuery = new Map<string, { prompt: string; queryType: string; citedBy: Array<{ model: string; position: number | null }> }>();
   for (const r of results) {
     const cited = r.cited === true || r.found === true;
     const existing = byQuery.get(r.prompt);
     if (existing) {
-      if (cited) existing.citedBy.push(r.model);
+      if (cited) existing.citedBy.push({ model: r.model, position: r.citation_position ?? null });
     } else {
       byQuery.set(r.prompt, {
         prompt: r.prompt,
         queryType: queryTypeMap.get(r.prompt) ?? '',
-        citedBy: cited ? [r.model] : [],
+        citedBy: cited ? [{ model: r.model, position: r.citation_position ?? null }] : [],
       });
     }
   }
@@ -387,8 +389,12 @@ function generatePrintReadyHTML(
           <div class="pq-grid">
             ${visibility.perQueryRows.map(row => {
               const anyCited = row.citedBy.length > 0;
+              // Show #N when a structured rank exists; bare label otherwise.
               const citedLabels = row.citedBy
-                .map((m) => ENGINES.find((e) => e.id === m)?.label ?? m)
+                .map((c) => {
+                  const label = ENGINES.find((e) => e.id === c.model)?.label ?? c.model;
+                  return c.position ? `${label} (#${c.position})` : label;
+                })
                 .join(', ');
               return `
                 <div class="pq-card">

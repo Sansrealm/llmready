@@ -218,7 +218,9 @@ export async function POST(req: NextRequest) {
               query: r.prompt,
               query_type: queryTypeMap.get(r.prompt) ?? '',
               status: r.cited ? 'cited' : 'not_cited',
-              citation_position: r.cited ? 1 : null,
+              // Real Perplexity citation rank from cited_urls. NULL when no URL
+              // evidence (Layer 1/3 credit). Replaces the prior hardcoded `1`.
+              citation_position: r.citationPosition ?? null,
               displaced_by: [],
               competitors_mentioned,
             } as CitationGap;
@@ -259,6 +261,7 @@ export async function POST(req: NextRequest) {
           prominence: r.prominence ?? null,
           cited: r.cited,
           cited_urls: r.citedUrls,
+          citation_position: r.citationPosition ?? null,
           mentioned_brands: r.mentionedBrands,
           score: r.score ?? null,
         }))
@@ -276,7 +279,7 @@ export async function POST(req: NextRequest) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type RawResult = Pick<VisibilityResultRow, 'model' | 'prompt' | 'found' | 'snippet' | 'prominence' | 'cited' | 'cited_urls' | 'mentioned_brands' | 'score'>;
+type RawResult = Pick<VisibilityResultRow, 'model' | 'prompt' | 'found' | 'snippet' | 'prominence' | 'cited' | 'cited_urls' | 'citation_position' | 'mentioned_brands' | 'score'>;
 
 /**
  * Groups flat result rows into a prompt-keyed structure:
@@ -307,13 +310,14 @@ function formatResults(rows: RawResult[]) {
 }
 
 function modelCell(row: RawResult | null) {
-  if (!row) return { found: false, snippet: null, prominence: null, cited: false, citedUrls: [], mentionedBrands: [], score: null, error: true };
+  if (!row) return { found: false, snippet: null, prominence: null, cited: false, citedUrls: [], citationPosition: null, mentionedBrands: [], score: null, error: true };
   return {
     found: row.found,
     snippet: row.snippet ?? null,
     prominence: row.prominence ?? null,
     cited: row.cited,
     citedUrls: row.cited_urls ?? [],
+    citationPosition: row.citation_position ?? null,
     mentionedBrands: row.mentioned_brands ?? [],
     score: row.score ?? null,
     error: false,

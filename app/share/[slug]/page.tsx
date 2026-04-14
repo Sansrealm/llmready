@@ -170,18 +170,21 @@ function buildPerQueryRows(
   const queryTypeMap = new Map<string, string>();
   if (queryBuckets) for (const b of queryBuckets) queryTypeMap.set(b.query, b.type);
 
-  const byQuery = new Map<string, { prompt: string; queryType: string; citedBy: string[]; totalEngines: number }>();
+  // citedBy carries an optional rank per engine — null when no URL-based
+  // position is available (Layer 1 text or Layer 3 query-context credit).
+  // Honest NULL is intentional; see PRODUCT_GUARDRAILS.md #9.
+  const byQuery = new Map<string, { prompt: string; queryType: string; citedBy: Array<{ model: string; position: number | null }>; totalEngines: number }>();
   for (const r of results) {
     const cited = r.cited === true || r.found === true;
     const existing = byQuery.get(r.prompt);
     if (existing) {
-      if (cited) existing.citedBy.push(r.model);
+      if (cited) existing.citedBy.push({ model: r.model, position: r.citation_position ?? null });
       existing.totalEngines += 1;
     } else {
       byQuery.set(r.prompt, {
         prompt: r.prompt,
         queryType: queryTypeMap.get(r.prompt) ?? '',
-        citedBy: cited ? [r.model] : [],
+        citedBy: cited ? [{ model: r.model, position: r.citation_position ?? null }] : [],
         totalEngines: 1,
       });
     }
@@ -486,7 +489,12 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
                             {anyCited ? (
                               <span className="text-xs text-gray-400">
                                 · Cited by {row.citedBy
-                                  .map((m) => ENGINES.find((e) => e.id === m)?.label ?? m)
+                                  .map((c) => {
+                                    const label = ENGINES.find((e) => e.id === c.model)?.label ?? c.model;
+                                    // Only show #N when we actually have a structured rank.
+                                    // NULL means brand was credited via text/query-context — no URL evidence.
+                                    return c.position ? `${label} (#${c.position})` : label;
+                                  })
                                   .join(', ')}
                               </span>
                             ) : (
