@@ -134,3 +134,50 @@ Per-engine override exists for Perplexity (line 613–623): if Perplexity's stru
 - Using `cited_urls` to compute the brand's retrieval position when the row was credited via Layer 1 or Layer 3 — that pretends to give a number that wasn't actually measured. `citation_position` should be NULL when no URL evidence exists.
 
 **Where:** `lib/ai-visibility-scan.ts:597–666` (the waterfall), `lib/ai-visibility-scan.ts:281` (`detectCitation`), commit `a11f298`.
+
+---
+
+## 10. When the brand's homepage is unreachable, brand-token resolution silently degrades
+
+`fetchPageMetadata` in `lib/ai-visibility-scan.ts:154–177` catches *any* fetch error (timeout, 4xx/5xx, network refused, redirect loop) and returns `{ ogSiteName: null, ogTitle: null, title: null, productTokens: [], httpStatus: 0 }`. When that happens, `extractDomainTokens` falls all the way through to `slugFallback = hostname.split('.')[0]` — a single, lowercase, no-space token like `"volvocars"`.
+
+This breaks **two** detection signals at once:
+
+1. The **first-word pattern in `findMentionIndex`** never gets added (gated on `brandName.includes(' ')`) — so the LLM's natural form (`/\bVolvo\b/i`) doesn't match the response text.
+2. The **Layer 3 `queryNamesBrand` gate** can't recognise the brand in prompts that use the spaced/proper form (e.g. "What are the best Volvo Cars models in 2025?" doesn't match `/\bvolvocars\b/i`).
+
+Net result: every visibility query for that brand can return `found: false` even when the LLM's response is saturated with the brand. Confirmed live for `volvocars.com` (returns 403 to our crawler).
+
+The current mitigation is `splitSlugBrand` (curated suffix list — splits "volvocars" → "Volvo Cars") plus the Layer 3 gate including the first word of multi-word brands. These are heuristics — they don't cover every brand. Slugs without a recognised business suffix (e.g. "honeywell", "cocacola") still fall through cleanly when the page is reachable but produce no detection when it isn't.
+
+**Don't try to "fix" by:**
+- Removing the catch in `fetchPageMetadata` and letting the error propagate — the scan must still run when the brand's site is blocked; the fallback layers exist for exactly that case.
+- Auto-following redirects with longer timeouts to "guarantee" we get metadata — adds latency, doesn't fix the truly-blocked case.
+- Aggressively expanding the slug-suffix list to common English words — false splits ("Honey Well") are worse than no split.
+- Treating a `findMentionIndex` miss + empty `cited_urls` + Layer 3 gate failure as a Gemini-specific bug — it's the brand-resolution cascade for that scan.
+
+**Where:** `lib/ai-visibility-scan.ts` `fetchPageMetadata`, `extractDomainTokens`, `splitSlugBrand`, the Layer 3 `queryNamesBrand` gate.
+
+---
+
+## 11. Gemini's grounding URIs are Vertex AI Search redirect wrappers, not publisher URLs
+
+`chunk.web.uri` from `result.response.candidates[0].groundingMetadata.groundingChunks` returns URLs of the form:
+
+```
+https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF...
+```
+
+These are opaque Google-side redirect wrappers; the actual publisher URL is encoded in the path and only resolves when the redirect is followed. They will **never** contain the brand's root domain as a substring. Confirmed live across all Gemini scans.
+
+Implications:
+- **Layer 2 citation fallback can't match `cited_urls.includes(rootDomain)` for Gemini.** Use `chunk.web.title` instead (page titles often contain the brand name) — the current code does this in the Layer 2 path.
+- **`citation_position` (PRODUCT_GUARDRAILS #9) is fundamentally NULL for Gemini rows.** We have no measurable rank against the brand domain because the URI list never contains it. This is honest semantics, not a bug.
+- **`cited_urls` stored for Gemini is full of `vertexaisearch.cloud.google.com/...` strings.** Don't attempt to display these to users without resolving the redirect first — they're opaque and useless as user-facing source links.
+
+**Don't try to "fix" by:**
+- Using `chunk.web.uri` for `findCitationPosition` — it will always return null for Gemini, which is correct, but pretending otherwise (e.g., positional rank against the redirect URL) would fabricate signal.
+- Following the redirects synchronously during a scan to resolve publisher URLs — adds an extra HTTP HEAD per chunk × 5 chunks × 5 prompts = 25 extra round-trips per scan. If we want this, scope it as a separate "rich sources" mode.
+- Replacing the title-based Layer 2 fallback with regex on the redirect URL — the redirect URL has no semantic content matchable to a brand.
+
+**Where:** `lib/ai-visibility-scan.ts` `queryGemini` (extracts both uri + title), Layer 2 of `runVisibilityScan` (uses titles as fallback signal), `lib/ai-visibility-scan.ts` `findCitationPosition` (intentionally returns null for Gemini).

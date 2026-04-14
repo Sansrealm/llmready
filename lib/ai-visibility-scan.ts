@@ -70,6 +70,44 @@ interface PageMeta {
  *   3. <title>       — same split logic as og:title
  *   4. URL slug      — last resort ("volvocars" from volvocars.com)
  */
+/**
+ * Curated list of common business-name suffixes used by `splitSlugBrand`.
+ * Conservative on purpose: bad splits (e.g. "honeywell" → "Honey Well") are
+ * worse than no split. Add new suffixes only when there's a concrete brand
+ * that needs them.
+ */
+const BRAND_SLUG_SUFFIXES = [
+  'cars', 'motors', 'group', 'inc', 'corp', 'co',
+  'shop', 'store', 'tech', 'media', 'systems',
+  'app', 'labs', 'health', 'bank', 'cloud',
+] as const;
+
+/**
+ * Try to split a single-token URL slug into a "Spoken Brand Name" form so
+ * the first-word pattern in `findMentionIndex` can fire when page-metadata
+ * fetch failed (e.g. site blocks our crawler with 403).
+ *
+ * Conservative split: only when the slug ends in a curated business suffix
+ * AND the head is at least 3 characters (avoids "Co" / "App" lone matches).
+ *
+ * Examples:
+ *   "volvocars"   → "Volvo Cars"
+ *   "homedepot"   → null (no curated suffix matches)  — would also be nice but skipped to stay safe
+ *   "honeywell"   → null (no suffix; "well" intentionally not in the list)
+ *   "cocacola"    → null (no suffix in the list — would need brand-specific data)
+ */
+function splitSlugBrand(slug: string): string | null {
+  const lower = slug.toLowerCase();
+  for (const suf of BRAND_SLUG_SUFFIXES) {
+    if (lower.endsWith(suf) && lower.length > suf.length + 2) {
+      const head = lower.slice(0, -suf.length);
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      return `${cap(head)} ${cap(suf)}`;
+    }
+  }
+  return null;
+}
+
 function extractDomainTokens(url: string, pageMeta?: PageMeta): { rootDomain: string; brandName: string; brandAlias: string } {
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
@@ -87,7 +125,22 @@ function extractDomainTokens(url: string, pageMeta?: PageMeta): { rootDomain: st
       (pageMeta?.title     ? firstSegment(pageMeta.title)     : null) ||
       slugFallback;
 
-    const brandName  = resolved ?? slugFallback;
+    let brandName  = resolved ?? slugFallback;
+
+    // If we fell through to the slug because page-metadata fetch failed
+    // (no ogSiteName, no ogTitle, no title — common when the brand's site
+    // blocks our crawler), try a heuristic suffix-split so the first-word
+    // pattern in `findMentionIndex` can match the brand's spoken form.
+    // See PRODUCT_GUARDRAILS.md #10.
+    const metaUnavailable = !pageMeta?.ogSiteName && !pageMeta?.ogTitle && !pageMeta?.title;
+    if (brandName === slugFallback && metaUnavailable) {
+      const split = splitSlugBrand(slugFallback);
+      if (split) {
+        console.log(`[ai-visibility] slug-split brand recovery: "${slugFallback}" → "${split}"`);
+        brandName = split;
+      }
+    }
+
     const brandAlias = brandName;
 
     return { rootDomain: hostname, brandName, brandAlias };
@@ -355,8 +408,15 @@ interface ModelResponse {
   text: string;
   /** Ranked source URLs returned by the model. Only populated for Perplexity
    *  (from the top-level `citations` field on the API response). Empty for
-   *  ChatGPT and Gemini, which don't expose a separate citations list. */
+   *  ChatGPT and Gemini, which don't expose a separate citations list.
+   *  IMPORTANT: For Gemini these are Vertex AI Search redirect wrappers
+   *  (vertexaisearch.cloud.google.com/grounding-api-redirect/...), not
+   *  publisher URLs. See PRODUCT_GUARDRAILS.md #11. */
   citations: string[];
+  /** Optional title array aligned 1:1 with `citations`. Currently populated
+   *  only by Gemini (`chunk.web.title`) so Layer 2 has a brand-detection
+   *  signal that doesn't depend on the opaque grounding-redirect URLs. */
+  citationTitles?: (string | null)[];
 }
 
 /** Non-blocking helper so spend logging never changes control flow. */
@@ -502,18 +562,31 @@ async function queryGemini(prompt: string, userId: string): Promise<ModelRespons
   const usage = result.response.usageMetadata;
   logScanSpend(userId, 'google', 'gemini-2.5-flash', usage?.promptTokenCount ?? 0, usage?.candidatesTokenCount ?? 0, null);
 
-  // Extract grounded source URLs from grounding metadata.
-  // Falls back to [] if grounding is unavailable (e.g. Vertex AI key without grounding enabled).
+  // Extract grounded source URLs + titles from grounding metadata.
+  // Falls back to [] if grounding is unavailable (e.g. Vertex AI key without
+  // grounding enabled).
+  //
+  // CRITICAL: Gemini's `chunk.web.uri` is a Vertex AI Search redirect URL
+  // (vertexaisearch.cloud.google.com/grounding-api-redirect/...), NOT the
+  // publisher URL. Use `chunk.web.title` for any brand-matching logic — see
+  // PRODUCT_GUARDRAILS.md #11.
   const groundingChunks =
     result.response.candidates?.[0]
       ?.groundingMetadata?.groundingChunks ?? [];
 
-  const citations = groundingChunks
-    .map((chunk) => chunk.web?.uri)
-    .filter((uri): uri is string => !!uri)
+  const chunkPairs = groundingChunks
+    .map((chunk) => ({
+      uri:   chunk.web?.uri ?? null,
+      title: chunk.web?.title ?? null,
+    }))
+    .filter((p): p is { uri: string; title: string | null } => !!p.uri)
     .slice(0, 5);
 
-  return { text: result.response.text(), citations };
+  return {
+    text: result.response.text(),
+    citations: chunkPairs.map((p) => p.uri),
+    citationTitles: chunkPairs.map((p) => p.title),
+  };
 }
 
 /**
@@ -626,7 +699,7 @@ export async function runVisibilityScan(
       }
 
       try {
-        const { text, citations } = outcome.value;
+        const { text, citations, citationTitles } = outcome.value;
         const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias, productTokens);
 
         // For Perplexity, override `cited` using the structured citations array
@@ -644,15 +717,41 @@ export async function runVisibilityScan(
           }
         }
 
-        // Citation-based found fallback: if text matching failed but the brand domain
-        // appears in the model's source citations (e.g. Gemini grounding chunks), mark
-        // as found with conservative attribution. Mirrors the Perplexity cited override.
+        // Citation-based found fallback: if text matching failed but the brand
+        // appears in the model's structured citations OR (for Gemini) in the
+        // grounding-chunk titles, mark as found with conservative attribution.
+        //
+        // Title fallback exists because Gemini's grounding URIs are Vertex AI
+        // Search redirect wrappers — they never contain the publisher domain.
+        // Titles often do (e.g. "Honeywell Industrial Automation | …"). See
+        // PRODUCT_GUARDRAILS.md #11.
         if (!analysis.found) {
           const citationFallback = citations.find((u) => u.includes(rootDomain));
-          if (citationFallback) {
-            console.log(`[ai-visibility] citation-fallback found for ${rootDomain} (${model}): ${citationFallback}`);
+
+          // Title-based fallback: only meaningful when chunk titles are
+          // populated (Gemini today). Match by brand name with word boundaries
+          // — domain match on titles is too noisy.
+          let titleFallback: string | null = null;
+          if (!citationFallback && citationTitles?.length && brandName.length >= 3) {
+            const brandPattern = new RegExp(`\\b${escapeRegex(brandName)}\\b`, 'i');
+            const firstWordPattern = brandName.includes(' ')
+              ? new RegExp(`\\b${escapeRegex(brandName.split(' ')[0])}\\b`, 'i')
+              : null;
+            for (const title of citationTitles) {
+              if (!title) continue;
+              if (brandPattern.test(title) || firstWordPattern?.test(title)) {
+                titleFallback = title;
+                break;
+              }
+            }
+          }
+
+          const fallbackEvidence = citationFallback ?? titleFallback;
+          if (fallbackEvidence) {
+            const via = citationFallback ? 'citation-uri' : 'citation-title';
+            console.log(`[ai-visibility] ${via} fallback found for ${rootDomain} (${model}): ${fallbackEvidence}`);
             analysis.found = true;
-            analysis.snippet = `Retrieved from ${citationFallback}`;
+            analysis.snippet = `Retrieved from ${fallbackEvidence}`;
             analysis.prominence = 'low';
             analysis.cited = true;
             analysis.score = computeScore('low', true);
@@ -666,7 +765,19 @@ export async function runVisibilityScan(
         //   3. response isn't focused on a *different* entity (competitor guard)
         // Conservative: low prominence, no citation credit.
         if (!analysis.found) {
-          const queryNamesBrand = [brandName, rootDomain].some(
+          // Build the brand-token set the prompt is allowed to "name" the brand by:
+          // - full brandName ("Volvo Cars")
+          // - rootDomain ("volvocars.com")
+          // - first word of multi-word brand ("Volvo") — handles the common case
+          //   where the prompt uses the spoken form but our resolved slug is
+          //   single-word. Symmetric with findMentionIndex first-word handling.
+          // See PRODUCT_GUARDRAILS.md #10.
+          const brandTokens: string[] = [brandName, rootDomain];
+          if (brandName.includes(' ')) {
+            const firstWord = brandName.split(' ')[0];
+            if (firstWord.length >= 3) brandTokens.push(firstWord);
+          }
+          const queryNamesBrand = brandTokens.some(
             (token) => new RegExp(`\\b${escapeRegex(token)}\\b`, 'i').test(prompt)
           );
 
