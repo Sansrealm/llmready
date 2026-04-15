@@ -108,6 +108,113 @@ function splitSlugBrand(slug: string): string | null {
   return null;
 }
 
+/**
+ * Domain-generic phrases and comparison keywords that should never be promoted
+ * as a brand token from query analysis. Lowercase for case-insensitive match.
+ * Conservative — add only when a real scan surfaces a false positive.
+ */
+const QUERY_TOKEN_STOP_PHRASES = new Set([
+  // Generic category / role terms that show up often in EOR/SaaS/agency queries
+  'employer of record', 'employers of record', 'eor',
+  'global employment', 'global payroll', 'global mobility', 'global hiring',
+  'global compliance', 'payroll services', 'hr services', 'hiring services',
+  // Generic interrogatives / superlatives in TitleCase form
+  'best', 'top', 'how', 'what', 'is', 'for', 'the', 'and', 'or',
+  // Generic country / region words
+  'united states', 'united kingdom', 'europe', 'asia',
+]);
+
+/**
+ * Comparator keywords that split a "vs" query into {brand side} vs {competitor side}.
+ * Everything appearing AFTER one of these in a query is considered competitor-side
+ * and its occurrences are NOT counted toward brand-token frequency.
+ */
+const COMPARATOR_SPLIT_REGEX = /\s+(?:vs\.?|versus|compared to|alternative to|better than|instead of)\s+/i;
+
+/**
+ * Extract a list of brand-token candidates from a set of visibility queries.
+ * Designed to catch the case where the query generator (in /api/analyze) named
+ * the brand correctly from page content but the scanner resolved a *different*
+ * brand token from og:site_name — see PRODUCT_GUARDRAILS.md #12.
+ *
+ * Approach (layered guards):
+ *   A. Position filter — split each query on " vs / versus / compared to / ...",
+ *      consider only the left-hand (brand) side for counting.
+ *   B. Frequency threshold — phrase must appear in ≥3 queries' brand-side after
+ *      position filtering. Single-occurrence competitors cannot clear this.
+ *   C. Stop-phrase filter — drop generic category phrases, single-word stop
+ *      words, and phrases already present in the existing brand-token set.
+ *
+ * Returns deduplicated, case-preserved candidate phrases (for display) but
+ * matching downstream uses case-insensitive regex (/i).
+ */
+function extractBrandTokensFromQueries(
+  queries: string[],
+  existingTokens: string[],
+  minFrequency = 3,
+): string[] {
+  if (!queries || queries.length === 0) return [];
+
+  // Pre-compute existing token set (lowercased) for de-dup.
+  const existingLower = new Set(existingTokens.filter(Boolean).map((t) => t.toLowerCase()));
+
+  // For each query, extract the brand-side portion (before any comparator).
+  // Keep original casing because we'll surface the canonical form for patterns.
+  const brandSides: string[] = queries.map((q) => {
+    const match = q.match(COMPARATOR_SPLIT_REGEX);
+    if (!match || match.index === undefined) return q;
+    return q.slice(0, match.index);
+  });
+
+  // Extract TitleCase proper-noun phrases (≤4 consecutive TitleCase words).
+  // Matches: "Acumen International", "Acumen", "Papaya Global", "Express Global Employment"
+  const PHRASE_REGEX = /\b(?:[A-Z][a-zA-Z0-9]{1,24}(?:\.[a-zA-Z]{2,})?)(?:\s+[A-Z][a-zA-Z0-9]{1,24}){0,3}\b/g;
+
+  // Frequency map keyed by lowercase phrase; value keeps the first-seen casing
+  // as the canonical display form.
+  const freq = new Map<string, { display: string; count: number }>();
+
+  for (const side of brandSides) {
+    for (const m of side.matchAll(PHRASE_REGEX)) {
+      const phrase = m[0].trim();
+      const key = phrase.toLowerCase();
+
+      // Guard C: stop-phrases (checked both as full phrase and as first-word-only).
+      if (QUERY_TOKEN_STOP_PHRASES.has(key)) continue;
+      if (phrase.length < 3) continue;
+
+      // Guard: skip already-known tokens (og:site_name and friends)
+      if (existingLower.has(key)) continue;
+
+      const entry = freq.get(key);
+      if (entry) {
+        entry.count += 1;
+      } else {
+        freq.set(key, { display: phrase, count: 1 });
+      }
+    }
+  }
+
+  // Guard B: apply frequency threshold
+  const promoted: string[] = [];
+  for (const { display, count } of freq.values()) {
+    if (count >= minFrequency) promoted.push(display);
+  }
+
+  // If a longer phrase and its first word are both above threshold, keep only
+  // the longer one (findMentionIndex will add a first-word pattern itself for
+  // multi-word tokens). Otherwise "Acumen" and "Acumen International" both get
+  // added and Acumen-only matches could over-credit generic Acumen mentions.
+  const byFirstWord = new Map<string, string>();
+  for (const p of promoted) {
+    const firstWord = p.split(' ')[0].toLowerCase();
+    const existing = byFirstWord.get(firstWord);
+    if (!existing || p.length > existing.length) byFirstWord.set(firstWord, p);
+  }
+
+  return [...byFirstWord.values()];
+}
+
 function extractDomainTokens(url: string, pageMeta?: PageMeta): { rootDomain: string; brandName: string; brandAlias: string } {
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
@@ -242,6 +349,7 @@ function findMentionIndex(
   brandName: string,
   brandAlias: string,
   productTokens: string[] = [],
+  extraTokens: string[] = [],
 ): number {
   const patterns: RegExp[] = [
     new RegExp(escapeRegex(rootDomain).replace(/\\\./g, '\\.'), 'i'),
@@ -272,6 +380,22 @@ function findMentionIndex(
   for (const token of productTokens) {
     if (token.length >= 3) {
       patterns.push(new RegExp(escapeRegex(token), 'i'));
+    }
+  }
+
+  // Query-derived brand tokens (PRODUCT_GUARDRAILS.md #12). Additive — catches
+  // the parent brand when og:site_name picked the operating entity, etc.
+  // Each token also generates a first-word pattern if multi-word, symmetric
+  // with how brandName is handled above.
+  for (const token of extraTokens) {
+    if (token.length >= 3) {
+      patterns.push(new RegExp(`\\b${escapeRegex(token)}\\b`, 'i'));
+      if (token.includes(' ')) {
+        const firstWord = token.split(' ')[0];
+        if (firstWord.length >= 3) {
+          patterns.push(new RegExp(`\\b${escapeRegex(firstWord)}\\b`, 'i'));
+        }
+      }
     }
   }
 
@@ -385,8 +509,9 @@ async function analyzeVisibility(
   brandName: string,
   brandAlias: string,
   productTokens: string[] = [],
+  extraTokens: string[] = [],
 ): Promise<Pick<VisibilityResult, 'found' | 'snippet' | 'prominence' | 'cited' | 'score'>> {
-  const mentionIndex = findMentionIndex(text, rootDomain, brandName, brandAlias, productTokens);
+  const mentionIndex = findMentionIndex(text, rootDomain, brandName, brandAlias, productTokens, extraTokens);
 
   if (mentionIndex === -1) {
     return { found: false, snippet: null, prominence: null, cited: false, score: 0 };
@@ -599,7 +724,12 @@ async function queryGemini(prompt: string, userId: string): Promise<ModelRespons
  * Best-effort — once mentionedBrands extraction is live this can be derived
  * from the Haiku output instead.
  */
-function isCompetitorFocusedResponse(text: string, brandName: string, rootDomain: string): boolean {
+function isCompetitorFocusedResponse(
+  text: string,
+  brandName: string,
+  rootDomain: string,
+  extraTokens: string[] = [],
+): boolean {
   const titleCaseWords = text.match(/\b[A-Z][a-z]{2,20}\b/g) ?? [];
 
   const STOP_WORDS = new Set([
@@ -616,13 +746,25 @@ function isCompetitorFocusedResponse(text: string, brandName: string, rootDomain
     'compare','compared','unlike','however','although','while',
   ]);
 
-  const brandLower = brandName.toLowerCase();
-  const domainToken = rootDomain.split('.')[0].toLowerCase();
+  // Build the excluded-from-competitor-count set from ALL known brand tokens,
+  // including their first words for multi-word tokens. This is the symmetric
+  // fix for PRODUCT_GUARDRAILS.md #9/#12: if brandName = "Volvo Cars" and the
+  // response says "Volvo" three times, "Volvo" should not count as a competitor.
+  const excluded = new Set<string>();
+  excluded.add(rootDomain.split('.')[0].toLowerCase());
+  for (const token of [brandName, ...extraTokens]) {
+    if (!token) continue;
+    excluded.add(token.toLowerCase());
+    if (token.includes(' ')) {
+      const firstWord = token.split(' ')[0];
+      if (firstWord.length >= 3) excluded.add(firstWord.toLowerCase());
+    }
+  }
 
   const freq = new Map<string, number>();
   for (const w of titleCaseWords) {
     const lower = w.toLowerCase();
-    if (STOP_WORDS.has(lower) || lower === brandLower || lower === domainToken) continue;
+    if (STOP_WORDS.has(lower) || excluded.has(lower)) continue;
     freq.set(lower, (freq.get(lower) ?? 0) + 1);
   }
 
@@ -677,6 +819,19 @@ export async function runVisibilityScan(
       ? visibilityQueries
       : getPromptsForIndustry(industry);
 
+  // Query-derived brand-token extraction (PRODUCT_GUARDRAILS.md #12).
+  // Catches the case where og:site_name picked the operating entity (e.g.
+  // "Express Global Employment") but the query generator identified a
+  // different parent brand (e.g. "Acumen International"). Skipped gracefully
+  // when visibilityQueries isn't available (cache path / industry defaults).
+  const existingTokensForDedup = [brandName, brandAlias, rootDomain];
+  const extraTokens = (visibilityQueries && visibilityQueries.length >= 10)
+    ? extractBrandTokensFromQueries(visibilityQueries, existingTokensForDedup)
+    : [];
+  if (extraTokens.length > 0) {
+    console.log(`[ai-visibility] query-derived brand tokens: ${extraTokens.map((t) => `"${t}"`).join(', ')}`);
+  }
+
   const tasks = prompts.flatMap((prompt) =>
     MODELS.map((model) => ({ prompt, model }))
   );
@@ -700,7 +855,7 @@ export async function runVisibilityScan(
 
       try {
         const { text, citations, citationTitles } = outcome.value;
-        const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias, productTokens);
+        const analysis = await analyzeVisibility(text, rootDomain, brandName, brandAlias, productTokens, extraTokens);
 
         // For Perplexity, override `cited` using the structured citations array
         // (ranked sources Perplexity retrieved from its index) rather than
@@ -729,19 +884,28 @@ export async function runVisibilityScan(
           const citationFallback = citations.find((u) => u.includes(rootDomain));
 
           // Title-based fallback: only meaningful when chunk titles are
-          // populated (Gemini today). Match by brand name with word boundaries
-          // — domain match on titles is too noisy.
+          // populated (Gemini today). Match brandName AND query-derived tokens
+          // with word boundaries — domain match on titles is too noisy.
           let titleFallback: string | null = null;
-          if (!citationFallback && citationTitles?.length && brandName.length >= 3) {
-            const brandPattern = new RegExp(`\\b${escapeRegex(brandName)}\\b`, 'i');
-            const firstWordPattern = brandName.includes(' ')
-              ? new RegExp(`\\b${escapeRegex(brandName.split(' ')[0])}\\b`, 'i')
-              : null;
-            for (const title of citationTitles) {
+          if (!citationFallback && citationTitles?.length) {
+            const tokensToMatch = [brandName, ...extraTokens].filter((t) => t && t.length >= 3);
+            const patterns: RegExp[] = [];
+            for (const token of tokensToMatch) {
+              patterns.push(new RegExp(`\\b${escapeRegex(token)}\\b`, 'i'));
+              if (token.includes(' ')) {
+                const firstWord = token.split(' ')[0];
+                if (firstWord.length >= 3) {
+                  patterns.push(new RegExp(`\\b${escapeRegex(firstWord)}\\b`, 'i'));
+                }
+              }
+            }
+            outer: for (const title of citationTitles) {
               if (!title) continue;
-              if (brandPattern.test(title) || firstWordPattern?.test(title)) {
-                titleFallback = title;
-                break;
+              for (const p of patterns) {
+                if (p.test(title)) {
+                  titleFallback = title;
+                  break outer;
+                }
               }
             }
           }
@@ -768,24 +932,28 @@ export async function runVisibilityScan(
           // Build the brand-token set the prompt is allowed to "name" the brand by:
           // - full brandName ("Volvo Cars")
           // - rootDomain ("volvocars.com")
-          // - first word of multi-word brand ("Volvo") — handles the common case
-          //   where the prompt uses the spoken form but our resolved slug is
-          //   single-word. Symmetric with findMentionIndex first-word handling.
-          // See PRODUCT_GUARDRAILS.md #10.
-          const brandTokens: string[] = [brandName, rootDomain];
-          if (brandName.includes(' ')) {
-            const firstWord = brandName.split(' ')[0];
-            if (firstWord.length >= 3) brandTokens.push(firstWord);
+          // - first word of multi-word brand ("Volvo")
+          // - query-derived brand tokens ("Acumen International") plus their first words
+          // All tokens treated equivalently; additive, never replaces brandName.
+          // See PRODUCT_GUARDRAILS.md #10 and #12.
+          const brandTokens: string[] = [brandName, rootDomain, ...extraTokens];
+          for (const t of [brandName, ...extraTokens]) {
+            if (t && t.includes(' ')) {
+              const firstWord = t.split(' ')[0];
+              if (firstWord.length >= 3 && !brandTokens.includes(firstWord)) {
+                brandTokens.push(firstWord);
+              }
+            }
           }
           const queryNamesBrand = brandTokens.some(
-            (token) => new RegExp(`\\b${escapeRegex(token)}\\b`, 'i').test(prompt)
+            (token) => token.length >= 3 && new RegExp(`\\b${escapeRegex(token)}\\b`, 'i').test(prompt)
           );
 
           if (queryNamesBrand) {
             const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
             const hedgePattern = /\b(i don'?t have|i cannot|i can'?t|i'?m unable|no information|not available|don'?t know|unable to find|i apologize)\b/i;
             const substantive = wordCount >= 50 && !hedgePattern.test(text);
-            const notCompetitorFocused = !isCompetitorFocusedResponse(text, brandName, rootDomain);
+            const notCompetitorFocused = !isCompetitorFocusedResponse(text, brandName, rootDomain, extraTokens);
 
             if (substantive && notCompetitorFocused) {
               console.log(`[ai-visibility] query-context fallback for ${rootDomain} (${model}): prompt names brand, response is substantive (${wordCount}w)`);
