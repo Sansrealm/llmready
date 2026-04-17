@@ -4,9 +4,9 @@ import Anthropic from '@anthropic-ai/sdk';
 export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
-import { limitAnalyze } from '@/lib/rate-limit';
+import { limitAnalyze, tryAcquireAnalyzeLock } from '@/lib/rate-limit';
 import { logLlmSpend } from '@/lib/llm-spend';
-import { saveAnalysis, getAnalysisByUrl } from '@/lib/db';
+import { saveAnalysis, getAnalysisByUrl, normalizeUrl } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 
 // Anthropic client — used for website scoring (independent of measured models)
@@ -81,7 +81,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
     }
 
-    // 2. Check for cached analysis if requested
+    // 2. Dedup: prevent duplicate Claude calls on page refresh / rapid resubmit
+    const normalizedUrl = normalizeUrl(url);
+    const lockAcquired = await tryAcquireAnalyzeLock(subscription.userId, normalizedUrl);
+
+    if (!lockAcquired) {
+      const recent = await getAnalysisByUrl(subscription.userId, url);
+      if (recent) {
+        const age = Date.now() - new Date(recent.analyzed_at).getTime();
+        if (age < 2 * 60 * 1000) {
+          console.log(`[analyze] dedup hit — returning recent analysis (${Math.round(age / 1000)}s old)`);
+          const dedupResult: AnalysisResult = {
+            overall_score: recent.overall_score,
+            parameters: recent.parameters,
+            recommendations: recent.recommendations ?? [],
+          };
+          if (!subscription.isPremium) {
+            dedupResult.remainingAnalyses = subscription.remainingAnalyses;
+          }
+          if (recent.query_buckets != null) {
+            dedupResult.queryBuckets = recent.query_buckets;
+            dedupResult.visibilityQueries = recent.query_buckets.map((q: QueryBucket) => q.query);
+          }
+          return NextResponse.json({
+            id: recent.id,
+            ...dedupResult,
+            cached: true,
+            analyzed_at: recent.analyzed_at,
+          });
+        }
+      }
+      return NextResponse.json(
+        { error: 'Analysis already in progress for this URL. Please wait.' },
+        { status: 409, headers: { 'Retry-After': '15' } }
+      );
+    }
+
+    // 3. Check for cached analysis if requested
     const searchParams = request.nextUrl.searchParams;
     const useCached = searchParams.get('cached') === 'true';
 

@@ -175,6 +175,29 @@ export async function limitVisibilityScan(userId: string): Promise<RateLimitResu
 }
 
 /**
+ * Dedup lock for /api/analyze — prevents duplicate Claude calls when the same
+ * URL is submitted twice in quick succession (page refresh, double navigation).
+ *
+ * Uses Redis NX (set-if-not-exists) with a 120s TTL matching the route's
+ * maxDuration. Returns true if the lock was acquired (proceed with analysis),
+ * false if another request holds it. Fails open if Redis is unavailable.
+ */
+export async function tryAcquireAnalyzeLock(
+  userId: string,
+  normalizedUrl: string,
+): Promise<boolean> {
+  if (!redis) return true;
+  try {
+    const key = `dedup:analyze:${userId}:${normalizedUrl}`;
+    const result = await redis.set(key, '1', { nx: true, ex: 120 });
+    return result !== null;
+  } catch (err) {
+    console.error('[rate-limit] analyze dedup lock failed, failing open:', err);
+    return true;
+  }
+}
+
+/**
  * Extract a best-effort client IP from a Next.js request. Uses Vercel's
  * `x-forwarded-for` (first hop is the real client on Vercel's edge).
  */
