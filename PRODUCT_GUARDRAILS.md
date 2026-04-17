@@ -206,3 +206,20 @@ If a longer phrase and its first word both clear the guards, only the longer for
 - Skipping the extraction when `visibilityQueries` is missing or has fewer than 10 entries — graceful fallback to existing behaviour is the safe default (cache path, industry-default prompts).
 
 **Where:** `lib/ai-visibility-scan.ts` `extractBrandTokensFromQueries`, `runVisibilityScan` (composes tokens), `findMentionIndex`, `analyzeVisibility`, Layer 2 title-fallback, Layer 3 `queryNamesBrand` gate, `isCompetitorFocusedResponse` (exclusion set now includes all brand tokens + their first words).
+
+---
+
+## 13. citation_gaps, citation_rate, and citation_data_quality are Perplexity-only, write-only, and reserved for Phase 3
+
+These columns on the `analyses` table have no live UI consumer. They are written by `/api/ai-visibility-scan` but never read by any user-facing path today.
+
+**Why Perplexity-only:** see #6 (ChatGPT no `cited_urls` on Tiers 2/3), #9 (`citation_position` NULL for Layer 1/3 credits), #11 (Gemini Vertex redirect wrappers).
+
+**Why not touched:** writeback skipped on cache hits and Perplexity errors. Consumer UI is Phase 3 agency work.
+
+**Don't try to "fix" by:**
+- Removing these columns — they are reserved for Phase 3 agency competitor views
+- Extending the writeback to ChatGPT or Gemini engines — the upstream data is not comparable (see cross-references above)
+- Reading these columns in the share page, PDF, or results page — all user-facing paths derive citation data from `ai_visibility_results` directly via `getLatestVisibilityScanAnyAge()` and `computeCitationStats()`
+
+**Where:** `app/api/ai-visibility-scan/route.ts:192–244` (writeback), `lib/db.ts:846–868` (`updateAnalysisCitationData`). See `ROADMAP.md` Phase 3 and `CLAUDE.md` Known Gaps for build context.
