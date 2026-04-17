@@ -227,8 +227,7 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
 
   const citationGaps = analysis.citation_gaps ?? [];
   const hasScan = !!scan && scan.results.length > 0;
-  // Fallback trigger per design intent: pre-scan analyses have no citation data
-  const usesFallback = !hasScan || citationGaps.length === 0;
+  const usesFallback = !hasScan;
 
   const stats = hasScan ? computeCitationStats(scan!.results, analysis.query_buckets) : null;
   const verdict = stats ? computeVerdict(stats.rate) : null;
