@@ -3,16 +3,20 @@
 Live doc — edit freely as phases evolve.
 Sequential: don't start next phase until current is stable.
 
-## Phase 1 — Ops stability ← current
-Resolve all P0s and the rate-limiting P1 before any feature work.
+## Phase 1 — Ops stability ✅ SHIPPED (Apr 13 2026)
+Admin auth gated on `isAdmin`, Upstash rate limiting on `/api/analyze` + `/api/ai-visibility-scan`, webhook retry replaced with Stripe-native + alerting, one-shot migration endpoints removed, `/api/analyze` auth-walled, LLM spend logging to `llm_spend` table, sonner Toaster mounted in `app/layout.tsx`.
 
-## Phase 2 — Report upgrade
-Make the AI Visibility report (real LLM citation data: ChatGPT/Gemini/Perplexity) the primary output for email and PDF download. The current "Readiness Report" (structural/markup scoring only) becomes secondary/supporting, not the headline. Goal: what users share and act on reflects actual citation reality.
+## Phase 2 — Report upgrade ✅ SHIPPED (Apr 13 2026)
+Share page, PDF, and OG image all lead with AI Visibility citation data. Parameter cards show weighted point contributions (X/Y pts). Conditional support heading based on citation rate. Structural score appears below the fold as supporting section.
 
-## Phase 3 — Agency UX
+## Phase 3 — Agency UX ← current
 Improve views and reports for agency-tier subscribers. Starting point is existing scan history. Likely scope: better multi-domain report views, cleaner exportable reports, improved dashboard for agencies managing multiple clients. Includes competitor comparison view — primitives exist (`mentioned_brands`, `citation_gaps`, `getPrimaryCompetitor()`).
-⚠️ **Depends on** fixing `mentioned_brands` cross-LLM normalisation (P1 gap) — ship that before this phase or the feature inherits dirty data.
+
+⚠️ **Blocked on** fixing `mentioned_brands` cross-LLM normalisation (P1 gap) — ship that before this phase or the feature inherits dirty data.
 User management (seats, client access) is out of scope for now.
+
+**Pre-requisite: test coverage on `lib/ai-visibility-scan.ts`.**
+Most-modified, most-complex file in the codebase (3-layer detection waterfall, brand resolution, query-derived tokens, Gemini title fallback, slug splitting). 4 changes landed in the Apr 13–16 window with zero automated regression coverage. Add tests before shipping Phase 3 features on top of this module.
 
 ## Scaffolded but un-shipped — "Fix this" generator
 Backend endpoint `app/api/generate-fix/route.js` exists and is fully working (OpenAI `gpt-4o`, 5 fix types: `title-tag`, `meta-description`, `schema-markup`, `internal-links`, `content-improvement`, returns confidence score). **No frontend caller.** Intended UX:
