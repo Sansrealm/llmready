@@ -8,6 +8,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import { Analytics } from "@/components/Analytics"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { QueryProvider } from "./providers/query-provider"
+import { Toaster } from "@/components/ui/sonner"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" })
@@ -113,6 +114,7 @@ export default function RootLayout({
               <Analytics />
               {children}
               <ThemeToggle />
+              <Toaster />
             </ThemeProvider>
           </QueryProvider>
         </body>
