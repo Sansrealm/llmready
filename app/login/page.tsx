@@ -26,7 +26,7 @@ export default function LoginPage() {
                                         card: "shadow-lg",
                                     }
                                 }}
-                                redirectUrl="/"
+                                fallbackRedirectUrl="/"
                             />
                         </div>
                     </div>

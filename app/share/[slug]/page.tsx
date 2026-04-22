@@ -569,11 +569,11 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
               <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
                 <Lock className="w-6 h-6 text-indigo-500" />
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Sign up free to see recommendations
+                  Sign in or sign up free to see recommendations
                 </p>
-                <Link href="/login">
+                <Link href={`/login?redirect_url=/share/${slug}`}>
                   <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    Sign up free
+                    Sign in free
                   </Button>
                 </Link>
               </div>
@@ -652,11 +652,11 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
               <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3">
                 <Lock className="w-6 h-6 text-indigo-500" />
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  {isGuest ? 'Sign up free to see trends' : 'Upgrade to Pro to see trends'}
+                  {isGuest ? 'Sign in or sign up free to see trends' : 'Upgrade to Pro to see trends'}
                 </p>
-                <Link href={isGuest ? '/login' : '/pricing'}>
+                <Link href={isGuest ? `/login?redirect_url=/share/${slug}` : '/pricing'}>
                   <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {isGuest ? 'Sign up free' : 'Upgrade to Pro'}
+                    {isGuest ? 'Sign in free' : 'Upgrade to Pro'}
                   </Button>
                 </Link>
               </div>
@@ -679,8 +679,8 @@ export default async function SharedAnalysisPage({ params }: PageProps) {
                   Run Your Own Analysis →
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline">Create Free Account</Button>
+              <Link href={`/login?redirect_url=/share/${slug}`}>
+                <Button size="lg" variant="outline">Sign in or create free account</Button>
               </Link>
             </div>
           </div>
