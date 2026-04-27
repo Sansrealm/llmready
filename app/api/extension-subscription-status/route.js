@@ -18,7 +18,7 @@ export async function GET(request) {
         try {
             const verifiedToken = await verifyToken(token, {
                 secretKey: process.env.CLERK_SECRET_KEY,
-                authorizedParties: ['chrome-extension://ajcjkkbebpgofanpddihbkilmcnjddad'],
+                authorizedParties: ['chrome-extension://ajcjkkbebpgofanpddihbkilmcnjddad', 'https://www.llmcheck.app'],
             });
             userId = verifiedToken.sub;
         } catch (tokenError) {
