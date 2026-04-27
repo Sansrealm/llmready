@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
+import { verifyToken } from '@clerk/backend';
 import { logLlmSpend } from '@/lib/llm-spend';
 
 // Initialize OpenAI client
@@ -196,24 +197,49 @@ RESPONSE FORMAT (JSON):
 
 export async function POST(request) {
     try {
-        // Get authentication status from Clerk
-        const { has, userId } = await auth();
+        // Dual auth: Bearer token (extension) or session cookie (web app)
+        let userId;
+        let isPremium = false;
 
-        console.log('🔐 Generate Fix - User authentication status:', userId ? 'Authenticated' : 'Not authenticated');
-
-        // Check if user is authenticated
-        if (!userId) {
-            return NextResponse.json(
-                { error: 'Authentication required' },
-                { status: 401 }
-            );
+        const authHeader = request.headers.get('authorization');
+        if (authHeader?.startsWith('Bearer ')) {
+            // Extension path: verify JWT against extension ID
+            const token = authHeader.substring(7);
+            try {
+                const verified = await verifyToken(token, {
+                    secretKey: process.env.CLERK_SECRET_KEY,
+                    authorizedParties: ['chrome-extension://ajcjkkbebpgofanpddihbkilmcnjddad'],
+                });
+                userId = verified.sub;
+            } catch {
+                return NextResponse.json(
+                    { error: 'Invalid or expired token' },
+                    { status: 401 }
+                );
+            }
+            if (!userId) {
+                return NextResponse.json(
+                    { error: 'Authentication required' },
+                    { status: 401 }
+                );
+            }
+            const clerk = await clerkClient();
+            const user = await clerk.users.getUser(userId);
+            isPremium = user.publicMetadata?.premiumUser === true;
+        } else {
+            // Web app path: Clerk session cookie
+            const { has, userId: sessionUserId } = await auth();
+            userId = sessionUserId;
+            if (!userId) {
+                return NextResponse.json(
+                    { error: 'Authentication required' },
+                    { status: 401 }
+                );
+            }
+            isPremium = !!has?.({ plan: 'llm_check_premium' });
         }
 
-        // Check if user has premium plan
-        const hasPremiumPlan = has({ plan: 'llm_check_premium' });
-        console.log('💎 Premium status check:', hasPremiumPlan ? 'Premium' : 'Free');
-
-        if (!hasPremiumPlan) {
+        if (!isPremium) {
             return NextResponse.json(
                 { error: 'Premium subscription required for AI fix generation' },
                 { status: 403 }
