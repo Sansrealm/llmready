@@ -33,6 +33,8 @@ TASK: Generate an improved title tag that:
 - Stays within 50-60 characters
 - Improves SEO while remaining descriptive
 
+${context.diagnosis ? `SPECIFIC ISSUE IDENTIFIED BY ANALYZER:\n${context.diagnosis}\n\nYour fix MUST directly address this specific finding above. Do not give generic SEO advice.` : ''}
+
 RESPONSE FORMAT (JSON):
 {
   "confidence": [0-100 number based on content sufficiency],
@@ -69,6 +71,8 @@ TASK: Generate an optimized meta description that:
 - Stays within 150-160 characters
 - Compels clicks while being truthful
 
+${context.diagnosis ? `SPECIFIC ISSUE IDENTIFIED BY ANALYZER:\n${context.diagnosis}\n\nYour fix MUST directly address this specific finding above. Do not give generic SEO advice.` : ''}
+
 RESPONSE FORMAT (JSON):
 {
   "confidence": [0-100],
@@ -102,6 +106,8 @@ TASK: Generate appropriate schema markup based on actual content:
 - Use only data visible in the content
 - Ensure valid JSON-LD format
 
+${context.diagnosis ? `SPECIFIC ISSUE IDENTIFIED BY ANALYZER:\n${context.diagnosis}\n\nYour fix MUST directly address this specific finding above. Do not give generic SEO advice.` : ''}
+
 RESPONSE FORMAT (JSON):
 {
   "confidence": [0-100],
@@ -134,6 +140,8 @@ TASK: Suggest internal linking opportunities based on actual content:
 - Suggest relevant anchor text from actual content
 - Recommend realistic target page types
 - Explain SEO and AI discoverability benefits
+
+${context.diagnosis ? `SPECIFIC ISSUE IDENTIFIED BY ANALYZER:\n${context.diagnosis}\n\nYour fix MUST directly address this specific finding above. Do not give generic SEO advice.` : ''}
 
 RESPONSE FORMAT (JSON):
 {
@@ -174,6 +182,8 @@ TASK: Suggest content improvements for:
 - Improved readability and structure
 - Enhanced semantic clarity
 - Better keyword distribution (using words already in content)
+
+${context.diagnosis ? `SPECIFIC ISSUE IDENTIFIED BY ANALYZER:\n${context.diagnosis}\n\nYour fix MUST directly address this specific finding above. Do not give generic SEO advice.` : ''}
 
 RESPONSE FORMAT (JSON):
 {
@@ -248,7 +258,7 @@ export async function POST(request) {
 
         // Get request data
         const requestData = await request.json();
-        const { type, currentContent, url, context } = requestData;
+        const { type, currentContent, url, context, diagnosis } = requestData;
 
         // Validate required fields
         if (!type || !currentContent || !url) {
@@ -278,7 +288,7 @@ export async function POST(request) {
         console.log(`🤖 Generating ${type} fix for URL: ${url} (${currentContent.length} chars of content)`);
 
         // Generate AI prompt with enhanced specificity
-        const prompt = AI_PROMPTS[type](currentContent, { ...context, url });
+        const prompt = AI_PROMPTS[type](currentContent, { ...context, url, diagnosis });
 
         // Call OpenAI API with lower temperature for more consistent results
         const completion = await openai.chat.completions.create({
