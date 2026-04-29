@@ -74,11 +74,26 @@ export async function POST(request: NextRequest) {
     const requestData = await request.json() as AnalysisRequest;
     const { url, email, industry } = requestData;
 
-    // 1. Validate URL — return 400 immediately if malformed
+    // 1. Validate URL — reject malformed, non-HTTP, and internal/private targets
+    let parsedUrl: URL;
     try {
-      new URL(url);
+      parsedUrl = new URL(url);
     } catch {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    }
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isPrivateHost =
+      /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[?::1\]?)$/.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^169\.254\./.test(hostname) ||
+      /^f[cd][0-9a-f]{2}:/i.test(hostname);
+    if (isPrivateHost) {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
     // 2. Dedup: prevent duplicate Claude calls on page refresh / rapid resubmit
@@ -175,14 +190,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Fetch website content
-    const response = await fetch(url);
+    // 4. Fetch website content (30s timeout, 5MB cap)
+    const fetchController = new AbortController();
+    const fetchTimer = setTimeout(() => fetchController.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: fetchController.signal, redirect: 'follow' });
+    } catch (fetchErr: unknown) {
+      clearTimeout(fetchTimer);
+      const msg = fetchErr instanceof Error && fetchErr.name === 'AbortError'
+        ? 'Website took too long to respond'
+        : 'Could not reach the website';
+      return NextResponse.json({ error: msg }, { status: 502 });
+    } finally {
+      clearTimeout(fetchTimer);
+    }
     const fetchStatus = response.status;
     const pageBlocked = fetchStatus === 403 || fetchStatus === 401;
     if (pageBlocked) {
       console.warn(`[analyze] page blocked (HTTP ${fetchStatus}): ${url}`);
     }
     const html = await response.text();
+    if (html.length > 5_000_000) {
+      return NextResponse.json({ error: 'Page too large to analyze' }, { status: 400 });
+    }
 
     // 5. Parse HTML — core signals
     const $ = cheerio.load(html);

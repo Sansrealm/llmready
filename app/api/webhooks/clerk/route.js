@@ -56,9 +56,14 @@ export async function POST(req) {
         // Check if the subscription is active and matches your premium plan slug
         if (status === 'active' && plan_id === 'llm_check_premium') {
             try {
-                await clerkClient.users.updateUserMetadata(user_id, {
-                    privateMetadata: {
-                        'plan': 'llm_check_premium'
+                const clerk = await clerkClient();
+                const user = await clerk.users.getUser(user_id);
+
+                await clerk.users.updateUserMetadata(user_id, {
+                    publicMetadata: {
+                        ...user.publicMetadata,
+                        premiumUser: true,
+                        plan: 'llm_check_premium'
                     }
                 });
                 console.log(`✅ User ${user_id} metadata updated to premium.`);
