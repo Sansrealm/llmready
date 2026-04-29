@@ -1043,9 +1043,6 @@ export default function ResultsPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                                        Well-known brands may rank high on AI Visibility due to existing web presence, even with a low optimization score. For newer businesses, a well-optimized page is the foundation for being indexed and cited by AI.
-                                    </p>
                                     <button
                                         onClick={() => setParametersExpanded(e => !e)}
                                         className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
@@ -1056,6 +1053,9 @@ export default function ResultsPage() {
                                 </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
                                     Website factors that influence your AI Visibility — improve these to increase your score
+                                    <span className="block text-xs mt-1 text-gray-400 dark:text-gray-500">
+                                        Well-known brands may rank high on AI Visibility due to existing web presence, even with a low optimization score. For newer businesses, a well-optimized page is the foundation for being indexed and cited by AI.
+                                    </span>
                                     <span className="block text-xs mt-1 text-gray-400 dark:text-gray-500">
                                         Score based on the analyzed URL. Submit a content-rich page (e.g. /faq or a blog post) for a deeper score.
                                     </span>
