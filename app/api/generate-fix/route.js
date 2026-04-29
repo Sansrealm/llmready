@@ -414,7 +414,7 @@ export async function POST(request) {
         // Handle OpenAI specific errors
         if (error.code === 'insufficient_quota') {
             return NextResponse.json(
-                { error: 'OpenAI quota exceeded. Please try again later.' },
+                { error: 'Service temporarily unavailable. Please try again later.' },
                 { status: 503 }
             );
         }

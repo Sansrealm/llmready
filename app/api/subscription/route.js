@@ -74,7 +74,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating portal session:', error);
     return NextResponse.json(
-      { error: 'Failed to create portal session: ' + error.message },
+      { error: 'Failed to create billing portal session. Please try again.' },
       { status: 500 }
     );
   }

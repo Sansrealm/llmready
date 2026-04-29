@@ -33,17 +33,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Opt out the email
+    // Opt out the email (no-op if not found — same response either way)
     const success = await optOutGuestEmail(email);
-
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Email not found in our system' },
-        { status: 404 }
-      );
+    if (success) {
+      console.log(`✅ Guest email unsubscribed: ${email}`);
     }
-
-    console.log(`✅ Guest email unsubscribed: ${email}`);
 
     // Return success page HTML
     return new NextResponse(
@@ -179,18 +173,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Opt out the email
+    // Opt out the email (no-op if not found — same response either way)
     const success = await optOutGuestEmail(email);
-
-    console.log(`✅ Guest email unsubscribed via POST: ${email}`);
+    if (success) {
+      console.log(`✅ Guest email unsubscribed via POST: ${email}`);
+    }
 
     return NextResponse.json({
-      success,
-      message: success
-        ? 'Successfully unsubscribed'
-        : 'Email not found in our system',
-    }, {
-      status: success ? 200 : 404
+      success: true,
+      message: 'Successfully unsubscribed',
     });
   } catch (error) {
     console.error('❌ Unsubscribe POST error:', error);
