@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import { validatePremiumAccess } from '@/lib/auth-utils';
 import { getAnalysisById, createPublicShare } from '@/lib/db';
+import { limitEmailSend } from '@/lib/rate-limit';
 import AnalysisReportEmail from '@/emails/analysis-report';
 
 // Initialize Resend client
@@ -50,7 +51,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Validate premium access (premium-only feature)
+    // 2. Rate limit: 10 emails/hour per user
+    const rl = await limitEmailSend(userId);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Email rate limit exceeded. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) } }
+      );
+    }
+
+    // 3. Validate premium access (premium-only feature)
     const premiumCheck = await validatePremiumAccess();
 
     if (!premiumCheck.allowed) {

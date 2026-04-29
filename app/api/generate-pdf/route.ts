@@ -6,10 +6,12 @@
 // Structural AI Readiness score is a supporting section below the fold.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { validatePremiumAccess } from '@/lib/auth-utils';
 import { AnalysisResult, QueryBucket } from '@/lib/types';
 import {
   getLatestVisibilityScanAnyAge,
+  getAnalysisByUrl,
   type VisibilityResultRow,
 } from '@/lib/db';
 import {
@@ -544,6 +546,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing analysis data or URL' },
         { status: 400 }
+      );
+    }
+
+    // Ownership check: verify the caller has an analysis for this URL
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const ownedAnalysis = await getAnalysisByUrl(userId, url);
+    if (!ownedAnalysis) {
+      return NextResponse.json(
+        { error: 'No analysis found for this URL' },
+        { status: 403 }
       );
     }
 

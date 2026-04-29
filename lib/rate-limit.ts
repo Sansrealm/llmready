@@ -92,6 +92,32 @@ export const visibilityScanLimit = redis
     })
   : null;
 
+/**
+ * /api/extension-subscription-status — token verification.
+ * 20/hour by IP to prevent brute-force enumeration.
+ */
+export const extensionAuthLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, '1 h'),
+      prefix: 'rl:ext-auth:ip:h',
+      analytics: true,
+    })
+  : null;
+
+/**
+ * /api/share/email — email sending (premium).
+ * 10/hour per userId to prevent spam relay abuse.
+ */
+export const emailSendLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      prefix: 'rl:email-send:user:h',
+      analytics: true,
+    })
+  : null;
+
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -167,6 +193,58 @@ export async function limitVisibilityScan(userId: string): Promise<RateLimitResu
   } catch (err) {
     console.error('[rate-limit] visibility-scan check failed, failing open:', err);
     sendAlert('Rate limiter unreachable (visibility-scan)', {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    }).catch(() => {});
+    return { allowed: true };
+  }
+}
+
+/**
+ * Check the extension auth limiter by client IP.
+ */
+export async function limitExtensionAuth(ip: string): Promise<RateLimitResult> {
+  if (!extensionAuthLimit) return { allowed: true };
+
+  try {
+    const res = await extensionAuthLimit.limit(ip);
+    if (!res.success) {
+      return {
+        allowed: false,
+        reason: 'hour',
+        retryAfterSeconds: Math.max(1, Math.ceil((res.reset - Date.now()) / 1000)),
+      };
+    }
+    return { allowed: true };
+  } catch (err) {
+    console.error('[rate-limit] extension-auth check failed, failing open:', err);
+    sendAlert('Rate limiter unreachable (extension-auth)', {
+      ip,
+      error: err instanceof Error ? err.message : String(err),
+    }).catch(() => {});
+    return { allowed: true };
+  }
+}
+
+/**
+ * Check the email-send limiter by userId.
+ */
+export async function limitEmailSend(userId: string): Promise<RateLimitResult> {
+  if (!emailSendLimit) return { allowed: true };
+
+  try {
+    const res = await emailSendLimit.limit(userId);
+    if (!res.success) {
+      return {
+        allowed: false,
+        reason: 'hour',
+        retryAfterSeconds: Math.max(1, Math.ceil((res.reset - Date.now()) / 1000)),
+      };
+    }
+    return { allowed: true };
+  } catch (err) {
+    console.error('[rate-limit] email-send check failed, failing open:', err);
+    sendAlert('Rate limiter unreachable (email-send)', {
       userId,
       error: err instanceof Error ? err.message : String(err),
     }).catch(() => {});

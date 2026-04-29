@@ -632,6 +632,46 @@ export async function saveVisibilityWaitlistSignup({
 }
 
 // ============================================================================
+// Generic Feature Waitlist
+// ============================================================================
+
+export async function saveFeatureWaitlistSignup({
+  feature,
+  email,
+  userId,
+  url,
+  metadata,
+}: {
+  feature: string;
+  email: string;
+  userId: string | null;
+  url?: string | null;
+  metadata?: Record<string, unknown>;
+}): Promise<{ id: string; email: string; is_new: boolean }> {
+  const result = await sql`
+    INSERT INTO feature_waitlist (feature, email, user_id, url, metadata)
+    VALUES (${feature}, ${email.toLowerCase()}, ${userId}, ${url ?? null}, ${JSON.stringify(metadata ?? {})})
+    ON CONFLICT (feature, email)
+    DO UPDATE SET
+      user_id = COALESCE(EXCLUDED.user_id, feature_waitlist.user_id),
+      url = COALESCE(EXCLUDED.url, feature_waitlist.url),
+      metadata = feature_waitlist.metadata || EXCLUDED.metadata,
+      created_at = NOW()
+    RETURNING id, email, (xmax = 0) AS is_new
+  `;
+
+  const record = result.rows[0];
+  return { id: record.id, email: record.email, is_new: record.is_new };
+}
+
+export async function getFeatureWaitlistCount(feature: string): Promise<number> {
+  const result = await sql`
+    SELECT COUNT(*)::int AS count FROM feature_waitlist WHERE feature = ${feature}
+  `;
+  return result.rows[0]?.count ?? 0;
+}
+
+// ============================================================================
 // AI Visibility Scan Functions
 // ============================================================================
 

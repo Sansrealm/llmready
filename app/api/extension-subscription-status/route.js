@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import { clerkClient } from '@clerk/nextjs/server';
 import { verifyToken } from '@clerk/backend';
+import { limitExtensionAuth, getClientIp } from '@/lib/rate-limit';
 
 export async function GET(request) {
     try {
+        const rl = await limitExtensionAuth(getClientIp(request.headers));
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { isPremium: false, error: 'Rate limit exceeded' },
+                { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) } }
+            );
+        }
+
         const authHeader = request.headers.get('authorization');
 
         if (!authHeader?.startsWith('Bearer ')) {
