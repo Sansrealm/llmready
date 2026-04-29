@@ -802,7 +802,7 @@ export default function ResultsPage() {
                                 <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
                                     <h2 className="text-2xl font-bold mb-1">Priority Action Plan</h2>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                        Your top 5 highest-impact actions to improve AI Visibility
+                                        Your top 5 highest-impact actions for consistent AI Visibility
                                     </p>
                                     <div className="space-y-4">
                                         {analysisResult.recommendations.map((rec, index) => (
@@ -1043,6 +1043,9 @@ export default function ResultsPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                                        Well-known brands may rank high on AI Visibility due to existing web presence, even with a low optimization score. For newer businesses, a well-optimized page is the foundation for being indexed and cited by AI.
+                                    </p>
                                     <button
                                         onClick={() => setParametersExpanded(e => !e)}
                                         className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
