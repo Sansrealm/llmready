@@ -4,10 +4,14 @@ import Anthropic from '@anthropic-ai/sdk';
 export const maxDuration = 120;
 import * as cheerio from 'cheerio';
 import { getUserSubscription, incrementAnalysisCount } from '@/lib/auth-utils';
+import { clerkClient } from '@clerk/nextjs/server';
 import { limitAnalyze, tryAcquireAnalyzeLock } from '@/lib/rate-limit';
 import { logLlmSpend } from '@/lib/llm-spend';
 import { saveAnalysis, getAnalysisByUrl, normalizeUrl } from '@/lib/db';
 import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
+import { Resend } from 'resend';
+import { render } from '@react-email/render';
+import FreeLimitReachedEmail from '@/emails/free-limit-reached';
 
 // Anthropic client — used for website scoring (independent of measured models)
 const anthropic = new Anthropic({
@@ -524,6 +528,36 @@ Note: Score based on the submitted URL only. If the site has richer content on s
         }
 
         console.log(`✅ Analysis count updated: ${subscription.analysisCount} → ${newCount} (remaining: ${newRemaining})`);
+
+        // Fire-and-forget: email free user the moment they exhaust their 3 free analyses.
+        // Condition is exact equality so this fires once — on the analysis that hits the cap,
+        // not before and not on subsequent over-limit attempts (which are blocked upstream).
+        if (!subscription.isPremium && newCount === subscription.limit) {
+          (async () => {
+            try {
+              const clerk = await clerkClient();
+              const user = await clerk.users.getUser(subscription.userId!);
+              const email = user.emailAddresses[0]?.emailAddress;
+              if (!email) {
+                console.warn('⚠️ Free limit email skipped: no email found for user');
+                return;
+              }
+              const firstName = user.firstName ?? 'there';
+              const resend = new Resend(process.env.RESEND_API_KEY);
+              const emailHtml = await render(FreeLimitReachedEmail({ firstName }));
+              await resend.emails.send({
+                from: 'LLM Check <analysis@llmcheck.app>',
+                to: email,
+                subject: "You've used all 3 free analyses",
+                html: emailHtml,
+              });
+              console.log('📧 Free limit email sent');
+            } catch (err) {
+              console.error('Free limit email failed:', err);
+            }
+          })();
+        }
+
       } catch (countError) {
         console.error('⚠️ Failed to increment analysis count:', countError);
       }

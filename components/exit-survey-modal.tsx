@@ -48,12 +48,14 @@ interface ExitSurveyModalProps {
   isPremium: boolean;
   isSignedIn: boolean;
   page?: string;
+  forceOpen?: boolean;
 }
 
 export default function ExitSurveyModal({
   isPremium,
   isSignedIn,
   page = "results",
+  forceOpen = false,
 }: ExitSurveyModalProps) {
   const [view, setView]           = useState<View>("hidden");
   const [selected, setSelected]   = useState<Reason | null>(null);
@@ -62,6 +64,12 @@ export default function ExitSurveyModal({
   const entryTime = useRef(Date.now());
 
   useEffect(() => {
+    // forceOpen bypasses exit-intent and localStorage checks — used on dedicated feedback pages
+    if (forceOpen) {
+      setView("modal");
+      return;
+    }
+
     // Never show to premium users
     if (isPremium) return;
 
@@ -120,7 +128,7 @@ export default function ExitSurveyModal({
       document.removeEventListener("mouseleave", onMouseLeave);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [isPremium, isSignedIn]);
+  }, [isPremium, isSignedIn, forceOpen]);
 
   const handleClose = () => {
     if (isSignedIn) {

@@ -7,6 +7,8 @@ import { render } from '@react-email/render';
 import { findUserByStripeSubscription, findUserByStripeCustomer } from '@/lib/stripe-utils';
 import { alertWebhookFailure } from '@/lib/alerts';
 import PremiumWelcomeEmail from '@/emails/premium-welcome';
+import CancellationDay0Email from '@/emails/cancellation-day0';
+import CancellationWinbackEmail from '@/emails/cancellation-winback';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -215,7 +217,7 @@ export async function POST(request: NextRequest) {
             }
 
             case 'customer.subscription.updated': {
-                const subscription = event.data.object;
+                const subscription = event.data.object as Stripe.Subscription;
                 console.log('Subscription updated:', subscription.id);
 
                 // Find the user with this subscription ID
@@ -277,6 +279,76 @@ export async function POST(request: NextRequest) {
                             { status: 500 }
                         );
                     }
+
+                    // Fire-and-forget cancellation sequence when user initiates cancel.
+                    // previous_attributes.cancel_at_period_end === false confirms this is the
+                    // cancellation action, not a renewal or other subscription update.
+                    const prevAttrs = event.data.previous_attributes as
+                        | { cancel_at_period_end?: boolean }
+                        | undefined;
+                    if (
+                        subscription.cancel_at_period_end === true &&
+                        prevAttrs?.cancel_at_period_end === false
+                    ) {
+                        (async () => {
+                            try {
+                                const cancelClient = await clerkClient();
+                                const cancelUser = await cancelClient.users.getUser(userId);
+                                const email = cancelUser.emailAddresses[0]?.emailAddress;
+                                const firstName = cancelUser.firstName ?? 'there';
+
+                                if (!email) {
+                                    console.warn('⚠️ Cancellation emails skipped: no email found for user');
+                                    return;
+                                }
+
+                                const resend = new Resend(process.env.RESEND_API_KEY);
+
+                                // EMAIL A: immediate day-0 understanding email
+                                try {
+                                    const day0Html = await render(CancellationDay0Email({ firstName }));
+                                    await resend.emails.send({
+                                        from: 'LLM Check <analysis@llmcheck.app>',
+                                        to: email,
+                                        subject: `Sorry to see you go, ${firstName}`,
+                                        html: day0Html,
+                                    });
+                                    console.log('📧 Cancellation day-0 email sent');
+                                } catch (err) {
+                                    console.error('Cancellation day-0 email failed:', err);
+                                }
+
+                                // EMAIL B: win-back email scheduled for day N-1 (day before access ends)
+                                // current_period_end is Unix seconds in the Stripe API response but
+                                // is not typed in this SDK version — access via bracket notation
+                                try {
+                                    const winbackHtml = await render(CancellationWinbackEmail({ firstName }));
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    const periodEnd: number | undefined = (subscription as any).current_period_end;
+                                    if (!periodEnd) {
+                                        console.warn('⚠️ Win-back email skipped: current_period_end not available');
+                                        return;
+                                    }
+                                    const scheduledAt = new Date(
+                                        (periodEnd - 86400) * 1000
+                                    ).toISOString();
+                                    await resend.emails.send({
+                                        from: 'LLM Check <analysis@llmcheck.app>',
+                                        to: email,
+                                        subject: 'Your LLM Check access ends tomorrow',
+                                        html: winbackHtml,
+                                        scheduledAt,
+                                    });
+                                    console.log(`📧 Cancellation win-back email scheduled for ${scheduledAt}`);
+                                } catch (err) {
+                                    console.error('Cancellation win-back email failed:', err);
+                                }
+                            } catch (err) {
+                                console.error('Cancellation email outer error:', err);
+                            }
+                        })();
+                    }
+
                 } catch (error) {
                     console.error('Error updating subscription status:', error);
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

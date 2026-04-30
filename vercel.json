@@ -1,4 +1,10 @@
 {
+    "crons": [
+        {
+            "path": "/api/cron/re-engage-premium",
+            "schedule": "0 9 * * *"
+        }
+    ],
     "build": {
         "env": {
             "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
