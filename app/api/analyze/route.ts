@@ -12,6 +12,7 @@ import { AnalysisResult, AnalysisRequest, QueryBucket } from '@/lib/types';
 import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import FreeLimitReachedEmail from '@/emails/free-limit-reached';
+import { waitUntil } from '@vercel/functions';
 
 // Anthropic client — used for website scoring (independent of measured models)
 const anthropic = new Anthropic({
@@ -533,7 +534,9 @@ Note: Score based on the submitted URL only. If the site has richer content on s
         // Condition is exact equality so this fires once — on the analysis that hits the cap,
         // not before and not on subsequent over-limit attempts (which are blocked upstream).
         if (!subscription.isPremium && newCount === subscription.limit) {
-          (async () => {
+          // waitUntil pins this async work to the function lifetime so it
+          // completes even after the response has been sent to the client.
+          waitUntil((async () => {
             try {
               const clerk = await clerkClient();
               const user = await clerk.users.getUser(subscription.userId!);
@@ -555,7 +558,7 @@ Note: Score based on the submitted URL only. If the site has richer content on s
             } catch (err) {
               console.error('Free limit email failed:', err);
             }
-          })();
+          })());
         }
 
       } catch (countError) {

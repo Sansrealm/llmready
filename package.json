@@ -48,6 +48,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "@vercel/blob": "^1.1.1",
+    "@vercel/functions": "^3.4.6",
     "@vercel/postgres": "^0.10.0",
     "autoprefixer": "^10.4.20",
     "cheerio": "^1.0.0",
