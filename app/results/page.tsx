@@ -20,11 +20,13 @@ import { computeParamContribution } from '@/lib/visibility-report';
 import AiVisibilityCheck from '@/components/ai-visibility-check';
 import type { ScanSummary } from '@/components/ai-visibility-check';
 import ExitSurveyModal from '@/components/exit-survey-modal';
+import { toast } from 'sonner';
 
 // Premium check that uses server-side API
 function useIsPremium() {
     const { user, isLoaded } = useUser();
     const [isPremium, setIsPremium] = useState(false);
+    const [canAnalyze, setCanAnalyze] = useState<boolean | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [debug, setDebug] = useState<DebugInfo>({});
 
@@ -44,6 +46,7 @@ function useIsPremium() {
                 console.log('✅ Server response:', data);
 
                 setIsPremium(data.isPremium || false);
+                setCanAnalyze(data.canAnalyze ?? null);
                 setDebug(data.debug || {});
 
             } catch (error) {
@@ -59,6 +62,7 @@ function useIsPremium() {
 
     return {
         isPremium,
+        canAnalyze,
         isLoading,
         debug,
         refresh: () => {
@@ -181,6 +185,8 @@ export default function ResultsPage() {
         if (inCooldown || loading) return;
         if (isSignedIn && !isPremium) {
             setShowReanalyzeWarning(true);
+        } else if (isSignedIn && canAnalyze === false) {
+            toast.warning("You've reached your analysis limit. Showing last saved analysis.");
         } else {
             bypassCacheRef.current = true;
             refetch();
@@ -218,7 +224,7 @@ export default function ResultsPage() {
     const [pdfError, setPdfError] = useState<string | null>(null);
 
     // Use the server-side subscription check
-    const { isPremium, isLoading: premiumLoading, debug, refresh } = useIsPremium();
+    const { isPremium, canAnalyze, isLoading: premiumLoading, debug, refresh } = useIsPremium();
 
     // 🔹 NEW: Content validation for ads
     const hasEnoughContent = useMemo(() => {

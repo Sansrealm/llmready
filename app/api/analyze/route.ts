@@ -147,9 +147,9 @@ export async function POST(request: NextRequest) {
 
         if (cachedAnalysis) {
           const cacheAge = Date.now() - new Date(cachedAnalysis.analyzed_at).getTime();
-          const oneDayMs = 24 * 60 * 60 * 1000;
+          const CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72h per product spec
 
-          if (cacheAge < oneDayMs) {
+          if (cacheAge < CACHE_TTL_MS) {
             console.log(`✅ Returning cached analysis (age: ${Math.floor(cacheAge / 1000 / 60)} minutes)`);
 
             const analysisResult: AnalysisResult = {
