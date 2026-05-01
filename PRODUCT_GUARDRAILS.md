@@ -223,3 +223,20 @@ These columns on the `analyses` table have no live UI consumer. They are written
 - Reading these columns in the share page, PDF, or results page — all user-facing paths derive citation data from `ai_visibility_results` directly via `getLatestVisibilityScanAnyAge()` and `computeCitationStats()`
 
 **Where:** `app/api/ai-visibility-scan/route.ts:192–244` (writeback), `lib/db.ts:846–868` (`updateAnalysisCitationData`). See `ROADMAP.md` Phase 3 and `CLAUDE.md` Known Gaps for build context.
+
+---
+
+## 14. Cache path security (`?cached=true`)
+
+The `?cached=true` early return in `app/api/analyze/route.ts` bypasses the burst rate limiter but NOT the auth gate or monthly limit. This is intentional and secure:
+
+- Auth gate (line 53) runs before the cache block — unauthenticated requests never reach it
+- Cache lookup is scoped to `subscription.userId` (server-verified Clerk identity) — a user can only retrieve their own results
+- Monthly 403 limit is not bypassed — cache only returns already-saved results at no cost; stale/missing cache falls through to the `canAnalyze` check normally
+
+**Don't try to "fix" by:**
+- Reordering the auth gate below the cache block
+- Allowing `userId` to be supplied from the request body
+- Moving the cache check outside the authenticated code path as a "performance optimisation"
+
+**Where:** `app/api/analyze/route.ts` — auth gate line 53, cache block starting line 98, `canAnalyze` check at line 232.
