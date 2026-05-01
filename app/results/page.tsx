@@ -158,17 +158,47 @@ export default function ResultsPage() {
     // Convert React Query error to string for compatibility with existing code
     const error = queryError ? (queryError as Error).message : null;
 
+    // ── Rate-limit fallback: when a 429 fires, attempt one cache-only fetch ──
+    // The backend now serves ?cached=true requests before the rate limiter, so
+    // this fallback fetch bypasses burst protection entirely.
+    const [rateLimitFallback, setRateLimitFallback] = useState<AnalysisResult | null>(null);
+    const [rateLimitFallbackAttempted, setRateLimitFallbackAttempted] = useState(false);
+
+    useEffect(() => {
+        if (!error || rateLimitFallbackAttempted) return;
+        if (!error.toLowerCase().includes('rate limit')) return;
+
+        setRateLimitFallbackAttempted(true);
+        toast.warning("Too many requests — showing your last saved analysis");
+
+        fetch('/api/analyze?cached=true', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, email: email ?? '', industry: industry ?? '' }),
+        })
+            .then(async (res) => {
+                if (res.ok) {
+                    const data = await res.json();
+                    setRateLimitFallback(data as AnalysisResult);
+                }
+            })
+            .catch(() => { /* toast already shown; silent fail is fine */ });
+    }, [error, rateLimitFallbackAttempted, url, email, industry]);
+
+    // Use fallback result when rate-limited — keeps the page from going blank
+    const displayResult = analysisResult ?? rateLimitFallback;
+
     // ── Re-analyze cooldown (72 h) ──────────────────────────────────────────
     useEffect(() => {
-        if (!analysisResult?.analyzed_at) return;
-        const lastAnalyzed = new Date(analysisResult.analyzed_at).getTime();
+        if (!displayResult?.analyzed_at) return;
+        const lastAnalyzed = new Date(displayResult.analyzed_at).getTime();
         const update = () => {
             setCooldownRemaining(Math.max(0, lastAnalyzed + REANALYZE_COOLDOWN_MS - Date.now()));
         };
         update();
         const timer = setInterval(update, 60_000);
         return () => clearInterval(timer);
-    }, [analysisResult?.analyzed_at]);
+    }, [displayResult?.analyzed_at]);
 
     const inCooldown = cooldownRemaining > 0;
 
@@ -228,20 +258,20 @@ export default function ResultsPage() {
 
     // 🔹 NEW: Content validation for ads
     const hasEnoughContent = useMemo(() => {
-        if (!analysisResult) return false;
+        if (!displayResult) return false;
 
         // Check for minimum content requirements
-        const hasValidScore = typeof analysisResult.overall_score === 'number';
-        const hasParameters = analysisResult.parameters && analysisResult.parameters.length >= 3;
-        const hasRecommendations = analysisResult.recommendations && analysisResult.recommendations.length >= 2;
+        const hasValidScore = typeof displayResult.overall_score === 'number';
+        const hasParameters = displayResult.parameters && displayResult.parameters.length >= 3;
+        const hasRecommendations = displayResult.recommendations && displayResult.recommendations.length >= 2;
 
         // Check for substantial text content in parameters
-        const hasSubstantialParameters = analysisResult.parameters?.some(param =>
+        const hasSubstantialParameters = displayResult.parameters?.some(param =>
             param.description && param.description.length > 50
         );
 
-        // Check for substantial text content in recommendations  
-        const hasSubstantialRecommendations = analysisResult.recommendations?.some(rec =>
+        // Check for substantial text content in recommendations
+        const hasSubstantialRecommendations = displayResult.recommendations?.some(rec =>
             rec.description && rec.description.length > 100
         );
 
@@ -259,7 +289,7 @@ export default function ResultsPage() {
         });
 
         return meetsMinimumThreshold;
-    }, [analysisResult]);
+    }, [displayResult]);
 
     // Randomly rotate AI model name in upgrade headline
     const aiModelName = useMemo(() => {
@@ -272,22 +302,22 @@ export default function ResultsPage() {
         return !isPremium && // Not premium user
             !loading && // Not in loading state
             !error && // No error occurred
-            analysisResult && // Has analysis results
+            displayResult && // Has analysis results
             hasEnoughContent; // Has substantial content
-    }, [isPremium, loading, error, analysisResult, hasEnoughContent]);
+    }, [isPremium, loading, error, displayResult, hasEnoughContent]);
 
     // Citation intelligence computed values
     const topQueriesForDisplay = useMemo(() => {
-        if (!analysisResult?.citationGaps) return [];
+        if (!displayResult?.citationGaps) return [];
         const types = ['problem', 'category', 'comparison'] as const;
         return types.flatMap(type => {
-            const match = analysisResult.citationGaps!.find(g => g.query_type === type);
+            const match = displayResult.citationGaps!.find(g => g.query_type === type);
             return match ? [match] : [];
         });
-    }, [analysisResult?.citationGaps]);
+    }, [displayResult?.citationGaps]);
 
     const bucketSummary = useMemo(() => {
-        if (!analysisResult?.citationGaps) return [];
+        if (!displayResult?.citationGaps) return [];
         const types = ['brand', 'problem', 'category', 'comparison'] as const;
         const labels: Record<string, string> = {
             brand: 'Brand', problem: 'Problem', category: 'Category', comparison: 'Comparison',
@@ -299,17 +329,17 @@ export default function ResultsPage() {
             comparison: 'LLMs mention you in comparisons',
         };
         return types.map(type => {
-            const gaps = analysisResult.citationGaps!.filter(g => g.query_type === type);
+            const gaps = displayResult.citationGaps!.filter(g => g.query_type === type);
             const cited = gaps.filter(g => g.status === 'cited').length;
             const total = gaps.length;
             return { type, label: labels[type], cited, total, implication: implications[type] };
         }).filter(b => b.total > 0);
-    }, [analysisResult?.citationGaps]);
+    }, [displayResult?.citationGaps]);
 
     const displacingDomains = useMemo(() => {
-        if (!analysisResult?.citationGaps) return [];
+        if (!displayResult?.citationGaps) return [];
         const freq: Record<string, number> = {};
-        for (const gap of analysisResult.citationGaps) {
+        for (const gap of displayResult.citationGaps) {
             if (gap.status === 'not_cited') {
                 // Prefer Claude-extracted competitors_mentioned, fall back to legacy displaced_by
                 if (gap.competitors_mentioned?.length) {
@@ -324,7 +354,7 @@ export default function ResultsPage() {
             }
         }
         return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    }, [analysisResult?.citationGaps]);
+    }, [displayResult?.citationGaps]);
 
     // Enhanced refresh function
     const refreshSession = async () => {
@@ -356,7 +386,7 @@ export default function ResultsPage() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    analysisResult,
+                    analysisResult: displayResult,
                     url,
                     email,
                     industry
@@ -491,13 +521,13 @@ export default function ResultsPage() {
                         </Alert>
                     )}
 
-                    {error ? (
+                    {error && !displayResult ? (
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Analysis Error</AlertTitle>
                             <AlertDescription>{error}</AlertDescription>
                         </Alert>
-                    ) : analysisResult ? (
+                    ) : displayResult ? (
                         <div className="space-y-8">
                             {/* ── Hero: two-column ── */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -655,8 +685,8 @@ export default function ResultsPage() {
                                     <div>
                                         {/* Page blocked banner — replaces narrative when crawler was rejected */}
                                         {(() => {
-                                            const blockedStatus = analysisResult.httpStatus ?? scanSummary?.pageHttpStatus;
-                                            const isBlocked = analysisResult.page_blocked === true || [0, 401, 403].includes(blockedStatus ?? 200);
+                                            const blockedStatus = displayResult.httpStatus ?? scanSummary?.pageHttpStatus;
+                                            const isBlocked = displayResult.page_blocked === true || [0, 401, 403].includes(blockedStatus ?? 200);
                                             const statusLabel = blockedStatus === 403 ? '403 Access Denied'
                                                 : blockedStatus === 401 ? '401 Unauthorized'
                                                 : blockedStatus === 0 ? 'connection refused'
@@ -672,7 +702,7 @@ export default function ResultsPage() {
                                             return null;
                                         })()}
 
-                                        {!analysisResult.page_blocked && ![0, 401, 403].includes(analysisResult.httpStatus ?? (scanSummary?.pageHttpStatus ?? 200)) && (
+                                        {!displayResult.page_blocked && ![0, 401, 403].includes(displayResult.httpStatus ?? (scanSummary?.pageHttpStatus ?? 200)) && (
                                         <div className="mb-5">
                                             <p className="text-base leading-snug text-gray-900 dark:text-white"
                                                style={{ fontFamily: 'var(--font-serif)' }}>
@@ -702,8 +732,8 @@ export default function ResultsPage() {
                                                     }
                                                     // Fallback: scan hasn't run yet — use readiness score but avoid
                                                     // "invisible" language since we have no actual visibility data
-                                                    const s = analysisResult.overall_score;
-                                                    const params = [...(analysisResult.parameters ?? [])].sort((a, b) => a.score - b.score);
+                                                    const s = displayResult.overall_score;
+                                                    const params = [...(displayResult.parameters ?? [])].sort((a, b) => a.score - b.score);
                                                     const worst = params.slice(0, 2).filter(p => p.score < 75);
                                                     const verdict = s >= 75 ? 'well-optimised for AI search'
                                                         : s >= 50 ? 'partially optimised for AI search'
@@ -715,10 +745,10 @@ export default function ResultsPage() {
                                                     return `Your site is ${verdict}.${gap ? ` ${gap}.` : ''}`;
                                                 })()}
                                             </p>
-                                            {analysisResult.analyzed_at && (
+                                            {displayResult.analyzed_at && (
                                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-3"
                                                    style={{ fontFamily: 'var(--font-mono)' }}>
-                                                    Analyzed {new Date(analysisResult.analyzed_at).toLocaleString('en-US', {
+                                                    Analyzed {new Date(displayResult.analyzed_at).toLocaleString('en-US', {
                                                         month: 'short',
                                                         day: 'numeric',
                                                         year: 'numeric',
@@ -743,13 +773,13 @@ export default function ResultsPage() {
                                             {pdfGenerating ? 'Generating...' : 'Report'}
                                         </Button>
 
-                                        {analysisResult?.id && (
+                                        {displayResult?.id && (
                                             <ShareButton
-                                                analysisId={analysisResult.id}
+                                                analysisId={displayResult.id}
                                                 isPremium={isPremium}
                                                 userEmail={email}
                                                 url={url || ''}
-                                                overallScore={analysisResult.overall_score}
+                                                overallScore={displayResult.overall_score}
                                             />
                                         )}
 
@@ -785,7 +815,7 @@ export default function ResultsPage() {
                                     {showReanalyzeWarning && (
                                         <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
                                             <p className="text-sm text-amber-800 dark:text-amber-300 mb-2">
-                                                ⚠️ This will use <strong>1 of your {analysisResult?.remainingAnalyses ?? 0} remaining analyses</strong>. Continue?
+                                                ⚠️ This will use <strong>1 of your {displayResult?.remainingAnalyses ?? 0} remaining analyses</strong>. Continue?
                                             </p>
                                             <div className="flex gap-2">
                                                 <button onClick={handleConfirmReanalyze}
@@ -804,14 +834,14 @@ export default function ResultsPage() {
                             </div>
 
                             {/* ── Priority Action Plan — immediately below hero ── */}
-                            {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
+                            {displayResult.recommendations && displayResult.recommendations.length > 0 && (
                                 <div className="bg-white dark:bg-gray-950 rounded-lg border p-6">
                                     <h2 className="text-2xl font-bold mb-1">Priority Action Plan</h2>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                                         Your top 5 highest-impact actions for consistent AI Visibility
                                     </p>
                                     <div className="space-y-4">
-                                        {analysisResult.recommendations.map((rec, index) => (
+                                        {displayResult.recommendations.map((rec, index) => (
                                             <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
                                                 <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                                                     <h3 className="font-semibold text-gray-900 dark:text-white">{rec.title}</h3>
@@ -852,7 +882,7 @@ export default function ResultsPage() {
                             {!isPremium && (
                                 <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 p-6">
                                     <div className="flex items-start gap-3 mb-3">
-                                        <span className="text-green-600 font-bold text-sm mt-0.5">✓ Your LLM score: {analysisResult.overall_score}/100</span>
+                                        <span className="text-green-600 font-bold text-sm mt-0.5">✓ Your LLM score: {displayResult.overall_score}/100</span>
                                     </div>
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                                         But is {aiModelName} actually recommending you?
@@ -891,14 +921,14 @@ export default function ResultsPage() {
                                 <div id="ai-visibility-section">
                                     <AiVisibilityCheck
                                         url={url}
-                                        industry={industry ?? analysisResult?.industry ?? null}
+                                        industry={industry ?? displayResult?.industry ?? null}
                                         isSignedIn={!!isSignedIn}
                                         isPremium={isPremium}
                                         userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
                                         userId={user?.id ?? null}
-                                        visibilityQueries={analysisResult?.visibilityQueries}
-                                        queryBuckets={analysisResult?.queryBuckets}
-                                        citationGaps={analysisResult?.citationGaps}
+                                        visibilityQueries={displayResult?.visibilityQueries}
+                                        queryBuckets={displayResult?.queryBuckets}
+                                        citationGaps={displayResult?.citationGaps}
                                         onScanLoading={() => setScanIsLoading(true)}
                                         onScanStatusKnown={(hasRun, hasCitationGaps, summary) => {
                                             setScanIsLoading(false);
@@ -1033,16 +1063,16 @@ export default function ResultsPage() {
                                                 <circle cx="40" cy="40" r="34" fill="none"
                                                     className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="6" />
                                                 <circle cx="40" cy="40" r="34" fill="none"
-                                                    stroke={analysisResult.overall_score >= 75 ? '#22c55e' : analysisResult.overall_score >= 50 ? '#3b82f6' : analysisResult.overall_score >= 30 ? '#f59e0b' : '#ef4444'}
+                                                    stroke={displayResult.overall_score >= 75 ? '#22c55e' : displayResult.overall_score >= 50 ? '#3b82f6' : displayResult.overall_score >= 30 ? '#f59e0b' : '#ef4444'}
                                                     strokeWidth="6"
                                                     strokeDasharray="213.6"
-                                                    strokeDashoffset={213.6 * (1 - analysisResult.overall_score / 100)}
+                                                    strokeDashoffset={213.6 * (1 - displayResult.overall_score / 100)}
                                                     strokeLinecap="round" />
                                             </svg>
                                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                                                 <span className="text-lg font-medium leading-none text-gray-900 dark:text-white"
                                                       style={{ fontFamily: 'var(--font-mono)' }}>
-                                                    {analysisResult.overall_score}
+                                                    {displayResult.overall_score}
                                                 </span>
                                                 <span className="text-[9px] text-gray-400 mt-0.5"
                                                       style={{ fontFamily: 'var(--font-mono)' }}>/100</span>
@@ -1068,7 +1098,7 @@ export default function ResultsPage() {
                                 </p>
                                 {parametersExpanded && (
                                     <div className="grid gap-6 md:grid-cols-2">
-                                        {analysisResult.parameters.map((param, index) => {
+                                        {displayResult.parameters.map((param, index) => {
                                             const c = computeParamContribution(param.name, param.score);
                                             return (
                                             <div key={index} className="p-4 border border-gray-100 dark:border-gray-800 rounded-lg">
@@ -1119,7 +1149,7 @@ export default function ResultsPage() {
                                         {isPremium && ' Premium user,'}
                                         {loading && ' Loading,'}
                                         {error && ' Error state,'}
-                                        {!analysisResult && ' No results,'}
+                                        {!displayResult && ' No results,'}
                                         {!hasEnoughContent && ' Insufficient content'}
                                     </p>
                                 </div>

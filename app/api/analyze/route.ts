@@ -63,19 +63,7 @@ export async function POST(request: NextRequest) {
         : `Free (${subscription.analysisCount}/${subscription.limit})`
     }`);
 
-    // Rate limit: burst protection on top of Clerk-based monthly caps.
-    const rl = await limitAnalyze({ userId: subscription.userId });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) },
-        }
-      );
-    }
-
-    // Get request data
+    // Get request data — parsed early so the cache-before-rate-limit path can use the URL
     const requestData = await request.json() as AnalysisRequest;
     const { url, email, industry } = requestData;
 
@@ -101,7 +89,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    // 2. Dedup: prevent duplicate Claude calls on page refresh / rapid resubmit
+    // 2. Cache check — runs BEFORE the burst rate limiter so that cache-hit
+    //    requests never consume a rate-limit token (they cost nothing).
+    //    Only active when the caller passes ?cached=true.
+    const searchParams = request.nextUrl.searchParams;
+    const useCached = searchParams.get('cached') === 'true';
+
+    if (useCached) {
+      try {
+        const cachedAnalysis = await getAnalysisByUrl(subscription.userId, url);
+
+        if (cachedAnalysis) {
+          const cacheAge = Date.now() - new Date(cachedAnalysis.analyzed_at).getTime();
+          const CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72h per product spec
+
+          if (cacheAge < CACHE_TTL_MS) {
+            console.log(`✅ Returning cached analysis (age: ${Math.floor(cacheAge / 1000 / 60)} minutes)`);
+
+            const analysisResult: AnalysisResult = {
+              overall_score: cachedAnalysis.overall_score,
+              parameters: cachedAnalysis.parameters,
+              recommendations: cachedAnalysis.recommendations ?? [],
+            };
+
+            if (!subscription.isPremium) {
+              analysisResult.remainingAnalyses = subscription.remainingAnalyses;
+            }
+
+            if (cachedAnalysis.query_buckets != null) {
+              analysisResult.queryBuckets = cachedAnalysis.query_buckets;
+              analysisResult.visibilityQueries = cachedAnalysis.query_buckets.map((q) => q.query);
+            }
+
+            return NextResponse.json({
+              id: cachedAnalysis.id,
+              ...analysisResult,
+              cached: true,
+              analyzed_at: cachedAnalysis.analyzed_at,
+            });
+          } else {
+            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), generating fresh`);
+          }
+        }
+      } catch (cacheError) {
+        console.error('⚠️ Cache lookup failed, continuing with fresh analysis:', cacheError);
+      }
+    }
+
+    // 3. Rate limit: burst protection — only reached when no valid cache was served.
+    //    Cache hits (above) bypass this entirely, so viewing saved results never
+    //    costs a rate-limit token.
+    const rl = await limitAnalyze({ userId: subscription.userId });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 60) },
+        }
+      );
+    }
+
+    // 4. Dedup: prevent duplicate Claude calls on page refresh / rapid resubmit
     const normalizedUrl = normalizeUrl(url);
     const lockAcquired = await tryAcquireAnalyzeLock(subscription.userId, normalizedUrl);
 
@@ -137,53 +186,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Check for cached analysis if requested
-    const searchParams = request.nextUrl.searchParams;
-    const useCached = searchParams.get('cached') === 'true';
-
-    if (useCached && subscription.isAuthenticated && subscription.userId) {
-      try {
-        const cachedAnalysis = await getAnalysisByUrl(subscription.userId, url);
-
-        if (cachedAnalysis) {
-          const cacheAge = Date.now() - new Date(cachedAnalysis.analyzed_at).getTime();
-          const CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72h per product spec
-
-          if (cacheAge < CACHE_TTL_MS) {
-            console.log(`✅ Returning cached analysis (age: ${Math.floor(cacheAge / 1000 / 60)} minutes)`);
-
-            const analysisResult: AnalysisResult = {
-              overall_score: cachedAnalysis.overall_score,
-              parameters: cachedAnalysis.parameters,
-              recommendations: cachedAnalysis.recommendations ?? [],
-            };
-
-            if (!subscription.isPremium) {
-              analysisResult.remainingAnalyses = subscription.remainingAnalyses;
-            }
-
-            // Forward query buckets from cache
-            if (cachedAnalysis.query_buckets != null) {
-              analysisResult.queryBuckets = cachedAnalysis.query_buckets;
-              analysisResult.visibilityQueries = cachedAnalysis.query_buckets.map((q) => q.query);
-            }
-
-            return NextResponse.json({
-              id: cachedAnalysis.id,
-              ...analysisResult,
-              cached: true,
-              analyzed_at: cachedAnalysis.analyzed_at,
-            });
-          } else {
-            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), generating fresh`);
-          }
-        }
-      } catch (cacheError) {
-        console.error('⚠️ Cache lookup failed, continuing with fresh analysis:', cacheError);
-      }
-    }
-
-    // 3. Check if authenticated user can analyze
+    // 5. Check if authenticated user can analyze
     if (subscription.isAuthenticated && !subscription.canAnalyze) {
       const upgradeMessage = subscription.isPremium
         ? `You've reached the premium analysis limit (${subscription.limit} analyses). Please contact support for higher limits.`
