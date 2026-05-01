@@ -176,7 +176,7 @@ export default function ResultsPage() {
 
         setCacheFallbackAttempted(true);
 
-        fetch('/api/analyze?cached=true', {
+        fetch('/api/analyze?cache_only=true', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, email: email ?? '', industry: industry ?? '' }),

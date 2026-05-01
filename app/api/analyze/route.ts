@@ -89,11 +89,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    // 2. Cache check — runs BEFORE the burst rate limiter so that cache-hit
+    // 2. Cache checks — both run BEFORE the burst rate limiter so cache-hit
     //    requests never consume a rate-limit token (they cost nothing).
-    //    Only active when the caller passes ?cached=true.
+    //
+    //    ?cached=true   — normal page load path. Returns the user's own analysis
+    //                     if within the 72h TTL; otherwise falls through to run a
+    //                     fresh analysis. Never sealed.
+    //
+    //    ?cache_only=true — limit-fallback path (used when the caller is at their
+    //                       monthly or burst limit). Returns the most recent stored
+    //                       analysis for this user regardless of age. Sealed — never
+    //                       falls through to a fresh analysis. 404 when no record
+    //                       exists at all.
     const searchParams = request.nextUrl.searchParams;
     const useCached = searchParams.get('cached') === 'true';
+    const cacheOnly = searchParams.get('cache_only') === 'true';
 
     if (useCached) {
       try {
@@ -128,17 +138,54 @@ export async function POST(request: NextRequest) {
               analyzed_at: cachedAnalysis.analyzed_at,
             });
           } else {
-            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), no fallback available`);
+            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours) — running fresh analysis`);
           }
         }
       } catch (cacheError) {
         console.error('⚠️ Cache lookup failed:', cacheError);
       }
+      // Falls through to fresh analysis when cache is stale or missing.
+    }
 
-      // ?cached=true always exits here — no fallthrough to fresh analysis,
-      // rate limiter, or dedup lock. Two outcomes only: 200 (cache hit) or 404.
+    if (cacheOnly) {
+      // Limit-fallback path: return whatever is stored for this user, any age.
+      // Sealed — never runs a fresh analysis; the caller is already at their limit.
+      try {
+        const storedAnalysis = await getAnalysisByUrl(subscription.userId, url);
+
+        if (storedAnalysis) {
+          const ageHours = Math.floor((Date.now() - new Date(storedAnalysis.analyzed_at).getTime()) / 1000 / 60 / 60);
+          console.log(`✅ cache_only: returning stored analysis (age: ${ageHours}h)`);
+
+          const analysisResult: AnalysisResult = {
+            overall_score: storedAnalysis.overall_score,
+            parameters: storedAnalysis.parameters,
+            recommendations: storedAnalysis.recommendations ?? [],
+          };
+
+          if (!subscription.isPremium) {
+            analysisResult.remainingAnalyses = subscription.remainingAnalyses;
+          }
+
+          if (storedAnalysis.query_buckets != null) {
+            analysisResult.queryBuckets = storedAnalysis.query_buckets;
+            analysisResult.visibilityQueries = storedAnalysis.query_buckets.map((q) => q.query);
+          }
+
+          return NextResponse.json({
+            id: storedAnalysis.id,
+            ...analysisResult,
+            cached: true,
+            analyzed_at: storedAnalysis.analyzed_at,
+          });
+        }
+      } catch (cacheError) {
+        console.error('⚠️ cache_only lookup failed:', cacheError);
+      }
+
+      // No record found at all — caller should show the limit-reached message.
       return NextResponse.json(
-        { error: 'No cached analysis found for this URL.' },
+        { error: 'No stored analysis found for this URL.' },
         { status: 404 }
       );
     }

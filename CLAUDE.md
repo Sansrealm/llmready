@@ -24,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Active feature plans: docs/plans/active/
 - Before starting any feature, read its plan file if one exists
 - .claude/instructions.md — read before any commit, branch, or push operation
+- UI overhaul plan: docs/plans/active/ui-overhaul.md — read before any work on dashboard, site workspace, or app shell
 
 ## SOP — Product Update / Feature Build Loop
 
@@ -463,6 +464,7 @@ Live list of open technical debt. Severity reflects ops/revenue impact, not effo
 
 | Gap | Where | Why it matters |
 |---|---|---|
+| Analysis cache is per-user, not cross-user | `lib/db.ts` `getAnalysisByUrl`, `/api/analyze` | Every user who analyzes the same URL runs a fresh Claude call, even if another user analyzed it minutes earlier. AI Visibility scans ARE cross-user shared (`getLatestVisibilityScan` queries by `normalized_url` only). Fix: add a cross-user cache check in the analyze route keyed on `normalized_url + industry` (industry is not currently stored in `analyses` — add column first). Cost impact grows with user volume. |
 | No test suite | — | Real gap, deferred. Build/type-check + manual QA acceptable at current scale. Revisit when revenue or team size justifies it. |
 | Stale backup files | `app/page-backup.tsx`, `app/results/page-backedup.tsx` | Dead code; remove. |
 | `TEMPORARY DEBUG` logs | `app/api/extension-subscription-status/route.js` | Flagged for removal. |
