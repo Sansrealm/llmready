@@ -128,12 +128,19 @@ export async function POST(request: NextRequest) {
               analyzed_at: cachedAnalysis.analyzed_at,
             });
           } else {
-            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), generating fresh`);
+            console.log(`⏰ Cached analysis too old (${Math.floor(cacheAge / 1000 / 60 / 60)} hours), no fallback available`);
           }
         }
       } catch (cacheError) {
-        console.error('⚠️ Cache lookup failed, continuing with fresh analysis:', cacheError);
+        console.error('⚠️ Cache lookup failed:', cacheError);
       }
+
+      // ?cached=true always exits here — no fallthrough to fresh analysis,
+      // rate limiter, or dedup lock. Two outcomes only: 200 (cache hit) or 404.
+      return NextResponse.json(
+        { error: 'No cached analysis found for this URL.' },
+        { status: 404 }
+      );
     }
 
     // 3. Rate limit: burst protection — only reached when no valid cache was served.

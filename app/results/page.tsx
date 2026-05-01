@@ -158,18 +158,23 @@ export default function ResultsPage() {
     // Convert React Query error to string for compatibility with existing code
     const error = queryError ? (queryError as Error).message : null;
 
-    // ── Rate-limit fallback: when a 429 fires, attempt one cache-only fetch ──
-    // The backend now serves ?cached=true requests before the rate limiter, so
-    // this fallback fetch bypasses burst protection entirely.
-    const [rateLimitFallback, setRateLimitFallback] = useState<AnalysisResult | null>(null);
-    const [rateLimitFallbackAttempted, setRateLimitFallbackAttempted] = useState(false);
+    // ── Limit fallback: on 429 (burst) or 403 (monthly), attempt a cache-only fetch ──
+    // ?cached=true exits the route before the rate limiter and dedup lock, so
+    // this fallback is always unblocked. Two outcomes: 200 (cached result shown
+    // silently) or 404 (no valid cache — show the neutral limit-reached alert).
+    const [cacheFallback, setCacheFallback] = useState<AnalysisResult | null>(null);
+    const [cacheFallbackAttempted, setCacheFallbackAttempted] = useState(false);
+    const [limitReachedNoCache, setLimitReachedNoCache] = useState(false);
 
     useEffect(() => {
-        if (!error || rateLimitFallbackAttempted) return;
-        if (!error.toLowerCase().includes('rate limit')) return;
+        if (!error || cacheFallbackAttempted) return;
+        const msg = error.toLowerCase();
+        const isLimitError =
+            msg.includes('rate limit') ||      // 429 burst
+            msg.includes('analysis limit');    // 403 monthly
+        if (!isLimitError) return;
 
-        setRateLimitFallbackAttempted(true);
-        toast.warning("Too many requests — showing your last saved analysis");
+        setCacheFallbackAttempted(true);
 
         fetch('/api/analyze?cached=true', {
             method: 'POST',
@@ -179,14 +184,16 @@ export default function ResultsPage() {
             .then(async (res) => {
                 if (res.ok) {
                     const data = await res.json();
-                    setRateLimitFallback(data as AnalysisResult);
+                    setCacheFallback(data as AnalysisResult);
+                } else if (res.status === 404) {
+                    setLimitReachedNoCache(true);
                 }
             })
-            .catch(() => { /* toast already shown; silent fail is fine */ });
-    }, [error, rateLimitFallbackAttempted, url, email, industry]);
+            .catch(() => { setLimitReachedNoCache(true); });
+    }, [error, cacheFallbackAttempted, url, email, industry]);
 
-    // Use fallback result when rate-limited — keeps the page from going blank
-    const displayResult = analysisResult ?? rateLimitFallback;
+    // Use fallback result when limit is hit — keeps the page from going blank
+    const displayResult = analysisResult ?? cacheFallback;
 
     // ── Re-analyze cooldown (72 h) ──────────────────────────────────────────
     useEffect(() => {
@@ -521,7 +528,16 @@ export default function ResultsPage() {
                         </Alert>
                     )}
 
-                    {error && !displayResult ? (
+                    {limitReachedNoCache ? (
+                        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <AlertTitle className="text-amber-800 dark:text-amber-200">Analysis limit reached</AlertTitle>
+                            <AlertDescription className="text-amber-700 dark:text-amber-300">
+                                You&apos;ve reached your analysis limit for this month. Your analyses are saved and available in{' '}
+                                <Link href="/analyses" className="underline font-medium">My Analysis</Link>.
+                            </AlertDescription>
+                        </Alert>
+                    ) : error && !displayResult ? (
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Analysis Error</AlertTitle>
