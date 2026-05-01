@@ -113,8 +113,16 @@ export async function POST(request: NextRequest) {
           const cacheAge = Date.now() - new Date(cachedAnalysis.analyzed_at).getTime();
           const CACHE_TTL_MS = 72 * 60 * 60 * 1000; // 72h per product spec
 
-          if (cacheAge < CACHE_TTL_MS) {
-            console.log(`✅ Returning cached analysis (age: ${Math.floor(cacheAge / 1000 / 60)} minutes)`);
+          // Return cached result if within TTL, OR if the user is at their
+          // limit and can't run a fresh analysis anyway — avoids the 403/409
+          // cascade that happens when a stale-cache fallthrough hits the
+          // monthly limit check and the dedup lock on retry.
+          const withinTtl = cacheAge < CACHE_TTL_MS;
+          const atLimit = subscription.isAuthenticated && !subscription.canAnalyze;
+
+          if (withinTtl || atLimit) {
+            const ageHours = Math.floor(cacheAge / 1000 / 60 / 60);
+            console.log(`✅ Returning cached analysis (age: ${ageHours}h, withinTtl: ${withinTtl}, atLimit: ${atLimit})`);
 
             const analysisResult: AnalysisResult = {
               overall_score: cachedAnalysis.overall_score,
